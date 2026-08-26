@@ -1,0 +1,51 @@
+# Services deployed to the child cluster through one MultiClusterService.
+#
+# Modelled on the `example` charts in k0rdent/catalog (apps/traefik,
+# apps/kserve), with one deliberate difference: catalog installs its own
+# repackaged charts from oci://ghcr.io/k0rdent/catalog/charts, which are
+# wrappers around the upstream ones, so its values are nested under the chart
+# name. This project points at the upstream repositories directly to avoid
+# depending on catalog releases, so the values here are one level flatter.
+#
+# Order matters: dependsOn refers to a service listed earlier.
+services:
+  - name: traefik
+    chart: traefik
+    version: 41.2.0
+    repo: https://traefik.github.io/charts
+    namespace: traefik
+    waitForPods: traefik-
+
+  # kserve needs cert-manager for its webhooks, and its CRDs before the
+  # controller. Same chain catalog's apps/kserve/example declares.
+  - name: cert-manager
+    chart: cert-manager
+    version: v1.20.2
+    repo: https://charts.jetstack.io
+    namespace: cert-manager
+    waitForPods: cert-manager-
+    values: |
+      crds:
+        enabled: true
+
+  - name: kserve-crd
+    chart: kserve-crd
+    version: v0.18.0
+    repo: oci://ghcr.io/kserve/charts
+    namespace: kserve
+    dependsOn: cert-manager
+
+  - name: kserve-resources
+    chart: kserve-resources
+    version: v0.18.0
+    repo: oci://ghcr.io/kserve/charts
+    namespace: kserve
+    dependsOn: kserve-crd
+    waitForPods: kserve-controller-manager-
+    values: |
+      kserve:
+        controller:
+          deploymentMode: Standard
+          gateway:
+            disableIstioVirtualHost: true
+            disableIngressCreation: true

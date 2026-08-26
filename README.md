@@ -14,7 +14,7 @@ the same approach [k0rdent/catalog](https://github.com/k0rdent/catalog) uses.
 | Release and templates reconcile | `apply_release.sh`, `wait_for_templates.sh` |
 | Management reaches Ready with the expected providers | `apply_management.sh`, `wait_for_management.sh` |
 | ClusterDeployment provisions a working cluster | `deploy_cld.sh`, `check_child_cluster.sh` |
-| A service reaches the child cluster and can be removed | `install_servicetemplate.sh`, `deploy_mcs.sh`, `remove_mcs.sh` |
+| Services reach the child cluster, in dependency order, and can be removed | `install_servicetemplate.sh`, `deploy_mcs.sh`, `remove_mcs.sh` |
 | Deletion cleans up, including CAPD containers | `remove_cld.sh`, `wait_for_cluster_removal.sh` |
 | Uninstall leaves nothing running | `remove_kcm.sh` |
 
@@ -35,7 +35,10 @@ spent building the images and provisioning the child cluster.
 | Mode | What happens |
 |---|---|
 | `source` (default) | Builds the controller and telemetry images from a KCM checkout, pushes the template charts to a throwaway local registry, and installs the chart from the source tree. Tests the code under review. |
-| `release` | Installs `oci://ghcr.io/k0rdent/kcm/charts/kcm` at `KCM_RELEASE_VERSION` (1.11.0). No build, no registry, no Go needed. Tests what users actually get. |
+| `release` | Installs `oci://ghcr.io/k0rdent/kcm/charts/kcm` at `KCM_RELEASE_VERSION`. No build, no registry, no Go or make needed. Tests what users actually get. |
+
+CI runs three legs in parallel: **src: main**, **release: 1.11.0** and
+**release: 1.10.0**.
 
 Both paths need the checkout, because it supplies the `Release` and template
 manifests. Release mode pins it to the matching tag and refuses to run if the
@@ -43,17 +46,30 @@ chart version there disagrees with `KCM_RELEASE_VERSION`.
 
 ### The service test
 
-After the child cluster is up, the run installs a `ServiceTemplate` for
-**traefik**, deploys it through a `MultiClusterService`, waits for the pods to
-be Ready *in the child cluster*, then removes the MCS and verifies the workload
-is gone. This follows the `example` flow from k0rdent/catalog — install service
-template, MCS deploy, MCS removal — but writes the `HelmRepository` and
-`ServiceTemplate` directly instead of going through the catalog's `kgst` chart,
-so the project does not depend on catalog releases.
+After the child cluster is up, the run installs a `ServiceTemplate` per service
+in `scripts/config/services.yaml`, deploys them all through a single
+`MultiClusterService`, waits for the pods to be Ready *in the child cluster*,
+then removes the MCS and verifies the workloads are gone.
 
-Point it at a different chart with `SERVICE_CHART`, `SERVICE_CHART_VERSION`,
-`SERVICE_HELM_REPO` and `SERVICE_NAMESPACE`, or skip it with
-`SKIP_SERVICE_TEST=true`.
+The set mirrors k0rdent/catalog's `example` charts:
+
+| Service | Chart | Namespace | Depends on |
+|---|---|---|---|
+| traefik | `traefik` 41.2.0 | `traefik` | – |
+| cert-manager | `cert-manager` v1.20.2 | `cert-manager` | – |
+| kserve-crd | `kserve-crd` v0.18.0 | `kserve` | cert-manager |
+| kserve-resources | `kserve-resources` v0.18.0 | `kserve` | kserve-crd |
+
+Two deliberate differences from catalog. It installs its own repackaged charts
+from `oci://ghcr.io/k0rdent/catalog/charts`, which wrap the upstream ones — so
+its MCS values are nested under the chart name. This project points at the
+upstream repositories directly, to avoid depending on catalog releases, which
+means the values in `services.yaml` are **one level flatter**. And catalog sets
+`test_remove_multiclusterservice: false` for kserve; here removal is part of
+what is being tested.
+
+Swap the set with `SERVICES_FILE=/path/to/your.yaml`, or skip the whole thing
+with `SKIP_SERVICE_TEST=true`.
 
 ### Parallel runs
 
@@ -149,7 +165,7 @@ environment variable. The ones worth knowing:
 | `RUN_ID` | – | isolate this run from others; see above |
 | `KCM_PROVIDERS` | CAPD, k0smotron, sveltos | providers KCM installs |
 | `KCM_CLUSTER_TEMPLATES` | `docker-hosted-cp` | cluster templates to apply |
-| `SERVICE_CHART` / `SERVICE_CHART_VERSION` | `traefik` / `41.2.0` | service under test |
+| `SERVICES_FILE` | `scripts/config/services.yaml` | services deployed via MCS |
 | `SKIP_SERVICE_TEST` | – | `true` to skip the ServiceTemplate/MCS steps |
 | `DOCKER_NETWORK` | `kind` | CAPD's network; the management cluster joins it |
 | `WORKERS_NUMBER` | `1` | worker nodes in the child cluster |
