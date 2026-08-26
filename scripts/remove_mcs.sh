@@ -35,13 +35,19 @@ while (( elapsed < MCS_TIMEOUT )); do
     sset="$(kube get serviceset -n "$NAMESPACE" \
         -o jsonpath="{.items[?(@.spec.multiClusterService==\"$MCS_NAME\")].metadata.name}" 2>/dev/null || true)"
     [[ -z "$sset" ]] && break
-    if (( elapsed % 30 == 0 )); then
+    if (( elapsed > 0 && elapsed % ${DIAG_INTERVAL:-120} == 0 )); then
+        warn "ServiceSet '$sset' still present after ${elapsed}s -- diagnostics:"
+        { describe_stuck ServiceSet "$sset" "$NAMESPACE"; kcm_errors 5m; } >&2
+    elif (( elapsed % 30 == 0 )); then
         log "⏳ ServiceSet '$sset' still present (${elapsed}s)"
     fi
     sleep 5
     elapsed=$(( elapsed + 5 ))
 done
-[[ -z "${sset:-}" ]] || die "ServiceSet '$sset' survived the MultiClusterService"
+if [[ -n "${sset:-}" ]]; then
+    { describe_stuck ServiceSet "$sset" "$NAMESPACE"; kcm_errors 20m; } >&2
+    die "ServiceSet '$sset' survived the MultiClusterService"
+fi
 ok "No ServiceSet left"
 
 if [[ "${SKIP_CHILD_API_CHECK:-false}" == "true" ]]; then
@@ -68,6 +74,7 @@ else
         if [[ "${remaining:-0}" != "0" ]]; then
             warn "Workloads still present in '$ns' after removal:"
             kube_child get all -n "$ns" >&2 || true
+            kcm_errors 20m >&2 || true
             exit 1
         fi
         log "✅ '$ns' has no workloads left"

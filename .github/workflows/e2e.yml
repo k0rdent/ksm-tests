@@ -32,7 +32,7 @@ concurrency:
 
 jobs:
   e2e-docker:
-    name: ${{ matrix.name }}
+    name: ${{ matrix.kcm.name }} / ${{ matrix.service_set }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     # Nightly runs only when the repo opts in, matching k0rdent/catalog.
@@ -40,35 +40,41 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
+        # GitHub Actions cannot fork a job mid-run: every combination gets its
+        # own runner and builds its own cluster from scratch. That is what makes
+        # these genuinely independent -- a service set that wedges the cluster
+        # cannot affect the other one.
+        kcm:
           # KCM built from the checkout -- tests the code under review.
           - name: 'src: main'
             id: src-main
-            kcm_source: source
-            kcm_ref: main
-            kcm_release_version: ''
+            source: source
+            ref: main
+            release_version: ''
           # Published charts -- tests what users actually install.
           - name: 'release: 1.11.0'
             id: rel-1-11-0
-            kcm_source: release
-            kcm_ref: ''
-            kcm_release_version: '1.11.0'
+            source: release
+            ref: ''
+            release_version: '1.11.0'
           - name: 'release: 1.10.0'
             id: rel-1-10-0
-            kcm_source: release
-            kcm_ref: ''
-            kcm_release_version: '1.10.0'
+            source: release
+            ref: ''
+            release_version: '1.10.0'
+        service_set: [traefik, kserve]
     env:
-      KCM_SOURCE: ${{ matrix.kcm_source }}
+      KCM_SOURCE: ${{ matrix.kcm.source }}
       # Empty lets common.sh pick the tag matching KCM_RELEASE_VERSION;
       # overriding it in release mode would trip the version check.
-      KCM_REF: ${{ github.event.inputs.kcm_ref || matrix.kcm_ref }}
-      KCM_RELEASE_VERSION: ${{ matrix.kcm_release_version }}
+      KCM_REF: ${{ github.event.inputs.kcm_ref || matrix.kcm.ref }}
+      KCM_RELEASE_VERSION: ${{ matrix.kcm.release_version }}
+      SERVICE_SET: ${{ matrix.service_set }}
       TEST_MODE: docker
       # Distinct per matrix leg so the jobs never share cluster or container
       # names, even on the same runner. Must stay valid in a docker tag and a
-      # Kubernetes object name, hence the slug rather than matrix.name.
-      RUN_ID: ci${{ github.run_id }}-${{ matrix.id }}
+      # Kubernetes object name, hence the slug rather than matrix.kcm.name.
+      RUN_ID: ci${{ github.run_id }}-${{ matrix.kcm.id }}-${{ matrix.service_set }}
     steps:
       - uses: actions/checkout@v7
 
@@ -92,7 +98,7 @@ jobs:
       # PATH for the source build. The binaries themselves are built inside
       # Docker, so a Go module cache here would not help.
       - uses: actions/setup-go@v7
-        if: matrix.kcm_source == 'source'
+        if: matrix.kcm.source == 'source'
         with:
           go-version: 'stable'
           cache: false
@@ -105,7 +111,7 @@ jobs:
 
       # The local registry only serves charts we built ourselves.
       - name: Deploy local registry
-        if: matrix.kcm_source == 'source'
+        if: matrix.kcm.source == 'source'
         run: ./scripts/deploy_registry.sh
 
       - name: Deploy management cluster
@@ -115,7 +121,7 @@ jobs:
         run: ./scripts/install_openebs.sh
 
       - name: Push images and charts
-        if: matrix.kcm_source == 'source'
+        if: matrix.kcm.source == 'source'
         run: ./scripts/push_kcm_artifacts.sh
 
       - name: Install KCM
@@ -162,7 +168,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: e2e-logs-${{ github.run_id }}-${{ matrix.id }}
+          name: e2e-logs-${{ github.run_id }}-${{ matrix.kcm.id }}-${{ matrix.service_set }}
           path: logs*/
           retention-days: 7
 

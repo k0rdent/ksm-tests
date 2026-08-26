@@ -37,8 +37,19 @@ spent building the images and provisioning the child cluster.
 | `source` (default) | Builds the controller and telemetry images from a KCM checkout, pushes the template charts to a throwaway local registry, and installs the chart from the source tree. Tests the code under review. |
 | `release` | Installs `oci://ghcr.io/k0rdent/kcm/charts/kcm` at `KCM_RELEASE_VERSION`. No build, no registry, no Go or make needed. Tests what users actually get. |
 
-CI runs three legs in parallel: **src: main**, **release: 1.11.0** and
-**release: 1.10.0**.
+CI runs every KCM variant against every service set — six jobs in parallel:
+
+|  | traefik | kserve |
+|---|---|---|
+| **src: main** | ✔ | ✔ |
+| **release: 1.11.0** | ✔ | ✔ |
+| **release: 1.10.0** | ✔ | ✔ |
+
+GitHub Actions has no way to fork a job mid-run and branch two "realities" off
+one cluster — each matrix combination gets its own runner and builds its own
+cluster from scratch. That costs a KCM install per leg, but it is also what
+makes the legs genuinely independent: a service set that wedges its cluster
+cannot affect the other.
 
 Both paths need the checkout, because it supplies the `Release` and template
 manifests. Release mode pins it to the matching tag and refuses to run if the
@@ -47,29 +58,25 @@ chart version there disagrees with `KCM_RELEASE_VERSION`.
 ### The service test
 
 After the child cluster is up, the run installs a `ServiceTemplate` per service
-in `scripts/config/services.yaml`, deploys them all through a single
-`MultiClusterService`, waits for the pods to be Ready *in the child cluster*,
-then removes the MCS and verifies the workloads are gone.
+in the chosen set, deploys them all through a single `MultiClusterService`,
+waits for the pods to be Ready *in the child cluster*, then removes the MCS and
+verifies the workloads are gone.
 
-The set mirrors k0rdent/catalog's `example` charts:
+`SERVICE_SET` picks the set (`scripts/config/services-<set>.yaml`):
 
-| Service | Chart | Namespace | Depends on |
-|---|---|---|---|
-| traefik | `traefik` 41.2.0 | `traefik` | – |
-| cert-manager | `cert-manager` v1.20.2 | `cert-manager` | – |
-| kserve-crd | `kserve-crd` v0.18.0 | `kserve` | cert-manager |
-| kserve-resources | `kserve-resources` v0.18.0 | `kserve` | kserve-crd |
+| Set | Services | Notes |
+|---|---|---|
+| `traefik` (default) | traefik 41.2.0 -> ns `traefik` | the light one |
+| `kserve` | cert-manager 1.20.2 -> kserve-crd v0.18.0 -> kserve-resources v0.18.0 | dependency chain, ns `cert-manager` and `kserve` |
 
-Two deliberate differences from catalog. It installs its own repackaged charts
-from `oci://ghcr.io/k0rdent/catalog/charts`, which wrap the upstream ones — so
-its MCS values are nested under the chart name. This project points at the
-upstream repositories directly, to avoid depending on catalog releases, which
-means the values in `services.yaml` are **one level flatter**. And catalog sets
-`test_remove_multiclusterservice: false` for kserve; here removal is part of
-what is being tested.
+Charts come from **k0rdent/catalog's registry** (`oci://ghcr.io/k0rdent/catalog/charts`),
+the same artifacts catalog's own `example` charts reference. Those are thin
+wrappers that declare the upstream chart as a dependency of the same name, so
+values must be **nested one level under that name**. Flatten them and helm
+ignores the lot without complaining — there is a unit test guarding this.
 
-Swap the set with `SERVICES_FILE=/path/to/your.yaml`, or skip the whole thing
-with `SKIP_SERVICE_TEST=true`.
+Skip the whole thing with `SKIP_SERVICE_TEST=true`, or point `SERVICES_FILE` at
+a set of your own.
 
 ### Parallel runs
 
@@ -122,6 +129,7 @@ make e2e                      # full run, then clean up
 make e2e-keep                 # leave the environment up for debugging
 make e2e-release              # same, against the published chart
 make e2e-parallel             # source and release side by side
+make e2e-kserve               # the kserve stack instead of traefik
 ```
 
 To point at a specific KCM revision or a local checkout:
@@ -165,7 +173,8 @@ environment variable. The ones worth knowing:
 | `RUN_ID` | – | isolate this run from others; see above |
 | `KCM_PROVIDERS` | CAPD, k0smotron, sveltos | providers KCM installs |
 | `KCM_CLUSTER_TEMPLATES` | `docker-hosted-cp` | cluster templates to apply |
-| `SERVICES_FILE` | `scripts/config/services.yaml` | services deployed via MCS |
+| `SERVICE_SET` | `traefik` | `traefik` or `kserve` |
+| `SERVICES_FILE` | derived from `SERVICE_SET` | override the services file outright |
 | `SKIP_SERVICE_TEST` | – | `true` to skip the ServiceTemplate/MCS steps |
 | `DOCKER_NETWORK` | `kind` | CAPD's network; the management cluster joins it |
 | `WORKERS_NUMBER` | `1` | worker nodes in the child cluster |

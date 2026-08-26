@@ -76,7 +76,10 @@ while (( elapsed < MCS_TIMEOUT )); do
         log "ServiceSet: $sset"
         break
     fi
-    if (( elapsed % 30 == 0 )); then
+    if (( elapsed > 0 && elapsed % ${DIAG_INTERVAL:-120} == 0 )); then
+        warn "No ServiceSet for '$MCS_NAME' after ${elapsed}s -- diagnostics:"
+        kcm_errors 5m >&2
+    elif (( elapsed % 30 == 0 )); then
         log "⏳ No ServiceSet for '$MCS_NAME' yet (${elapsed}s)"
     fi
     sleep 5
@@ -86,6 +89,7 @@ if [[ -z "${sset:-}" ]]; then
     warn "No ServiceSet was created for '$MCS_NAME' -- check the MCS selector"
     kube get multiclusterservice "$MCS_NAME" -o yaml >&2 || true
     kube get clusterdeployment "$CLD_NAME" -n "$NAMESPACE" --show-labels >&2 || true
+    kcm_errors 20m >&2 || true
     exit 1
 fi
 
@@ -115,8 +119,10 @@ while IFS="$SERVICE_SEP" read -r name _chart _version _repo namespace _dep waitf
         sleep 5
         elapsed=$(( elapsed + 5 ))
     done
-    kube_child get namespace "$namespace" >/dev/null 2>&1 \
-        || die "Namespace '$namespace' never appeared in the child cluster (service '$name')"
+    if ! kube_child get namespace "$namespace" >/dev/null 2>&1; then
+        { describe_stuck MultiClusterService "$MCS_NAME" ""; kcm_errors 20m; } >&2
+        die "Namespace '$namespace' never appeared in the child cluster (service '$name')"
+    fi
 
     [[ -n "$waitfor" ]] || { log "no waitForPods for '$name', namespace is enough"; continue; }
 

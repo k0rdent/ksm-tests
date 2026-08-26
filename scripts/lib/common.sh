@@ -119,11 +119,13 @@ CLD_GROUP_LABEL="${CLD_GROUP_LABEL:-e2e-${RUN_ID:-default}}"
 export CLUSTER_NAME_SUFFIX CLD_NAME WORKERS_NUMBER CLD_GROUP_LABEL
 
 # ── Services under test (ServiceTemplates + one MultiClusterService) ─────────
-# Declared in a file rather than env vars: there are several of them, with
-# dependencies and values blocks. Point SERVICES_FILE elsewhere to swap the set.
-SERVICES_FILE="${SERVICES_FILE:-$CONFIG_DIR/services.yaml}"
+# Declared in a file rather than env vars: they have dependencies and values
+# blocks. SERVICE_SET picks one of scripts/config/services-<set>.yaml;
+# SERVICES_FILE overrides the path outright.
+SERVICE_SET="${SERVICE_SET:-traefik}"
+SERVICES_FILE="${SERVICES_FILE:-$CONFIG_DIR/services-$SERVICE_SET.yaml}"
 MCS_NAME="${MCS_NAME:-e2e-$CLUSTER_NAME_SUFFIX}"
-export SERVICES_FILE MCS_NAME
+export SERVICE_SET SERVICES_FILE MCS_NAME
 
 # ── Timeouts (seconds) ───────────────────────────────────────────────────────
 MANAGEMENT_TIMEOUT="${MANAGEMENT_TIMEOUT:-1500}"   # 25 min
