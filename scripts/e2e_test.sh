@@ -54,3 +54,4 @@ trap on_exit EXIT
 "$SCRIPTS_DIR/deploy_cld.sh"
 "$SCRIPTS_DIR/check_child_cluster.sh"
 "$SCRIPTS_DIR/remove_cld.sh"
+"$SCRIPTS_DIR/remove_kcm.sh"

@@ -15,7 +15,7 @@ jobs:
     name: bash tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       # test_apply_release.sh exercises the Release trimming, which needs yq.
       - name: Install yq
