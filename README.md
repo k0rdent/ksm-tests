@@ -107,6 +107,17 @@ The chart is installed with `createManagement`, `createRelease` and
 `createTemplates` all off, so the test controls exactly which Release,
 Management and templates exist.
 
+Two ordering details are load-bearing. `ClusterTemplate`s stay invalid until a
+`Management` exists, so they are checked after it, not with the
+`ProviderTemplate`s. And `Management.spec.core.kcm.config` has to repeat the
+Helm values, or the HelmRelease reinstalls KCM from the published image and the
+locally built one is never used.
+
+Removal deletes the k0smotron etcd PVC explicitly: `docker-hosted-cp` exposes
+`storage.etcd.autoDeletePVCs` but no template in chart 1.0.15 reads it, so the
+PVC would outlive the cluster and the next run of the same name would boot on
+the old etcd — complete with its stale, NotReady nodes.
+
 ## Not covered yet
 
 ServiceTemplates and MultiClusterService, KCM upgrades (N-1 → N), adopted and
