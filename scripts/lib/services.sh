@@ -6,11 +6,17 @@ service_count() {
     yq -r '.services | length' "$SERVICES_FILE"
 }
 
-# services_tsv -- one line per service:
-#   name<TAB>chart<TAB>version<TAB>repo<TAB>namespace<TAB>dependsOn<TAB>waitForPods
-services_tsv() {
+# SERVICE_SEP must not be whitespace: `read` with a whitespace IFS collapses
+# runs of it, which silently drops empty fields and shifts every later value
+# left. Optional fields like dependsOn are routinely empty.
+# shellcheck disable=SC2034 # used by the scripts that source this
+SERVICE_SEP='|'
+
+# services_rows -- one line per service, SERVICE_SEP separated:
+#   name|chart|version|repo|namespace|dependsOn|waitForPods
+services_rows() {
     yq -r '.services[] | [.name, .chart, .version, .repo, .namespace,
-                          (.dependsOn // ""), (.waitForPods // "")] | @tsv' "$SERVICES_FILE"
+                          (.dependsOn // ""), (.waitForPods // "")] | join("|")' "$SERVICES_FILE"
 }
 
 # service_namespaces -- each target namespace once, in declaration order.

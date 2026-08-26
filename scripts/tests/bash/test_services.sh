@@ -19,9 +19,19 @@ source "$SCRIPTS_DIR/lib/services.sh"
 # ── The shipped set ──────────────────────────────────────────────────────────
 assert_eq "four services are declared" 4 "$(service_count)"
 
-names="$(services_tsv | cut -f1 | tr '\n' ' ')"
+names="$(services_rows | cut -d'|' -f1 | tr '\n' ' ')"
 assert_eq "declaration order puts dependencies first" \
     "traefik cert-manager kserve-crd kserve-resources " "$names"
+
+# An empty optional field must not shift the later ones. A whitespace IFS
+# collapses runs of separators, which silently moved waitForPods into dependsOn.
+row_traefik="$(services_rows | head -1)"
+assert_eq "every row has 7 fields" 7 "$(awk -F'|' '{print NF}' <<< "$row_traefik")"
+while IFS="$SERVICE_SEP" read -r n _c _v _r _ns dep wait; do
+    [[ "$n" == traefik ]] || continue
+    assert_eq "traefik has no dependsOn" "" "$dep"
+    assert_eq "traefik keeps its waitForPods" "traefik-" "$wait"
+done < <(services_rows)
 
 assert_eq "kserve-crd waits for cert-manager" "cert-manager" \
     "$(service_field kserve-crd dependsOn)"
@@ -91,6 +101,16 @@ assert_eq "rendered MCS parses as YAML" "MultiClusterService" \
     "$(yq -r '.kind' "$WORKDIR/mcs.yaml" 2>/dev/null)"
 assert_eq "kserve-resources depends on kserve-crd" "kserve-crd" \
     "$(yq -r '.spec.serviceSpec.services[] | select(.name=="kserve-resources") | .dependsOn[0].name' "$WORKDIR/mcs.yaml" 2>/dev/null)"
+assert_eq "the dependency carries its namespace" "cert-manager" \
+    "$(yq -r '.spec.serviceSpec.services[] | select(.name=="kserve-crd") | .dependsOn[0].namespace' "$WORKDIR/mcs.yaml" 2>/dev/null)"
+# Independent services must have no dependsOn at all -- a stray one makes KCM
+# wait forever for a service that is never deployed.
+assert_eq "traefik has no dependsOn in the MCS" "null" \
+    "$(yq -r '.spec.serviceSpec.services[] | select(.name=="traefik") | .dependsOn' "$WORKDIR/mcs.yaml" 2>/dev/null)"
+assert_eq "cert-manager has no dependsOn in the MCS" "null" \
+    "$(yq -r '.spec.serviceSpec.services[] | select(.name=="cert-manager") | .dependsOn' "$WORKDIR/mcs.yaml" 2>/dev/null)"
+assert_eq "cert-manager values reach the chart" "true" \
+    "$(yq -r '.spec.serviceSpec.services[] | select(.name=="cert-manager") | .values' "$WORKDIR/mcs.yaml" 2>/dev/null | yq -r '.crds.enabled')"
 
 rm -rf "$WORKDIR" "$MOCK_BIN"
 finish

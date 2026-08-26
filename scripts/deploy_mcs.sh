@@ -36,7 +36,7 @@ spec:
     services:
 EOF
 
-while IFS=$'\t' read -r name chart version _repo namespace dep _wait; do
+while IFS="$SERVICE_SEP" read -r name chart version _repo namespace dep _wait; do
     [[ -n "$name" ]] || continue
     {
         echo "      - template: $(template_name_for "$chart" "$version")"
@@ -57,7 +57,7 @@ while IFS=$'\t' read -r name chart version _repo namespace dep _wait; do
         # shellcheck disable=SC2001 # per-line prefix, not a substring replace
         sed 's/^/          /' <<< "$values" >> "$MANIFEST"
     fi
-done < <(services_tsv)
+done < <(services_rows)
 
 step "Creating MultiClusterService '$MCS_NAME' (group=$CLD_GROUP_LABEL)"
 cat "$MANIFEST"
@@ -100,7 +100,7 @@ fi
     || die "No child kubeconfig at $KUBECONFIG_CHILD. Run ./scripts/check_child_cluster.sh first."
 
 step "Waiting for the workloads in the child cluster"
-while IFS=$'\t' read -r name _chart _version _repo namespace _dep waitfor; do
+while IFS="$SERVICE_SEP" read -r name _chart _version _repo namespace _dep waitfor; do
     [[ -n "$name" ]] || continue
     # Services without a waitForPods only ship CRDs or config, so there is
     # nothing to wait for beyond the namespace.
@@ -122,7 +122,7 @@ while IFS=$'\t' read -r name _chart _version _repo namespace _dep waitfor; do
 
     KUBECONFIG="$KUBECONFIG_CHILD" NAMESPACE="$namespace" \
         WAIT_FOR_PODS="$waitfor" "$SCRIPTS_DIR/wait_for_deployment.sh"
-done < <(services_tsv)
+done < <(services_rows)
 
 step "Deployed workloads"
 while read -r ns; do

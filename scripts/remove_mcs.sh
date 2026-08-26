@@ -75,11 +75,11 @@ else
 fi
 
 step "Removing the ServiceTemplates"
-while IFS=$'\t' read -r name chart version _repo _ns _dep _wait; do
+while IFS="$SERVICE_SEP" read -r name chart version _repo _ns _dep _wait; do
     [[ -n "$name" ]] || continue
     kube delete servicetemplate "$(template_name_for "$chart" "$version")" \
         -n "$NAMESPACE" --ignore-not-found
     kube delete helmrepository "$name" -n "$NAMESPACE" --ignore-not-found
-done < <(services_tsv)
+done < <(services_rows)
 
 ok "Service lifecycle completed"

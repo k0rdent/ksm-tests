@@ -26,7 +26,7 @@ MANIFEST="$WORKDIR/service-templates.rendered.yaml"
 
 step "Rendering $(service_count) ServiceTemplate(s) from $(basename "$SERVICES_FILE")"
 
-while IFS=$'\t' read -r name chart version repo namespace _dep _wait; do
+while IFS="$SERVICE_SEP" read -r name chart version repo namespace _dep _wait; do
     [[ -n "$name" ]] || continue
     tmpl="$(template_name_for "$chart" "$version")"
     log "$tmpl  <-  $repo  (namespace $namespace)"
@@ -63,17 +63,17 @@ spec:
         kind: HelmRepository
         name: $name
 EOF
-done < <(services_tsv)
+done < <(services_rows)
 
 step "Applying"
 kube apply -f "$MANIFEST"
 
 step "Waiting for the ServiceTemplates to become valid"
-while IFS=$'\t' read -r name chart version _repo _ns _dep _wait; do
+while IFS="$SERVICE_SEP" read -r name chart version _repo _ns _dep _wait; do
     [[ -n "$name" ]] || continue
     wait_for_valid ServiceTemplate "$(template_name_for "$chart" "$version")" \
         "$NAMESPACE" "$TEMPLATES_TIMEOUT"
-done < <(services_tsv)
+done < <(services_rows)
 
 kube get servicetemplates -n "$NAMESPACE"
 ok "All ServiceTemplates are valid"
