@@ -1,0 +1,17 @@
+# Extra values for KCM_SOURCE=source: point the deployments at the images we
+# built and imported into the node's containerd.
+# NOTE: envsubst also expands variables inside comments -- keep them out.
+image:
+  repository: ${IMG_REPO}
+  tag: ${IMG_TAG}
+  pullPolicy: IfNotPresent
+
+regional:
+  telemetry:
+    controller:
+      image:
+        repository: ${IMG_TELEMETRY_REPO}
+        tag: ${IMG_TELEMETRY_TAG}
+        pullPolicy: IfNotPresent
+      logger:
+        devel: true

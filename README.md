@@ -1,7 +1,7 @@
 # k0rdent-kcm-tests
 
 Standalone end-to-end tests for [k0rdent KCM](https://github.com/K0rdent/kcm),
-built from source and exercised on a throwaway cluster.
+exercised on a throwaway cluster.
 
 Everything is a shell script, so **CI runs exactly what you run locally** —
 the same approach [k0rdent/catalog](https://github.com/k0rdent/catalog) uses.
@@ -10,10 +10,11 @@ the same approach [k0rdent/catalog](https://github.com/k0rdent/catalog) uses.
 
 | Area | Covered by |
 |---|---|
-| KCM installs from a source build | `build_kcm.sh`, `push_kcm_artifacts.sh`, `deploy_kcm.sh` |
+| KCM installs, from source or from the release | `prepare_kcm.sh`, `push_kcm_artifacts.sh`, `deploy_kcm.sh` |
 | Release and templates reconcile | `apply_release.sh`, `wait_for_templates.sh` |
 | Management reaches Ready with the expected providers | `apply_management.sh`, `wait_for_management.sh` |
 | ClusterDeployment provisions a working cluster | `deploy_cld.sh`, `check_child_cluster.sh` |
+| A service reaches the child cluster and can be removed | `install_servicetemplate.sh`, `deploy_mcs.sh`, `remove_mcs.sh` |
 | Deletion cleans up, including CAPD containers | `remove_cld.sh`, `wait_for_cluster_removal.sh` |
 | Uninstall leaves nothing running | `remove_kcm.sh` |
 
@@ -27,10 +28,57 @@ projectsveltos — instead of the eleven a default `Management` would pull in.
 A full run takes roughly 10 minutes with a warm KCM checkout, most of it
 spent building the images and provisioning the child cluster.
 
+### Two install paths
+
+`KCM_SOURCE` picks what is under test:
+
+| Mode | What happens |
+|---|---|
+| `source` (default) | Builds the controller and telemetry images from a KCM checkout, pushes the template charts to a throwaway local registry, and installs the chart from the source tree. Tests the code under review. |
+| `release` | Installs `oci://ghcr.io/k0rdent/kcm/charts/kcm` at `KCM_RELEASE_VERSION` (1.11.0). No build, no registry, no Go needed. Tests what users actually get. |
+
+Both paths need the checkout, because it supplies the `Release` and template
+manifests. Release mode pins it to the matching tag and refuses to run if the
+chart version there disagrees with `KCM_RELEASE_VERSION`.
+
+### The service test
+
+After the child cluster is up, the run installs a `ServiceTemplate` for
+**traefik**, deploys it through a `MultiClusterService`, waits for the pods to
+be Ready *in the child cluster*, then removes the MCS and verifies the workload
+is gone. This follows the `example` flow from k0rdent/catalog — install service
+template, MCS deploy, MCS removal — but writes the `HelmRepository` and
+`ServiceTemplate` directly instead of going through the catalog's `kgst` chart,
+so the project does not depend on catalog releases.
+
+Point it at a different chart with `SERVICE_CHART`, `SERVICE_CHART_VERSION`,
+`SERVICE_HELM_REPO` and `SERVICE_NAMESPACE`, or skip it with
+`SKIP_SERVICE_TEST=true`.
+
+### Parallel runs
+
+Set `RUN_ID` and several runs coexist on one machine:
+
+```bash
+RUN_ID=src KCM_SOURCE=source  ./scripts/e2e_test.sh &
+RUN_ID=rel KCM_SOURCE=release ./scripts/e2e_test.sh &
+wait
+```
+
+Container names, host ports, the working directory, kubeconfigs, image tags,
+the cluster name and the MCS selector label are all suffixed with it. Host
+ports are picked from the first free one, so runs never fight over 6443 or
+5001. Runs share the `kind` Docker network — that is CAPD's default and safe,
+because the cluster names differ. They also share `.work/bin`, so the CLI
+tools are downloaded once.
+
+Without `RUN_ID` the plain names are used, so a single run is unchanged.
+
 ## Requirements
 
-`docker`, `git`, `make`, `go`, `curl`, `tar`, `envsubst`. Everything else
-(`kubectl`, `helm`, `yq`, `jq`) is installed into `.work/bin` by `deps.sh`.
+`docker`, `git`, `curl`, `tar`, `envsubst`, plus `make` and `go` for
+`KCM_SOURCE=source`. Everything else (`kubectl`, `helm`, `yq`, `jq`) is
+installed into `.work/bin` by `deps.sh`.
 
 ### macOS
 
@@ -56,6 +104,8 @@ it — this project only knows `docker`.
 ```bash
 make e2e                      # full run, then clean up
 make e2e-keep                 # leave the environment up for debugging
+make e2e-release              # same, against the published chart
+make e2e-parallel             # source and release side by side
 ```
 
 To point at a specific KCM revision or a local checkout:
@@ -92,10 +142,15 @@ environment variable. The ones worth knowing:
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `KCM_REF` | `main` | branch, tag or SHA to test |
+| `KCM_SOURCE` | `source` | `source` or `release` |
+| `KCM_RELEASE_VERSION` | `1.11.0` | chart version for release mode |
+| `KCM_REF` | mode-dependent | branch, tag or SHA to check out |
 | `KCM_SRC_DIR` | – | use an existing checkout instead of cloning |
+| `RUN_ID` | – | isolate this run from others; see above |
 | `KCM_PROVIDERS` | CAPD, k0smotron, sveltos | providers KCM installs |
 | `KCM_CLUSTER_TEMPLATES` | `docker-hosted-cp` | cluster templates to apply |
+| `SERVICE_CHART` / `SERVICE_CHART_VERSION` | `traefik` / `41.2.0` | service under test |
+| `SKIP_SERVICE_TEST` | – | `true` to skip the ServiceTemplate/MCS steps |
 | `DOCKER_NETWORK` | `kind` | CAPD's network; the management cluster joins it |
 | `WORKERS_NUMBER` | `1` | worker nodes in the child cluster |
 | `CLD_TIMEOUT` | `1800` | seconds to wait for the ClusterDeployment |
@@ -137,5 +192,5 @@ the old etcd — complete with its stale, NotReady nodes.
 
 ## Not covered yet
 
-ServiceTemplates and MultiClusterService, KCM upgrades (N-1 → N), adopted and
-remote clusters, backup/restore, and the cloud providers.
+KCM upgrades (N-1 → N), adopted and remote clusters, backup/restore, service
+dependency graphs and template chains, and the cloud providers.

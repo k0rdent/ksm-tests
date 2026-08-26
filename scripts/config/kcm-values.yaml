@@ -1,34 +1,24 @@
 # Values for the KCM chart under test.
 #
-# Placeholders are substituted by scripts/deploy_kcm.sh via envsubst.
+# Rendered by scripts/deploy_kcm.sh via envsubst. In release mode the image
+# block is dropped, so the chart's published defaults apply.
 #
 # The three create* switches are the important part: they turn off the
 # controller's "bootstrap everything from the chart" behaviour so this project
 # can apply a trimmed Release, a trimmed Management and only the templates the
 # scenario actually needs. Without that, KCM would reconcile all eleven
 # providers on every run.
-image:
-  repository: ${IMG_REPO}
-  tag: ${IMG_TAG}
-  pullPolicy: IfNotPresent
-
+# NOTE: envsubst also expands variables inside comments -- keep them out.
 controller:
   createManagement: false
   createRelease: false
   createTemplates: false
   templatesRepoURL: ${TEMPLATES_REPO_URL}
-  insecureRegistry: true
+  insecureRegistry: ${INSECURE_REGISTRY}
   defaultHelmTimeout: 20m
   logger:
     devel: true
 
 regional:
   telemetry:
-    controller:
-      image:
-        repository: ${IMG_TELEMETRY_REPO}
-        tag: ${IMG_TELEMETRY_TAG}
-        pullPolicy: IfNotPresent
-      logger:
-        devel: true
     mode: disabled

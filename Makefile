@@ -15,6 +15,17 @@ e2e: ## Run the full end-to-end test (build KCM, deploy, create/destroy a CAPD c
 e2e-keep: ## Same as `e2e` but leaves the environment running for debugging.
 	./$(SCRIPTS)/e2e_test.sh --keep
 
+.PHONY: e2e-release
+e2e-release: ## Run the e2e against the published KCM chart instead of a source build.
+	KCM_SOURCE=release ./$(SCRIPTS)/e2e_test.sh
+
+.PHONY: e2e-parallel
+e2e-parallel: ## Run the source and release e2e side by side.
+	@set -e; \
+	RUN_ID=src KCM_SOURCE=source  ./$(SCRIPTS)/e2e_test.sh & src=$$!; \
+	RUN_ID=rel KCM_SOURCE=release ./$(SCRIPTS)/e2e_test.sh & rel=$$!; \
+	rc=0; wait $$src || rc=1; wait $$rel || rc=1; exit $$rc
+
 .PHONY: unit
 unit: ## Run the bash unit tests (no cluster required).
 	./$(SCRIPTS)/tests/bash/run.sh

@@ -1,5 +1,7 @@
 # Working directory: kcm checkout, downloaded tools, packaged charts
+# (.work-<RUN_ID> for parallel runs)
 .work/
+.work-*/
 
 # Kubeconfigs written by the scripts
 kcfg_*
@@ -13,5 +15,6 @@ gh_read_token.txt
 
 # Log dumps from collect_logs.sh
 logs/
+logs-*/
 
 *.bak
