@@ -29,7 +29,7 @@ ok "All Machines are Running"
 step "Extracting the child cluster kubeconfig"
 SECRET_NAME="$CLD_NAME-kubeconfig"
 resource_exists secret "$SECRET_NAME" "$NAMESPACE" || die "Secret '$SECRET_NAME' not found in '$NAMESPACE'"
-kube get secret "$SECRET_NAME" -n "$NAMESPACE" -o jsonpath='{.data.value}' | base64 -d > "$KUBECONFIG_CHILD"
+kube get secret "$SECRET_NAME" -n "$NAMESPACE" -o jsonpath='{.data.value}' | b64decode > "$KUBECONFIG_CHILD"
 chmod 0600 "$KUBECONFIG_CHILD"
 log "Wrote $KUBECONFIG_CHILD"
 

@@ -51,7 +51,7 @@ while (( SECONDS < TIMEOUT )); do
     fi
 
     for row in $(jq -r '.items[] | @base64' <<< "$pods_json"); do
-        _jq() { echo "${row}" | base64 --decode | jq -r "${1}"; }
+        _jq() { echo "${row}" | b64decode | jq -r "${1}"; }
 
         name=$(_jq '.metadata.name')
         status=$(_jq '.status.phase')
@@ -110,7 +110,7 @@ if (( SECONDS >= TIMEOUT )); then
     warn "Timeout after ${TIMEOUT}s: pods in '$NAMESPACE' are still not ready"
     kubectl get pods -n "$NAMESPACE" -o wide >&2 || true
     for row in $(jq -r '.items[] | @base64' <<< "$pods_json"); do
-        _jq() { echo "${row}" | base64 --decode | jq -r "${1}"; }
+        _jq() { echo "${row}" | b64decode | jq -r "${1}"; }
         pod_name=$(_jq '.metadata.name')
         pod_phase=$(_jq '.status.phase')
         echo "📦 Pod: $pod_name (Phase: $pod_phase)" >&2

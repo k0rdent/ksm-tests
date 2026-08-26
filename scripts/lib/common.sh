@@ -139,6 +139,17 @@ require_cmd() {
     fi
 }
 
+# ── Portability ──────────────────────────────────────────────────────────────
+
+# b64decode -- decode stdin. GNU base64 wants --decode, BSD/macOS wants -D.
+b64decode() {
+    if base64 --decode </dev/null >/dev/null 2>&1; then
+        base64 --decode
+    else
+        base64 -D
+    fi
+}
+
 # ── Version helpers ──────────────────────────────────────────────────────────
 
 # fqdn_version 1.11.0 -> 1-11-0 ; v1.11.0 -> 1-11-0

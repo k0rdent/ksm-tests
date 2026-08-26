@@ -32,9 +32,24 @@ spent building the images and provisioning the child cluster.
 `docker`, `git`, `make`, `go`, `curl`, `tar`, `envsubst`. Everything else
 (`kubectl`, `helm`, `yq`, `jq`) is installed into `.work/bin` by `deps.sh`.
 
-Linux is the supported platform. On macOS the CAPI-side checks work, but the
-child cluster's API is not reachable from the host — set
-`SKIP_CHILD_API_CHECK=true`.
+### macOS
+
+Docker Desktop must be running, and `envsubst` comes from a keg-only formula:
+
+```bash
+brew install gettext && brew link --force gettext
+```
+
+The child cluster's API sits on a NodePort inside the Docker network, which a
+macOS host cannot route to, so skip the checks that talk to it:
+
+```bash
+export SKIP_CHILD_API_CHECK=true
+```
+
+Everything up to and including the CAPI-side verification still runs. If you
+have `TEST_MODE` exported for k0rdent/catalog (`aws`, `adopted`, …), `unset`
+it — this project only knows `docker`.
 
 ## Running it
 
