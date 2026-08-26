@@ -118,13 +118,12 @@ WORKERS_NUMBER="${WORKERS_NUMBER:-1}"
 CLD_GROUP_LABEL="${CLD_GROUP_LABEL:-e2e-${RUN_ID:-default}}"
 export CLUSTER_NAME_SUFFIX CLD_NAME WORKERS_NUMBER CLD_GROUP_LABEL
 
-# ── Service under test (traefik via ServiceTemplate + MultiClusterService) ───
-SERVICE_NAME="${SERVICE_NAME:-traefik}"
-SERVICE_CHART="${SERVICE_CHART:-traefik}"
-SERVICE_CHART_VERSION="${SERVICE_CHART_VERSION:-41.2.0}"
-SERVICE_HELM_REPO="${SERVICE_HELM_REPO:-https://traefik.github.io/charts}"
-SERVICE_NAMESPACE="${SERVICE_NAMESPACE:-traefik}"
-export SERVICE_NAME SERVICE_CHART SERVICE_CHART_VERSION SERVICE_HELM_REPO SERVICE_NAMESPACE
+# ── Services under test (ServiceTemplates + one MultiClusterService) ─────────
+# Declared in a file rather than env vars: there are several of them, with
+# dependencies and values blocks. Point SERVICES_FILE elsewhere to swap the set.
+SERVICES_FILE="${SERVICES_FILE:-$CONFIG_DIR/services.yaml}"
+MCS_NAME="${MCS_NAME:-e2e-$CLUSTER_NAME_SUFFIX}"
+export SERVICES_FILE MCS_NAME
 
 # ── Timeouts (seconds) ───────────────────────────────────────────────────────
 MANAGEMENT_TIMEOUT="${MANAGEMENT_TIMEOUT:-1500}"   # 25 min
@@ -227,12 +226,6 @@ chart_version() { yaml_top_scalar "${1:?chart_version needs a chart dir}/Chart.y
 template_name() {
     local dir="${1:?template_name needs a chart dir}"
     echo "$(chart_name "$dir")-$(fqdn_version "$(chart_version "$dir")")"
-}
-
-# service_template_name -> e.g. traefik-41-2-0. Same naming KCM uses for
-# ServiceTemplates, so it matches what a MultiClusterService references.
-service_template_name() {
-    echo "$SERVICE_CHART-$(fqdn_version "$SERVICE_CHART_VERSION")"
 }
 
 # check_kcm_source -- guard against a typo in KCM_SOURCE.

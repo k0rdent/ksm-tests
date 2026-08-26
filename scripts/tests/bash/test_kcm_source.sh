@@ -69,9 +69,8 @@ fi
 rm -rf "$nogo"
 
 # ServiceTemplate naming has to match what the MCS references.
-assert_eq "service template name" "traefik-41-2-0" \
-    "$(bash -c "source '$SCRIPTS_DIR/lib/common.sh'; service_template_name")"
-assert_eq "service template name follows the version" "traefik-40-3-0" \
-    "$(SERVICE_CHART_VERSION=40.3.0 bash -c "source '$SCRIPTS_DIR/lib/common.sh'; service_template_name")"
+tn() { bash -c "source '$SCRIPTS_DIR/lib/common.sh'; source '$SCRIPTS_DIR/lib/services.sh'; template_name_for '$1' '$2'"; }
+assert_eq "service template name" "traefik-41-2-0" "$(tn traefik 41.2.0)"
+assert_eq "v-prefixed versions lose the v" "kserve-crd-0-18-0" "$(tn kserve-crd v0.18.0)"
 
 finish

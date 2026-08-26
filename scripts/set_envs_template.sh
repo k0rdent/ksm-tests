@@ -38,12 +38,11 @@
 # export KCM_PROVIDERS="cluster-api-provider-docker cluster-api-provider-k0sproject-k0smotron projectsveltos"
 # export KCM_CLUSTER_TEMPLATES="docker-hosted-cp"
 
-# ── Service deployed through a MultiClusterService ───────────────────────────
-# export SERVICE_NAME="traefik"
-# export SERVICE_CHART="traefik"
-# export SERVICE_CHART_VERSION="41.2.0"
-# export SERVICE_HELM_REPO="https://traefik.github.io/charts"
-# export SERVICE_NAMESPACE="traefik"
+# ── Services deployed through a MultiClusterService ──────────────────────────
+# The set is declared in scripts/config/services.yaml (traefik, then
+# cert-manager -> kserve-crd -> kserve-resources). Point this at your own copy
+# to test a different set.
+# export SERVICES_FILE="$PWD/scripts/config/services.yaml"
 # export SKIP_SERVICE_TEST="true"        # skip the ServiceTemplate/MCS steps
 
 # ── Environment names ────────────────────────────────────────────────────────
