@@ -19,6 +19,10 @@ e2e-keep: ## Same as `e2e` but leaves the environment running for debugging.
 e2e-release: ## Run the e2e against the published KCM chart instead of a source build.
 	KCM_SOURCE=release ./$(SCRIPTS)/e2e_test.sh
 
+.PHONY: e2e-kserve
+e2e-kserve: ## Run the e2e with the kserve service set instead of traefik.
+	SERVICE_SET=kserve ./$(SCRIPTS)/e2e_test.sh
+
 .PHONY: e2e-parallel
 e2e-parallel: ## Run the source and release e2e side by side.
 	@set -e; \

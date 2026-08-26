@@ -1,0 +1,41 @@
+# The kserve stack -- the heavy service set, and the one with a dependency
+# chain: cert-manager provides the webhook certificates, the CRDs must exist
+# before the controller. Same chain as catalog's apps/kserve/example.
+#
+# Charts come from k0rdent/catalog's registry. Those are thin wrappers that
+# declare the upstream chart as a dependency of the same name, so values are
+# nested one level under that name, exactly as catalog's own example does.
+services:
+  - name: cert-manager
+    chart: cert-manager
+    version: 1.20.2
+    repo: oci://ghcr.io/k0rdent/catalog/charts
+    namespace: cert-manager
+    waitForPods: cert-manager-
+    values: |
+      cert-manager:
+        crds:
+          enabled: true
+
+  - name: kserve-crd
+    chart: kserve-crd
+    version: v0.18.0
+    repo: oci://ghcr.io/k0rdent/catalog/charts
+    namespace: kserve
+    dependsOn: cert-manager
+
+  - name: kserve-resources
+    chart: kserve-resources
+    version: v0.18.0
+    repo: oci://ghcr.io/k0rdent/catalog/charts
+    namespace: kserve
+    dependsOn: kserve-crd
+    waitForPods: kserve-controller-manager-
+    values: |
+      kserve-resources:
+        kserve:
+          controller:
+            deploymentMode: Standard
+            gateway:
+              disableIstioVirtualHost: true
+              disableIngressCreation: true

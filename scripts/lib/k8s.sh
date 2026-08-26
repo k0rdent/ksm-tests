@@ -66,6 +66,7 @@ wait_for_condition() {
     [[ -n "$ns" ]] && args+=(-n "$ns")
     args+=(-o yaml)
     kube "${args[@]}" 2>/dev/null | sed -n '/^status:/,$p' >&2 || true
+    kcm_errors 20m >&2 || true
     return 1
 }
 
@@ -93,13 +94,63 @@ wait_for_valid() {
 
     warn "Timeout after ${timeout}s waiting for $kind/$name to become valid"
     kube "${args[@]}" -o yaml >&2 || true
+    kcm_errors 20m >&2 || true
     return 1
 }
 
+# kcm_errors [SINCE] -- warning events and error log lines from the controllers,
+# printed straight into the CI log. A stuck finalizer says nothing by itself;
+# the reason is almost always in here.
+kcm_errors() {
+    local since="${1:-10m}"
+
+    echo "── Warning events (last $since)"
+    kube get events -A --field-selector type=Warning \
+        --sort-by=.lastTimestamp -o custom-columns=\
+'TIME:.lastTimestamp,NS:.metadata.namespace,OBJECT:.involvedObject.name,REASON:.reason,MESSAGE:.message' \
+        2>/dev/null | tail -25 || true
+
+    local ns pod
+    for ns in "$NAMESPACE" projectsveltos; do
+        kube get namespace "$ns" >/dev/null 2>&1 || continue
+        while read -r pod; do
+            [[ -n "$pod" ]] || continue
+            local hits
+            hits="$(kube logs -n "$ns" "$pod" --all-containers --since="$since" 2>/dev/null \
+                | grep -iE '"level":"error"|level=error|\berror\b|failed' \
+                | grep -viE 'errors?\.go|no error|error_|errorf' \
+                | tail -8 || true)"
+            [[ -n "$hits" ]] || continue
+            echo "── $ns/${pod#pod/}"
+            cut -c1-400 <<< "$hits"
+        done < <(kube get pods -n "$ns" -o name 2>/dev/null)
+    done
+}
+
+# describe_stuck KIND NAME NAMESPACE -- why an object will not go away.
+describe_stuck() {
+    local kind="$1" name="$2" ns="$3"
+    local args=(get "$kind" "$name")
+    [[ -n "$ns" ]] && args+=(-n "$ns")
+
+    echo "── $kind/$name finalizers and status"
+    kube "${args[@]}" -o jsonpath='{"finalizers: "}{.metadata.finalizers}{"\ndeletionTimestamp: "}{.metadata.deletionTimestamp}{"\n"}' 2>/dev/null || true
+    kube "${args[@]}" -o yaml 2>/dev/null | sed -n '/^status:/,$p' | head -40 || true
+
+    echo "── ServiceSets"
+    kube get servicesets -A -o wide 2>/dev/null || true
+    echo "── HelmReleases"
+    kube get helmreleases -A 2>/dev/null || true
+}
+
 # wait_for_absence KIND NAME NAMESPACE TIMEOUT_SECONDS [POLL_SECONDS]
+#
+# Every DIAG_INTERVAL seconds of waiting it dumps why the object is stuck, so a
+# CI log shows the reason instead of a wall of identical "still present" lines.
 wait_for_absence() {
     local kind="$1" name="$2" ns="$3" timeout="$4" poll="${5:-5}"
     local elapsed=0
+    local diag_every="${DIAG_INTERVAL:-120}"
 
     log "Waiting for $kind/$name to disappear (timeout ${timeout}s)"
     while (( elapsed < timeout )); do
@@ -107,7 +158,10 @@ wait_for_absence() {
             ok "$kind/$name is gone"
             return 0
         fi
-        if (( elapsed % 30 == 0 )); then
+        if (( elapsed > 0 && elapsed % diag_every == 0 )); then
+            warn "$kind/$name still present after ${elapsed}s -- diagnostics:"
+            { describe_stuck "$kind" "$name" "$ns"; kcm_errors 5m; } >&2
+        elif (( elapsed % 30 == 0 )); then
             log "⏳ $kind/$name still present (${elapsed}s elapsed)"
         fi
         sleep "$poll"
@@ -115,9 +169,6 @@ wait_for_absence() {
     done
 
     warn "Timeout after ${timeout}s waiting for $kind/$name to be removed"
-    local args=(get "$kind" "$name")
-    [[ -n "$ns" ]] && args+=(-n "$ns")
-    args+=(-o yaml)
-    kube "${args[@]}" 2>/dev/null >&2 || true
+    { describe_stuck "$kind" "$name" "$ns"; kcm_errors 20m; } >&2
     return 1
 }

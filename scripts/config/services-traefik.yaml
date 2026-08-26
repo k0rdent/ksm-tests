@@ -1,0 +1,12 @@
+# Traefik on its own -- the light service set.
+#
+# Charts come from k0rdent/catalog's registry. Those are thin wrappers that
+# declare the upstream chart as a dependency of the same name, so values must
+# be nested one level under that name, exactly as catalog's own example does.
+services:
+  - name: traefik
+    chart: traefik
+    version: 41.2.0
+    repo: oci://ghcr.io/k0rdent/catalog/charts
+    namespace: traefik
+    waitForPods: traefik-

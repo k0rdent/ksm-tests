@@ -39,10 +39,11 @@
 # export KCM_CLUSTER_TEMPLATES="docker-hosted-cp"
 
 # ── Services deployed through a MultiClusterService ──────────────────────────
-# The set is declared in scripts/config/services.yaml (traefik, then
-# cert-manager -> kserve-crd -> kserve-resources). Point this at your own copy
-# to test a different set.
-# export SERVICES_FILE="$PWD/scripts/config/services.yaml"
+# The set is picked by SERVICE_SET: "traefik", or "kserve" for the
+# cert-manager -> kserve-crd -> kserve-resources chain. Point SERVICES_FILE at
+# your own file to test a different set.
+# export SERVICE_SET="traefik"          # or "kserve"
+# export SERVICES_FILE="$PWD/scripts/config/services-traefik.yaml"
 # export SKIP_SERVICE_TEST="true"        # skip the ServiceTemplate/MCS steps
 
 # ── Environment names ────────────────────────────────────────────────────────
