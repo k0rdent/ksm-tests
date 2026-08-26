@@ -32,14 +32,20 @@ for kind in cluster machine devcluster devmachine; do
 done
 ok "No leftover CAPI objects"
 
-step "Checking no etcd PVCs were left behind"
-# A surviving PVC means the next cluster of the same name boots on the previous
-# one's etcd data -- stale nodes, unschedulable pods, very confusing failures.
+step "Cleaning up the etcd PVCs"
+# docker-hosted-cp exposes storage.etcd.autoDeletePVCs but no template consumes
+# it (checked against chart 1.0.15), so the k0smotron etcd PVC always outlives
+# the cluster. Left in place, the next cluster of the same name boots on the
+# previous one's etcd and inherits its stale nodes.
 leftover_pvcs="$(kube get pvc -n "$NAMESPACE" -o name 2>/dev/null | grep -- "$CLD_NAME" || true)"
 if [[ -n "$leftover_pvcs" ]]; then
-    die "Leftover PVCs after deletion: $(echo "$leftover_pvcs" | tr '\n' ' ')"
+    log "Deleting: $(echo "$leftover_pvcs" | tr '\n' ' ')"
+    # shellcheck disable=SC2086 # deliberate word splitting of the name list
+    kube delete -n "$NAMESPACE" $leftover_pvcs --wait=false
+    ok "Leftover etcd PVCs removed"
+else
+    ok "No leftover PVCs"
 fi
-ok "No leftover PVCs"
 
 step "Checking CAPD left no containers behind"
 # CAPD names the node containers <cluster>-<role>-<suffix>.

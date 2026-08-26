@@ -22,7 +22,10 @@ Docker, child clusters as sibling containers. No cloud credentials, no cost.
 
 KCM is installed with only three providers enabled — CAPD, k0smotron and
 projectsveltos — instead of the eleven a default `Management` would pull in.
-That is the difference between a ~10-minute and a ~30-minute install.
+`Management` reaches Ready in about 2.5 minutes as a result.
+
+A full run takes roughly 10 minutes with a warm KCM checkout, most of it
+spent building the images and provisioning the child cluster.
 
 ## Requirements
 
