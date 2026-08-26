@@ -1,0 +1,32 @@
+#!/bin/bash
+set -euo pipefail
+
+# Retry a command until it succeeds or MAX_RETRIES is exhausted.
+#
+#   MAX_RETRIES=5 SLEEP=2 ./scripts/retry.sh helm dependency update ./chart
+#
+# Adapted from k0rdent/catalog's scripts/retry.sh.
+
+MAX_RETRIES="${MAX_RETRIES:-60}"
+SLEEP_SECONDS="${SLEEP:-10}"
+
+attempt=1
+
+while true; do
+  echo "Attempt ${attempt}/${MAX_RETRIES}: $*"
+
+  if "$@"; then
+    echo "Command succeeded"
+    exit 0
+  fi
+
+  if [[ "$attempt" -ge "$MAX_RETRIES" ]]; then
+    echo "Command failed after ${MAX_RETRIES} attempts"
+    exit 1
+  fi
+
+  echo "Command failed. Retrying in ${SLEEP_SECONDS}s..."
+  sleep "$SLEEP_SECONDS"
+
+  attempt=$((attempt + 1))
+done
