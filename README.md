@@ -78,6 +78,25 @@ ignores the lot without complaining — there is a unit test guarding this.
 Skip the whole thing with `SKIP_SERVICE_TEST=true`, or point `SERVICES_FILE` at
 a set of your own.
 
+#### Known defect: kserve teardown on KCM 1.11.0
+
+`release: 1.11.0 / kserve` fails at `Remove MultiClusterService`, reproducibly.
+Sveltos removes `kserve-crd` before it uninstalls `kserve-resources`, whose
+release still contains a `ClusterStorageContainer`, so the uninstall fails:
+
+```
+failed to undeploy HelmCharts
+    no matches for kind "ClusterStorageContainer" in version "serving.kserve.io/v1alpha1"
+    ensure CRDs are installed first
+```
+
+Sveltos retries forever and the `MultiClusterService` finalizer never clears.
+KCM 1.10.0 and main are unaffected; k0rdent/catalog sets
+`test_remove_multiclusterservice: false` for kserve, so upstream does not
+exercise this path either. That one matrix combination is marked
+`continue-on-error`, so it still runs and still reports without blocking the
+workflow — remove the marker once KCM fixes the teardown order.
+
 ### Parallel runs
 
 Set `RUN_ID` and several runs coexist on one machine:

@@ -35,6 +35,15 @@ jobs:
     name: ${{ matrix.kcm.name }} / ${{ matrix.service_set }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    # KCM 1.11.0 cannot tear the kserve stack down: sveltos removes kserve-crd
+    # before uninstalling kserve-resources, whose release still holds a
+    # ClusterStorageContainer, so the uninstall fails with "ensure CRDs are
+    # installed first" and the MultiClusterService finalizer never clears.
+    # Reproduced on every run; 1.10.0 and main are unaffected, and catalog
+    # itself sets test_remove_multiclusterservice: false for kserve. The job
+    # still runs and still reports -- it just does not block the workflow.
+    continue-on-error: >-
+      ${{ matrix.kcm.id == 'rel-1-11-0' && matrix.service_set == 'kserve' }}
     # Nightly runs only when the repo opts in, matching k0rdent/catalog.
     if: github.event_name != 'schedule' || vars.ENABLE_CRON == '1'
     strategy:

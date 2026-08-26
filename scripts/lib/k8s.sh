@@ -116,10 +116,18 @@ kcm_errors() {
         while read -r pod; do
             [[ -n "$pod" ]] || continue
             local hits
+            # Go's logger wraps long errors as `err=<` ... `>` across several
+            # lines. Matching line by line drops the body, which is where the
+            # actual reason lives -- keep the continuation lines too.
             hits="$(kube logs -n "$ns" "$pod" --all-containers --since="$since" 2>/dev/null \
-                | grep -iE '"level":"error"|level=error|\berror\b|failed' \
+                | awk '
+                    /"level":"error"|level=error|^E[0-9]{4} |[Ee]rror|failed/ {
+                        print; if ($0 ~ /err=<[[:space:]]*$/) inblock=1; next
+                    }
+                    inblock { print; if ($0 ~ /^[[:space:]]*>/) inblock=0 }
+                  ' \
                 | grep -viE 'errors?\.go|no error|error_|errorf' \
-                | tail -8 || true)"
+                | tail -20 || true)"
             [[ -n "$hits" ]] || continue
             echo "── $ns/${pod#pod/}"
             cut -c1-400 <<< "$hits"
