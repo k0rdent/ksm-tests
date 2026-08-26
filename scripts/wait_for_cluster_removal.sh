@@ -32,6 +32,15 @@ for kind in cluster machine devcluster devmachine; do
 done
 ok "No leftover CAPI objects"
 
+step "Checking no etcd PVCs were left behind"
+# A surviving PVC means the next cluster of the same name boots on the previous
+# one's etcd data -- stale nodes, unschedulable pods, very confusing failures.
+leftover_pvcs="$(kube get pvc -n "$NAMESPACE" -o name 2>/dev/null | grep -- "$CLD_NAME" || true)"
+if [[ -n "$leftover_pvcs" ]]; then
+    die "Leftover PVCs after deletion: $(echo "$leftover_pvcs" | tr '\n' ' ')"
+fi
+ok "No leftover PVCs"
+
 step "Checking CAPD left no containers behind"
 # CAPD names the node containers <cluster>-<role>-<suffix>.
 orphans="$(docker ps -a --filter "name=^$CLD_NAME-" --format '{{.Names}}')"

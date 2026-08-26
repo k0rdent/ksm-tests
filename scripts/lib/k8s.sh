@@ -11,6 +11,14 @@ kube_child() {
     kubectl --kubeconfig "$KUBECONFIG_CHILD" "$@"
 }
 
+# require_cluster -- fail loudly if the API is unreachable. Without this a
+# "does not exist, nothing to do" check silently passes against a dead cluster.
+require_cluster() {
+    [[ -f "$KUBECONFIG_MGMT" ]] || die "No kubeconfig at $KUBECONFIG_MGMT"
+    kube version --request-timeout=10s >/dev/null 2>&1 \
+        || die "Cannot reach the management cluster API using $KUBECONFIG_MGMT"
+}
+
 # resource_exists KIND NAME [NAMESPACE]
 resource_exists() {
     local kind="$1" name="$2" ns="${3:-}"

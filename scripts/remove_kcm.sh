@@ -12,6 +12,7 @@ source "$SCRIPTS_DIR/lib/k8s.sh"
 require_cmd kubectl helm
 
 export KUBECONFIG="$KUBECONFIG_MGMT"
+require_cluster
 
 if ! kube get namespace "$NAMESPACE" >/dev/null 2>&1; then
     log "Namespace '$NAMESPACE' does not exist -- nothing to uninstall"
