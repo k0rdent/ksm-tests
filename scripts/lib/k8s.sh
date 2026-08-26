@@ -61,6 +61,33 @@ wait_for_condition() {
     return 1
 }
 
+# wait_for_valid KIND NAME NAMESPACE TIMEOUT_SECONDS [POLL_SECONDS]
+# Templates expose readiness as status.valid rather than a condition.
+wait_for_valid() {
+    local kind="$1" name="$2" ns="$3" timeout="$4" poll="${5:-5}"
+    local elapsed=0 valid="" err=""
+    local args=(get "$kind" "$name")
+    [[ -n "$ns" ]] && args+=(-n "$ns")
+
+    while (( elapsed < timeout )); do
+        valid="$(kube "${args[@]}" -o 'jsonpath={.status.valid}' 2>/dev/null || true)"
+        if [[ "$valid" == "true" ]]; then
+            log "✅ $kind/$name is valid"
+            return 0
+        fi
+        if (( elapsed % 30 == 0 )); then
+            err="$(kube "${args[@]}" -o 'jsonpath={.status.validationError}' 2>/dev/null || true)"
+            log "⏳ $kind/$name valid='${valid:-<none>}' ${err:+($err)} (${elapsed}s)"
+        fi
+        sleep "$poll"
+        elapsed=$(( elapsed + poll ))
+    done
+
+    warn "Timeout after ${timeout}s waiting for $kind/$name to become valid"
+    kube "${args[@]}" -o yaml >&2 || true
+    return 1
+}
+
 # wait_for_absence KIND NAME NAMESPACE TIMEOUT_SECONDS [POLL_SECONDS]
 wait_for_absence() {
     local kind="$1" name="$2" ns="$3" timeout="$4" poll="${5:-5}"

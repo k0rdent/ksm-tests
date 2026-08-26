@@ -1,8 +1,12 @@
 #!/bin/bash
 set -euo pipefail
 
-# Wait for the applied templates to become valid and the Release to go Ready.
+# Wait for the ProviderTemplates to become valid and the Release to go Ready.
 # Validity means the chart was pulled, so this also proves the registry wiring.
+#
+# ClusterTemplates are deliberately not covered here: they stay invalid with
+# "Waiting for Management creation" until a Management exists, which comes
+# later. wait_for_management.sh checks those.
 
 # shellcheck source=scripts/lib/common.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
@@ -18,43 +22,9 @@ source "$RELEASE_ENV"
 
 export KUBECONFIG="$KUBECONFIG_MGMT"
 
-# wait_template KIND NAME [NAMESPACE]
-wait_template() {
-    local kind="$1" name="$2" ns="${3:-}"
-    local elapsed=0 valid=""
-    local args=(get "$kind" "$name")
-    [[ -n "$ns" ]] && args+=(-n "$ns")
-    args+=(-o 'jsonpath={.status.valid}')
-
-    while (( elapsed < TEMPLATES_TIMEOUT )); do
-        valid="$(kube "${args[@]}" 2>/dev/null || true)"
-        if [[ "$valid" == "true" ]]; then
-            log "✅ $kind/$name is valid"
-            return 0
-        fi
-        if (( elapsed % 30 == 0 )); then
-            log "⏳ $kind/$name valid='${valid:-<none>}' (${elapsed}s)"
-        fi
-        sleep 5
-        elapsed=$(( elapsed + 5 ))
-    done
-
-    warn "Timeout waiting for $kind/$name to become valid"
-    local dump=(get "$kind" "$name")
-    [[ -n "$ns" ]] && dump+=(-n "$ns")
-    dump+=(-o yaml)
-    kube "${dump[@]}" >&2 || true
-    return 1
-}
-
 step "Waiting for ProviderTemplates to become valid"
 for name in ${PROVIDER_TEMPLATES:-}; do
-    wait_template ProviderTemplate "$name"
-done
-
-step "Waiting for ClusterTemplates to become valid"
-for name in ${CLUSTER_TEMPLATES:-}; do
-    wait_template ClusterTemplate "$name" "$NAMESPACE"
+    wait_for_valid ProviderTemplate "$name" "" "$TEMPLATES_TIMEOUT"
 done
 
 step "Waiting for Release '$RELEASE_NAME' to become Ready"

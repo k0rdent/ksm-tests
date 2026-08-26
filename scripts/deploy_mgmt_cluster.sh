@@ -21,10 +21,21 @@ ensure_network "$DOCKER_NETWORK"
 
 if container_running "$MGMT_CLUSTER_NAME"; then
     log "Management cluster container already running"
+    # Reuse whatever port it was actually started with.
+    MGMT_API_PORT="$(published_port "$MGMT_CLUSTER_NAME" 6443)"
+    [[ -n "$MGMT_API_PORT" ]] || die "Container '$MGMT_CLUSTER_NAME' publishes no port for 6443"
+    log "API published on 127.0.0.1:$MGMT_API_PORT"
 else
     if container_exists "$MGMT_CLUSTER_NAME"; then
         log "Removing stale container '$MGMT_CLUSTER_NAME'"
         docker rm -vf "$MGMT_CLUSTER_NAME" >/dev/null
+    fi
+
+    if port_in_use "$MGMT_API_PORT"; then
+        new_port="$(free_port "$MGMT_API_PORT")" \
+            || die "No free port near $MGMT_API_PORT for the API server"
+        warn "Port $MGMT_API_PORT is taken, using $new_port instead"
+        MGMT_API_PORT="$new_port"
     fi
 
     log "Starting $K0S_IMAGE"

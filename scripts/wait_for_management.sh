@@ -36,6 +36,19 @@ done
 installed_count="$(kube get management kcm -o jsonpath='{.spec.providers[*].name}' | wc -w | tr -d ' ')"
 log "Management enables $installed_count provider(s)"
 
+step "Waiting for ClusterTemplates to become valid"
+# These stay invalid until a Management exists, so they can only be checked here.
+RELEASE_ENV="$WORKDIR/release.env"
+if [[ -f "$RELEASE_ENV" ]]; then
+    # shellcheck source=/dev/null
+    source "$RELEASE_ENV"
+    for name in ${CLUSTER_TEMPLATES:-}; do
+        wait_for_valid ClusterTemplate "$name" "$NAMESPACE" "$TEMPLATES_TIMEOUT"
+    done
+else
+    warn "$RELEASE_ENV not found -- skipping the ClusterTemplate check"
+fi
+
 step "Waiting for the projectsveltos pods"
 if kube get namespace projectsveltos >/dev/null 2>&1; then
     NAMESPACE=projectsveltos "$SCRIPTS_DIR/wait_for_deployment.sh"

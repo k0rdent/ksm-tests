@@ -72,10 +72,23 @@ else
     log "helm: $(command -v helm)"
 fi
 
-if needs_install yq; then
+# Several unrelated tools are called "yq". We need mikefarah's Go one; the
+# python wrapper takes the same expressions but emits JSON, which silently
+# changes the manifests we generate.
+is_mikefarah_yq() {
+    command -v yq >/dev/null 2>&1 || return 1
+    yq --version 2>&1 | grep -qi mikefarah
+}
+
+if needs_install yq || ! is_mikefarah_yq; then
+    if command -v yq >/dev/null 2>&1 && ! is_mikefarah_yq; then
+        log "yq at $(command -v yq) is not mikefarah/yq -- installing our own"
+    fi
     log "Installing yq $YQ_VERSION into $BIN_DIR"
     download "https://github.com/mikefarah/yq/releases/download/$YQ_VERSION/yq_${OS}_${ARCH}" "$BIN_DIR/yq"
     chmod +x "$BIN_DIR/yq"
+    hash -r
+    is_mikefarah_yq || die "yq on PATH is still not mikefarah/yq: $(command -v yq)"
 else
     log "yq: $(command -v yq)"
 fi
