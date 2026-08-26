@@ -26,13 +26,15 @@ envsubst < "$CONFIG_DIR/service-mcs.yaml" > "$MANIFEST"
 cat "$MANIFEST"
 kube apply -f "$MANIFEST"
 
-step "Waiting for the ServiceSet on '$CLD_NAME'"
+step "Waiting for the ServiceSet from '$MCS_NAME'"
 # KCM turns the MCS into a ServiceSet per matched cluster; if the selector is
 # wrong nothing is ever created, which is the failure worth catching early.
+# Filter on spec.multiClusterService, not spec.cluster: every ClusterDeployment
+# already owns a ServiceSet of its own, which would match unconditionally.
 elapsed=0
 while (( elapsed < MCS_TIMEOUT )); do
     sset="$(kube get serviceset -n "$NAMESPACE" \
-        -o jsonpath="{.items[?(@.spec.cluster==\"$CLD_NAME\")].metadata.name}" 2>/dev/null || true)"
+        -o jsonpath="{.items[?(@.spec.multiClusterService==\"$MCS_NAME\")].metadata.name}" 2>/dev/null || true)"
     if [[ -n "$sset" ]]; then
         log "ServiceSet: $sset"
         break

@@ -26,10 +26,12 @@ else
 fi
 
 step "Checking the ServiceSet is gone"
+# Only the MCS-owned one: the ClusterDeployment keeps a ServiceSet of its own
+# for as long as the cluster exists.
 elapsed=0
 while (( elapsed < MCS_TIMEOUT )); do
     sset="$(kube get serviceset -n "$NAMESPACE" \
-        -o jsonpath="{.items[?(@.spec.cluster==\"$CLD_NAME\")].metadata.name}" 2>/dev/null || true)"
+        -o jsonpath="{.items[?(@.spec.multiClusterService==\"$MCS_NAME\")].metadata.name}" 2>/dev/null || true)"
     [[ -z "$sset" ]] && break
     if (( elapsed % 30 == 0 )); then
         log "⏳ ServiceSet '$sset' still present (${elapsed}s)"
