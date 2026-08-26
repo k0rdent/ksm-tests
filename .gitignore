@@ -1,0 +1,17 @@
+# Working directory: kcm checkout, downloaded tools, packaged charts
+.work/
+
+# Kubeconfigs written by the scripts
+kcfg_*
+
+# Local environment (copy of scripts/set_envs_template.sh)
+set_envs.sh
+
+# Credentials -- never commit
+gh_read_token.txt
+*token*.txt
+
+# Log dumps from collect_logs.sh
+logs/
+
+*.bak

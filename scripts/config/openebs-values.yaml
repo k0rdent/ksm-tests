@@ -1,0 +1,22 @@
+# Minimal OpenEBS: hostpath localpv as the default StorageClass, everything else off.
+engines:
+  local:
+    lvm:
+      enabled: false
+    zfs:
+      enabled: false
+  replicated:
+    mayastor:
+      enabled: false
+loki:
+  enabled: false
+alloy:
+  enabled: false
+localpv-provisioner:
+  hostpathClass:
+    enabled: true
+    isDefaultClass: true
+openebs-crds:
+  csi:
+    volumeSnapshots:
+      enabled: false

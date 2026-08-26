@@ -1,0 +1,14 @@
+# Minimal Management. The provider list is rendered by apply_management.sh;
+# core.kcm and core.capi take their templates from the Release.
+# NOTE: envsubst also expands variables inside comments -- keep them out.
+apiVersion: k0rdent.mirantis.com/v1beta1
+kind: Management
+metadata:
+  name: kcm
+spec:
+  release: ${RELEASE_NAME}
+  core:
+    kcm: {}
+    capi: {}
+  providers:
+${MANAGEMENT_PROVIDERS}

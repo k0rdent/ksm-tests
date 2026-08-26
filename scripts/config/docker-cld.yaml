@@ -1,0 +1,16 @@
+# ClusterDeployment under test: k0s on Docker with a k0smotron-hosted control
+# plane. The template name is resolved from the chart version by deploy_cld.sh.
+apiVersion: k0rdent.mirantis.com/v1beta1
+kind: ClusterDeployment
+metadata:
+  name: ${CLD_NAME}
+  namespace: ${NAMESPACE}
+  labels:
+    k0rdent-kcm-tests/scenario: docker
+spec:
+  template: ${CLD_TEMPLATE}
+  credential: docker-stub-credential
+  config:
+    workersNumber: ${WORKERS_NUMBER}
+    clusterLabels: {}
+    clusterAnnotations: {}

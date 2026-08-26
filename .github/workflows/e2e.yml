@@ -1,0 +1,125 @@
+name: E2E
+
+on:
+  workflow_dispatch:
+    inputs:
+      kcm_ref:
+        description: 'KCM branch, tag or SHA to test'
+        required: false
+        default: 'main'
+      keep_cluster:
+        description: 'Skip cleanup (for debugging)'
+        type: boolean
+        required: false
+        default: false
+  schedule:
+    - cron: '0 2 * * *'   # 02:00 UTC
+  push:
+    branches:
+      - '**'
+    paths:
+      - 'scripts/**'
+      - .github/workflows/e2e.yml
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'scripts/**'
+      - .github/workflows/e2e.yml
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e-docker:
+    name: docker (CAPD)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    # Nightly runs only when the repo opts in, matching k0rdent/catalog.
+    if: github.event_name != 'schedule' || vars.ENABLE_CRON == '1'
+    env:
+      KCM_REF: ${{ github.event.inputs.kcm_ref || 'main' }}
+      TEST_MODE: docker
+      CLUSTER_NAME_SUFFIX: ci-${{ github.run_id }}
+      DEBUG: ${{ runner.debug == '1' && 'true' || '' }}
+    steps:
+      - uses: actions/checkout@v5
+
+      # The Go build, two container images, k0s and the CAPD nodes together
+      # outgrow the default runner disk.
+      - name: Free disk space
+        run: |
+          df -h /
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+                      /usr/local/share/boost "$AGENT_TOOLSDIRECTORY" || true
+          sudo apt-get clean
+          df -h /
+
+      # KCM's Makefile shells out to `go env` while parsing, so go must be on
+      # PATH. The binaries themselves are built inside Docker, so a Go module
+      # cache here would not help.
+      - uses: actions/setup-go@v6
+        with:
+          go-version: 'stable'
+          cache: false
+
+      - name: Install dependencies
+        run: ./scripts/deps.sh
+
+      - name: Build KCM from source
+        run: ./scripts/build_kcm.sh
+
+      - name: Deploy local registry
+        run: ./scripts/deploy_registry.sh
+
+      - name: Deploy management cluster
+        run: ./scripts/deploy_mgmt_cluster.sh
+
+      - name: Install OpenEBS
+        run: ./scripts/install_openebs.sh
+
+      - name: Push images and charts
+        run: ./scripts/push_kcm_artifacts.sh
+
+      - name: Install KCM
+        run: ./scripts/deploy_kcm.sh
+
+      - name: Apply Release and templates
+        run: ./scripts/apply_release.sh
+
+      - name: Wait for templates
+        run: ./scripts/wait_for_templates.sh
+
+      - name: Apply Management
+        run: ./scripts/apply_management.sh
+
+      - name: Wait for Management
+        run: ./scripts/wait_for_management.sh
+
+      - name: Deploy ClusterDeployment
+        run: ./scripts/deploy_cld.sh
+
+      - name: Check child cluster
+        run: ./scripts/check_child_cluster.sh
+
+      - name: Remove ClusterDeployment
+        run: ./scripts/remove_cld.sh
+
+      - name: Uninstall KCM
+        run: ./scripts/remove_kcm.sh
+
+      - name: Collect diagnostics
+        if: failure()
+        run: ./scripts/collect_logs.sh
+
+      - name: Upload diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-logs-${{ github.run_id }}
+          path: logs/
+          retention-days: 7
+
+      - name: Cleanup
+        if: always() && github.event.inputs.keep_cluster != 'true'
+        run: ./scripts/cleanup.sh
