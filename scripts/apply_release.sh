@@ -16,7 +16,7 @@ require_yq
 
 RELEASE_FILE="$(kcm_release_file)"
 TEMPLATES_DIR_KCM="$(kcm_templates_dir)"
-[[ -f "$RELEASE_FILE" ]] || die "Release manifest not found at $RELEASE_FILE. Run ./scripts/build_kcm.sh first."
+[[ -f "$RELEASE_FILE" ]] || die "Release manifest not found at $RELEASE_FILE. Run ./scripts/prepare_kcm.sh first."
 
 export KUBECONFIG="$KUBECONFIG_MGMT"
 ensure_workdir

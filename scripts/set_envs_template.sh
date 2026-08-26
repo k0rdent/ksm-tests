@@ -10,12 +10,23 @@
 # scripts/lib/common.sh -- uncomment only what you want to change.
 
 # ── Which KCM to test ────────────────────────────────────────────────────────
+# "source" builds the images and charts from a checkout; "release" installs the
+# published chart from ghcr and needs neither Go nor a local registry.
+# export KCM_SOURCE="source"
+# export KCM_RELEASE_VERSION="1.11.0"
+
 # Test a branch/tag/SHA from the upstream repository:
 # export KCM_REPO="https://github.com/K0rdent/kcm.git"
 # export KCM_REF="main"
 
-# ...or point at a checkout you are already working in (skips the clone):
+# ...or point at a checkout you are already working in (skips the clone).
+# Do not share it between parallel source-mode runs -- the build writes into it.
 # export KCM_SRC_DIR="$HOME/src/kcm"
+
+# ── Running several e2e at once ──────────────────────────────────────────────
+# Any non-empty value isolates this run: container names, host ports, workdir,
+# kubeconfigs, image tags, cluster name and the MCS selector label.
+# export RUN_ID="mine"
 
 # ── Scope of the run ─────────────────────────────────────────────────────────
 # export TEST_MODE="docker"
@@ -26,6 +37,14 @@
 # install time -- each extra provider is another Helm chart to reconcile.
 # export KCM_PROVIDERS="cluster-api-provider-docker cluster-api-provider-k0sproject-k0smotron projectsveltos"
 # export KCM_CLUSTER_TEMPLATES="docker-hosted-cp"
+
+# ── Service deployed through a MultiClusterService ───────────────────────────
+# export SERVICE_NAME="traefik"
+# export SERVICE_CHART="traefik"
+# export SERVICE_CHART_VERSION="41.2.0"
+# export SERVICE_HELM_REPO="https://traefik.github.io/charts"
+# export SERVICE_NAMESPACE="traefik"
+# export SKIP_SERVICE_TEST="true"        # skip the ServiceTemplate/MCS steps
 
 # ── Environment names ────────────────────────────────────────────────────────
 # export MGMT_CLUSTER_NAME="kcm-mgmt"

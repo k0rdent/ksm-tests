@@ -49,6 +49,9 @@ dump providertemplates.txt kube get providertemplates
 dump clustertemplates.txt kube get clustertemplates -A
 dump clusterdeployments.yaml kube get clusterdeployments -A -o yaml
 dump credentials.txt kube get credentials -A
+dump servicetemplates.txt kube get servicetemplates -A
+dump multiclusterservices.yaml kube get multiclusterservices -o yaml
+dump servicesets.yaml kube get servicesets -A -o yaml
 
 # ── Flux / CAPI ──────────────────────────────────────────────────────────────
 dump helmreleases.txt kube get helmreleases -A
@@ -68,5 +71,14 @@ for ns in "$NAMESPACE" projectsveltos; do
         dump "logs-$ns-$safe.log" kube logs -n "$ns" "$pod" --all-containers --tail 2000
     done < <(kube get pods -n "$ns" -o name 2>/dev/null)
 done
+
+# ── Child cluster ────────────────────────────────────────────────────────────
+if [[ -f "$KUBECONFIG_CHILD" ]] && kube_child version --request-timeout=10s >/dev/null 2>&1; then
+    dump child-nodes.txt kube_child get nodes -o wide
+    dump child-pods.txt kube_child get pods -A -o wide
+    dump child-events.txt kube_child get events -A --sort-by=.lastTimestamp
+else
+    log "Child cluster not reachable -- skipping its dump"
+fi
 
 ok "Diagnostics written to $LOG_DIR"

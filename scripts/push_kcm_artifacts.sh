@@ -11,7 +11,16 @@ source "$SCRIPTS_DIR/lib/docker.sh"
 
 require_cmd docker make
 
-[[ -d "$KCM_DIR" ]] || die "KCM source not found at $KCM_DIR. Run ./scripts/build_kcm.sh first."
+[[ "$KCM_SOURCE" == "source" ]] \
+    || die "push_kcm_artifacts.sh only applies to KCM_SOURCE=source (got '$KCM_SOURCE')"
+
+[[ -d "$KCM_DIR" ]] || die "KCM source not found at $KCM_DIR. Run ./scripts/prepare_kcm.sh first."
+
+# deploy_registry.sh may have had to pick a different port.
+if [[ -f "$WORKDIR/registry.env" ]]; then
+    # shellcheck source=/dev/null
+    source "$WORKDIR/registry.env"
+fi
 container_running "$MGMT_CLUSTER_NAME" \
     || die "Management cluster '$MGMT_CLUSTER_NAME' is not running. Run ./scripts/deploy_mgmt_cluster.sh first."
 container_running "$REGISTRY_NAME" \

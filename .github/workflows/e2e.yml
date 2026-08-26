@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       kcm_ref:
-        description: 'KCM branch, tag or SHA to test'
+        description: 'KCM branch, tag or SHA to test (source mode only)'
         required: false
-        default: 'main'
+        default: ''
       keep_cluster:
         description: 'Skip cleanup (for debugging)'
         type: boolean
@@ -32,15 +32,26 @@ concurrency:
 
 jobs:
   e2e-docker:
-    name: docker (CAPD)
+    name: docker (CAPD, ${{ matrix.kcm_source }})
     runs-on: ubuntu-latest
     timeout-minutes: 90
     # Nightly runs only when the repo opts in, matching k0rdent/catalog.
     if: github.event_name != 'schedule' || vars.ENABLE_CRON == '1'
+    strategy:
+      fail-fast: false
+      matrix:
+        # source  -- KCM built from the checkout, tests the code under review
+        # release -- the published chart, tests what users actually install
+        kcm_source: [source, release]
     env:
-      KCM_REF: ${{ github.event.inputs.kcm_ref || 'main' }}
+      KCM_SOURCE: ${{ matrix.kcm_source }}
+      # Empty means "let common.sh pick": main for source, the matching tag for
+      # release. Overriding it for release mode would break the version check.
+      KCM_REF: ${{ github.event.inputs.kcm_ref || '' }}
       TEST_MODE: docker
-      CLUSTER_NAME_SUFFIX: ci-${{ github.run_id }}
+      # Distinct per matrix leg so the two jobs never share cluster or
+      # container names, even on the same runner.
+      RUN_ID: ci${{ github.run_id }}-${{ matrix.kcm_source }}
     steps:
       - uses: actions/checkout@v7
 
@@ -61,9 +72,10 @@ jobs:
           df -h /
 
       # KCM's Makefile shells out to `go env` while parsing, so go must be on
-      # PATH. The binaries themselves are built inside Docker, so a Go module
-      # cache here would not help.
+      # PATH for the source build. The binaries themselves are built inside
+      # Docker, so a Go module cache here would not help.
       - uses: actions/setup-go@v7
+        if: matrix.kcm_source == 'source'
         with:
           go-version: 'stable'
           cache: false
@@ -71,10 +83,12 @@ jobs:
       - name: Install dependencies
         run: ./scripts/deps.sh
 
-      - name: Build KCM from source
-        run: ./scripts/build_kcm.sh
+      - name: Prepare KCM
+        run: ./scripts/prepare_kcm.sh
 
+      # The local registry only serves charts we built ourselves.
       - name: Deploy local registry
+        if: matrix.kcm_source == 'source'
         run: ./scripts/deploy_registry.sh
 
       - name: Deploy management cluster
@@ -84,6 +98,7 @@ jobs:
         run: ./scripts/install_openebs.sh
 
       - name: Push images and charts
+        if: matrix.kcm_source == 'source'
         run: ./scripts/push_kcm_artifacts.sh
 
       - name: Install KCM
@@ -107,6 +122,15 @@ jobs:
       - name: Check child cluster
         run: ./scripts/check_child_cluster.sh
 
+      - name: Install ServiceTemplate
+        run: ./scripts/install_servicetemplate.sh
+
+      - name: Deploy service via MultiClusterService
+        run: ./scripts/deploy_mcs.sh
+
+      - name: Remove MultiClusterService
+        run: ./scripts/remove_mcs.sh
+
       - name: Remove ClusterDeployment
         run: ./scripts/remove_cld.sh
 
@@ -121,8 +145,8 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: e2e-logs-${{ github.run_id }}
-          path: logs/
+          name: e2e-logs-${{ github.run_id }}-${{ matrix.kcm_source }}
+          path: logs*/
           retention-days: 7
 
       - name: Cleanup
