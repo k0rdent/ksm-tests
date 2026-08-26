@@ -41,9 +41,14 @@ jobs:
       KCM_REF: ${{ github.event.inputs.kcm_ref || 'main' }}
       TEST_MODE: docker
       CLUSTER_NAME_SUFFIX: ci-${{ github.run_id }}
-      DEBUG: ${{ runner.debug == '1' && 'true' || '' }}
     steps:
       - uses: actions/checkout@v7
+
+      # The runner context is not available in job-level env, so DEBUG is set
+      # here instead: re-running with debug logging turns on verbose output.
+      - name: Enable debug output
+        if: runner.debug == '1'
+        run: echo "DEBUG=true" >> "$GITHUB_ENV"
 
       # The Go build, two container images, k0s and the CAPD nodes together
       # outgrow the default runner disk.
