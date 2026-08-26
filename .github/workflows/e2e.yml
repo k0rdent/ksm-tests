@@ -43,7 +43,7 @@ jobs:
       CLUSTER_NAME_SUFFIX: ci-${{ github.run_id }}
       DEBUG: ${{ runner.debug == '1' && 'true' || '' }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       # The Go build, two container images, k0s and the CAPD nodes together
       # outgrow the default runner disk.
@@ -58,7 +58,7 @@ jobs:
       # KCM's Makefile shells out to `go env` while parsing, so go must be on
       # PATH. The binaries themselves are built inside Docker, so a Go module
       # cache here would not help.
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v7
         with:
           go-version: 'stable'
           cache: false
@@ -114,7 +114,7 @@ jobs:
 
       - name: Upload diagnostics
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: e2e-logs-${{ github.run_id }}
           path: logs/
