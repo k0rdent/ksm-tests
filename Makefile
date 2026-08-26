@@ -20,8 +20,10 @@ unit: ## Run the bash unit tests (no cluster required).
 	./$(SCRIPTS)/tests/bash/run.sh
 
 .PHONY: lint
-lint: ## Run shellcheck over every shell script.
+lint: ## Run shellcheck over every shell script, and actionlint if installed.
 	shellcheck $(SCRIPTS)/*.sh $(SCRIPTS)/lib/*.sh $(SCRIPTS)/tests/bash/*.sh
+	@command -v actionlint >/dev/null 2>&1 && actionlint \
+		|| echo "actionlint not installed, skipping workflow lint"
 
 .PHONY: deps
 deps: ## Verify/install the required CLI tools into .work/bin.

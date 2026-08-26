@@ -65,7 +65,7 @@ kubectl get clusterdeployment -n kcm-system
 
 ```bash
 make unit     # bash unit tests, no cluster needed
-make lint     # shellcheck
+make lint     # shellcheck, plus actionlint if it is installed
 make logs     # dump diagnostics into ./logs
 make clean    # tear everything down
 ```
@@ -94,7 +94,9 @@ hardcoded — they are read from the charts in the KCM checkout.
 * `e2e.yml` — the full run on `ubuntu-latest`; on PRs, on pushes touching
   `scripts/**`, nightly (needs repo variable `ENABLE_CRON=1`), or manually with
   a `kcm_ref` input. Diagnostics are uploaded as an artifact on failure.
-* `bash-unit-tests.yml`, `lint-bash.yml` — fast checks on every change.
+* `bash-unit-tests.yml`, `lint.yml` — fast checks on every change: shellcheck
+  plus actionlint, because a workflow that fails to validate never starts a job
+  and so produces no logs to debug.
 
 ## Design notes
 

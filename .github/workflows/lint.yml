@@ -1,0 +1,39 @@
+name: Lint
+
+on:
+  push:
+    paths:
+      - '**/*.sh'
+      - .github/workflows/**
+  pull_request:
+    paths:
+      - '**/*.sh'
+      - .github/workflows/**
+
+jobs:
+  shellcheck:
+    name: ShellCheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install ShellCheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+
+      - name: Run ShellCheck
+        run: shellcheck scripts/*.sh scripts/lib/*.sh scripts/tests/bash/*.sh
+
+  actionlint:
+    name: actionlint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # A workflow that fails to validate never starts a job, so the failure
+      # carries no logs. Catch those before pushing instead.
+      - name: Run actionlint
+        run: |
+          curl -fsSL -o actionlint.tar.gz \
+            https://github.com/rhysd/actionlint/releases/download/v1.7.7/actionlint_1.7.7_linux_amd64.tar.gz
+          tar -xzf actionlint.tar.gz actionlint
+          ./actionlint
