@@ -12,6 +12,7 @@ require_cmd kubectl
 "$SCRIPTS_DIR/check_test_mode.sh"
 
 export KUBECONFIG="$KUBECONFIG_MGMT"
+require_cluster
 
 if ! resource_exists ClusterDeployment "$CLD_NAME" "$NAMESPACE"; then
     log "ClusterDeployment '$CLD_NAME' does not exist -- nothing to remove"
