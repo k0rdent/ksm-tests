@@ -41,14 +41,22 @@ download() { # download URL DEST
     curl -fsSL "$1" -o "$2"
 }
 
+check_kcm_source
+
 step "Checking host prerequisites"
 # These are too intrusive to install automatically -- fail loudly instead.
-for cmd in docker git make go curl tar; do
+# envsubst is checked separately below, where the hint can name the package.
+host_cmds=(docker git curl tar)
+# make and go are only needed to build KCM; release mode installs the
+# published chart and must run on a host without a Go toolchain.
+[[ "$KCM_SOURCE" == "source" ]] && host_cmds+=(make go)
+
+for cmd in "${host_cmds[@]}"; do
     command -v "$cmd" >/dev/null 2>&1 \
-        || die "'$cmd' is required but not installed. Install it and re-run."
+        || die "'$cmd' is required for KCM_SOURCE=$KCM_SOURCE but is not installed."
 done
 docker info >/dev/null 2>&1 || die "Cannot talk to the Docker daemon."
-log "docker, git, make, go, curl, tar are present"
+log "Present: ${host_cmds[*]}"
 
 step "Checking test tooling"
 

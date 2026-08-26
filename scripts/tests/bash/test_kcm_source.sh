@@ -38,6 +38,36 @@ for mode in source release; do
     assert_eq "'$mode' is accepted" 0 "$?"
 done
 
+# Release mode must run on a host with no Go toolchain: CI skips setup-go for
+# that leg, so an unconditional check here fails the whole job. Real tools are
+# used deliberately -- mocking curl or yq would only test the mocks.
+nogo="$(mktemp -d)"
+for d in /usr/bin /bin /usr/local/bin; do
+    [[ -d "$d" ]] || continue
+    for f in "$d"/*; do [[ -x "$f" ]] && ln -sf "$f" "$nogo/$(basename "$f")" 2>/dev/null; done
+done
+rm -f "$nogo/go" "$nogo/make" "$nogo/gmake"
+
+if [[ -x "$REPO_ROOT/.work/bin/yq" ]]; then
+    ln -sf "$REPO_ROOT/.work/bin/yq" "$nogo/yq"
+fi
+
+if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+    out=$(PATH="$nogo" KCM_SOURCE=release BIN_DIR="$REPO_ROOT/.work/bin" \
+          bash "$SCRIPTS_DIR/deps.sh" 2>&1)
+    assert_eq "release mode succeeds without go/make" 0 "$?"
+    assert_not_contains "does not ask for go" "$out" "'go' is required"
+
+    out=$(PATH="$nogo" KCM_SOURCE=source BIN_DIR="$REPO_ROOT/.work/bin" \
+          bash "$SCRIPTS_DIR/deps.sh" 2>&1)
+    assert_eq "source mode fails without go/make" 1 "$?"
+    assert_contains "says which mode needs it" "$out" "KCM_SOURCE=source"
+else
+    echo "  ! docker unavailable, skipping the deps.sh prerequisite checks"
+fi
+
+rm -rf "$nogo"
+
 # ServiceTemplate naming has to match what the MCS references.
 assert_eq "service template name" "traefik-41-2-0" \
     "$(bash -c "source '$SCRIPTS_DIR/lib/common.sh'; service_template_name")"
