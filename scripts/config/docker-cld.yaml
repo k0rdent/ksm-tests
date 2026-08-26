@@ -14,8 +14,3 @@ spec:
     workersNumber: ${WORKERS_NUMBER}
     clusterLabels: {}
     clusterAnnotations: {}
-    storage:
-      etcd:
-        # Off by default. Without this the etcd PVC outlives the cluster, and a
-        # re-run with the same name inherits the old cluster's node registry.
-        autoDeletePVCs: true
