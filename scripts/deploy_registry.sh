@@ -21,6 +21,8 @@ elif container_exists "$REGISTRY_NAME"; then
     log "Starting existing registry container '$REGISTRY_NAME'"
     docker start "$REGISTRY_NAME" >/dev/null
 else
+    port_in_use "$REGISTRY_PORT" \
+        && die "Port $REGISTRY_PORT is already in use. Set REGISTRY_PORT to a free one."
     docker run -d --restart=always \
         --name "$REGISTRY_NAME" \
         --network "$DOCKER_NETWORK" \

@@ -12,6 +12,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
 source "$SCRIPTS_DIR/lib/k8s.sh"
 
 require_cmd kubectl envsubst
+require_yq
 
 RELEASE_ENV="$WORKDIR/release.env"
 [[ -f "$RELEASE_ENV" ]] || die "$RELEASE_ENV not found. Run ./scripts/apply_release.sh first."
@@ -32,6 +33,14 @@ export MANAGEMENT_PROVIDERS RELEASE_NAME
 
 MANIFEST="$WORKDIR/management.rendered.yaml"
 envsubst < "$CONFIG_DIR/management.yaml" > "$MANIFEST"
+
+# Management reinstalls the KCM component from the chart in the registry, so
+# core.kcm.config must repeat the values we installed with -- otherwise it
+# reverts to the published image and pulls fail. This is what the controller
+# does for itself when createManagement is on.
+VALUES_FILE="$WORKDIR/kcm-values.rendered.yaml"
+[[ -f "$VALUES_FILE" ]] || die "$VALUES_FILE not found. Run ./scripts/deploy_kcm.sh first."
+VALUES_FILE="$VALUES_FILE" yq -i '.spec.core.kcm.config = load(strenv(VALUES_FILE))' "$MANIFEST"
 
 step "Applying Management (release $RELEASE_NAME, ${#providers[@]} providers)"
 cat "$MANIFEST"

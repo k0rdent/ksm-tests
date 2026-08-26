@@ -119,6 +119,14 @@ require_env() {
     fi
 }
 
+# require_yq -- several unrelated tools are called "yq"; we need mikefarah's.
+# The python one accepts the same expressions but emits JSON and rejects -i.
+require_yq() {
+    require_cmd yq
+    yq --version 2>&1 | grep -qi mikefarah \
+        || die "yq at $(command -v yq) is not mikefarah/yq. Run ./scripts/deps.sh"
+}
+
 # require_cmd CMD [CMD...] -- fail unless every command is on PATH.
 require_cmd() {
     local missing=()

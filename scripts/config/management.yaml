@@ -1,5 +1,5 @@
-# Minimal Management. The provider list is rendered by apply_management.sh;
-# core.kcm and core.capi take their templates from the Release.
+# Minimal Management. The provider list is rendered by apply_management.sh,
+# which also injects the Helm values into core.kcm.config.
 # NOTE: envsubst also expands variables inside comments -- keep them out.
 apiVersion: k0rdent.mirantis.com/v1beta1
 kind: Management
@@ -8,7 +8,8 @@ metadata:
 spec:
   release: ${RELEASE_NAME}
   core:
-    kcm: {}
+    kcm:
+      config: {}
     capi: {}
   providers:
 ${MANAGEMENT_PROVIDERS}

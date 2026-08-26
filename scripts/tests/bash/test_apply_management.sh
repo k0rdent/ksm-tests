@@ -10,8 +10,17 @@ exit 0
 EOF
 
 WORKDIR="$(mktemp -d)"
-export WORKDIR
+# BIN_DIR normally lives under WORKDIR; keep pointing at the real tools.
+BIN_DIR="$REPO_ROOT/.work/bin"
+export WORKDIR BIN_DIR
 echo 'RELEASE_NAME=kcm-1-11-0' > "$WORKDIR/release.env"
+cat > "$WORKDIR/kcm-values.rendered.yaml" <<'EOF'
+image:
+  repository: localhost/kcm/controller
+  tag: latest
+controller:
+  createManagement: false
+EOF
 
 KCM_PROVIDERS="cluster-api-provider-docker projectsveltos" \
     bash "$SCRIPTS_DIR/apply_management.sh" >/dev/null 2>&1
@@ -22,9 +31,16 @@ assert_contains "references the Release from release.env" "$rendered" "release: 
 assert_contains "lists the docker provider" "$rendered" "- name: cluster-api-provider-docker"
 assert_contains "lists sveltos" "$rendered" "- name: projectsveltos"
 assert_not_contains "does not enable aws" "$rendered" "cluster-api-provider-aws"
-assert_eq "exactly 2 providers" 2 "$(grep -c '^  - name:' <<< "$rendered")"
+assert_eq "exactly 2 providers" 2 "$(grep -cE '^ +- name:' <<< "$rendered")"
+# Without this the HelmRelease would reinstall KCM from the published image.
+assert_contains "carries the local image into core.kcm.config" "$rendered" "localhost/kcm/controller"
 
-# Without release.env the script must refuse rather than render junk.
+# Missing inputs must fail loudly rather than render junk.
+rm -f "$WORKDIR/kcm-values.rendered.yaml"
+out=$(bash "$SCRIPTS_DIR/apply_management.sh" 2>&1)
+assert_eq "fails without the rendered values" 1 "$?"
+assert_contains "points at deploy_kcm.sh" "$out" "deploy_kcm.sh"
+
 rm -f "$WORKDIR/release.env"
 out=$(bash "$SCRIPTS_DIR/apply_management.sh" 2>&1)
 assert_eq "fails without release.env" 1 "$?"

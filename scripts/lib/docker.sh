@@ -11,6 +11,28 @@ container_running() {
     [[ -n "$(docker ps --filter "name=^$1\$" --format '{{.Names}}')" ]]
 }
 
+# port_in_use PORT -- probe 127.0.0.1 without needing ss/lsof/root.
+port_in_use() {
+    (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null || return 1
+    exec 3<&- 3>&-
+    return 0
+}
+
+# free_port START -- first free port at or after START.
+free_port() {
+    local port="$1" limit=$(( $1 + 100 ))
+    while (( port < limit )); do
+        port_in_use "$port" || { echo "$port"; return 0; }
+        port=$(( port + 1 ))
+    done
+    return 1
+}
+
+# published_port CONTAINER PORT -- host port a container port maps to.
+published_port() {
+    docker port "$1" "$2" 2>/dev/null | head -1 | awk -F: '{print $NF}'
+}
+
 # ensure_network NAME -- create the docker network unless it already exists.
 ensure_network() {
     local name="$1"

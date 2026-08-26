@@ -3,8 +3,11 @@
 # shellcheck source=scripts/tests/bash/helpers.sh
 source "$(dirname "${BASH_SOURCE[0]}")/helpers.sh"
 
-if ! command -v yq >/dev/null 2>&1; then
-    echo "  ! yq not installed, skipping"
+BIN_DIR="$REPO_ROOT/.work/bin"
+export BIN_DIR
+PATH="$BIN_DIR:$PATH"
+if ! yq --version 2>&1 | grep -qi mikefarah; then
+    echo "  ! mikefarah/yq not installed, skipping"
     exit 0
 fi
 

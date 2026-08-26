@@ -11,7 +11,8 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
 # shellcheck source=scripts/lib/k8s.sh
 source "$SCRIPTS_DIR/lib/k8s.sh"
 
-require_cmd kubectl yq
+require_cmd kubectl
+require_yq
 
 RELEASE_FILE="$(kcm_release_file)"
 TEMPLATES_DIR_KCM="$(kcm_templates_dir)"
