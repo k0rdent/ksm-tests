@@ -94,8 +94,11 @@ else
 fi
 
 if needs_install jq; then
+    # jq names its macOS assets "macos", not "darwin".
+    jq_os="$OS"
+    [[ "$OS" == "darwin" ]] && jq_os=macos
     log "Installing jq $JQ_VERSION into $BIN_DIR"
-    download "https://github.com/jqlang/jq/releases/download/jq-$JQ_VERSION/jq-${OS}-${ARCH}" "$BIN_DIR/jq"
+    download "https://github.com/jqlang/jq/releases/download/jq-$JQ_VERSION/jq-${jq_os}-${ARCH}" "$BIN_DIR/jq"
     chmod +x "$BIN_DIR/jq"
 else
     log "jq: $(command -v jq)"
