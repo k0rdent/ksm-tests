@@ -1,7 +1,19 @@
-# The kserve stack -- the heavy service set, and the one with a dependency
-# chain: cert-manager provides the webhook certificates, the CRDs must exist
-# before the controller. Same chain as catalog's apps/kserve/example.
-#
+name: 02_depends_on_valid
+description: >-
+  A valid dependsOn chain: cert-manager provides the webhook certificates, the
+  CRDs must exist before the controller. Same chain as catalog's apps/kserve.
+
+# KCM versions where this scenario is known to fail. CI still runs the leg and
+# still reports it, but it does not block the workflow. Drop an entry once the
+# defect is fixed upstream.
+knownFailures:
+  - kcm: rel-1-11-0
+    reason: >-
+      Teardown removes kserve-crd before uninstalling kserve-resources, whose
+      release still holds a ClusterStorageContainer, so the uninstall fails with
+      "ensure CRDs are installed first" and the MCS finalizer never clears.
+      1.10.0 and main are unaffected; catalog does not test this path at all.
+
 # Charts come from k0rdent/catalog's registry. Those are thin wrappers that
 # declare the upstream chart as a dependency of the same name, so values are
 # nested one level under that name, exactly as catalog's own example does.

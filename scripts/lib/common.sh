@@ -32,6 +32,60 @@ case ":$PATH:" in
 esac
 export PATH
 
+# ── Output helpers ───────────────────────────────────────────────────────────
+# Defined this early because the KCM variant lookup below can fail.
+
+log() { echo "   $*"; }
+
+step() { echo -e "\n▶ $*"; }
+
+ok() { echo "✅ $*"; }
+
+warn() { echo "⚠️  $*" >&2; }
+
+die() {
+    echo "❌ $*" >&2
+    exit 1
+}
+
+# ── KCM variants ─────────────────────────────────────────────────────────────
+# scripts/config/kcm-variants.yaml is shared with CI. Parsed with awk rather
+# than yq on purpose: deps.sh sources this file to decide whether it needs go
+# and make, and that runs before yq is installed.
+KCM_VARIANTS_FILE="${KCM_VARIANTS_FILE:-$CONFIG_DIR/kcm-variants.yaml}"
+export KCM_VARIANTS_FILE
+
+# list_kcm_variants -- one id per line, in file order.
+list_kcm_variants() {
+    awk '/^[[:space:]]*-[[:space:]]+id:[[:space:]]*/ { print $3 }' "$KCM_VARIANTS_FILE"
+}
+
+# kcm_variant_field ID FIELD -- a field of one variant, empty if absent.
+kcm_variant_field() {
+    awk -v want="$1" -v field="$2:" '
+        /^[[:space:]]*-[[:space:]]+id:[[:space:]]*/ { inblock = ($3 == want); next }
+        inblock && $1 == field { $1 = ""; sub(/^[[:space:]]+/, ""); gsub(/^['"'"'"]|['"'"'"]$/, ""); print; exit }
+    ' "$KCM_VARIANTS_FILE"
+}
+
+# KCM=<id> is the shorthand CI and the Makefile both speak. Explicitly set
+# KCM_SOURCE/KCM_REF/KCM_RELEASE_VERSION still win, so an ad-hoc version that
+# is not a declared variant stays testable.
+KCM="${KCM:-}"
+if [[ -n "$KCM" ]]; then
+    [[ -f "$KCM_VARIANTS_FILE" ]] || die "No KCM variants file at $KCM_VARIANTS_FILE"
+    if ! list_kcm_variants | grep -qx "$KCM"; then
+        die "Unknown KCM variant '$KCM'. Available: $(list_kcm_variants | tr '\n' ' ')"
+    fi
+    KCM_SOURCE="${KCM_SOURCE:-$(kcm_variant_field "$KCM" source)}"
+    _variant_ref="$(kcm_variant_field "$KCM" ref)"
+    _variant_version="$(kcm_variant_field "$KCM" releaseVersion)"
+    [[ -n "$_variant_ref" ]] && KCM_REF="${KCM_REF:-$_variant_ref}"
+    [[ -n "$_variant_version" ]] && KCM_RELEASE_VERSION="${KCM_RELEASE_VERSION:-$_variant_version}"
+    unset _variant_ref _variant_version
+fi
+export KCM
+
 # ── What is under test ───────────────────────────────────────────────────────
 # source  -- build the images and charts from a KCM checkout (tests a PR/main)
 # release -- install the published chart from ghcr (tests what users get)
@@ -118,14 +172,18 @@ WORKERS_NUMBER="${WORKERS_NUMBER:-1}"
 CLD_GROUP_LABEL="${CLD_GROUP_LABEL:-e2e-${RUN_ID:-default}}"
 export CLUSTER_NAME_SUFFIX CLD_NAME WORKERS_NUMBER CLD_GROUP_LABEL
 
-# ── Services under test (ServiceTemplates + one MultiClusterService) ─────────
-# Declared in a file rather than env vars: they have dependencies and values
-# blocks. SERVICE_SET picks one of scripts/config/services-<set>.yaml;
-# SERVICES_FILE overrides the path outright.
-SERVICE_SET="${SERVICE_SET:-traefik}"
-SERVICES_FILE="${SERVICES_FILE:-$CONFIG_DIR/services-$SERVICE_SET.yaml}"
-MCS_NAME="${MCS_NAME:-e2e-$CLUSTER_NAME_SUFFIX}"
-export SERVICE_SET SERVICES_FILE MCS_NAME
+# ── Scenario under test ──────────────────────────────────────────────────────
+# A scenario is a file in test_scenarios/ describing the services and their
+# dependencies. SCENARIO picks one by filename stem; SERVICES_FILE overrides
+# the path outright.
+SCENARIOS_DIR="${SCENARIOS_DIR:-$PROJECT_ROOT/test_scenarios}"
+SCENARIO="${SCENARIO:-01_single_svc}"
+SERVICES_FILE="${SERVICES_FILE:-$SCENARIOS_DIR/$SCENARIO.yaml}"
+# Scenario stems use underscores, which RFC 1123 forbids in Kubernetes object
+# names -- and the scenario reaches CLD_NAME through RUN_ID.
+SCENARIO_SLUG="${SCENARIO//_/-}"
+MCS_NAME="${MCS_NAME:-mcs-$CLUSTER_NAME_SUFFIX-$SCENARIO_SLUG}"
+export SCENARIOS_DIR SCENARIO SCENARIO_SLUG SERVICES_FILE MCS_NAME
 
 # ── Timeouts (seconds) ───────────────────────────────────────────────────────
 MANAGEMENT_TIMEOUT="${MANAGEMENT_TIMEOUT:-1500}"   # 25 min
@@ -136,21 +194,6 @@ PODS_TIMEOUT="${PODS_TIMEOUT:-900}"                # 15 min
 MCS_TIMEOUT="${MCS_TIMEOUT:-900}"                  # 15 min
 export MANAGEMENT_TIMEOUT TEMPLATES_TIMEOUT CLD_TIMEOUT CLD_REMOVAL_TIMEOUT
 export PODS_TIMEOUT MCS_TIMEOUT
-
-# ── Output helpers ───────────────────────────────────────────────────────────
-
-log() { echo "   $*"; }
-
-step() { echo -e "\n▶ $*"; }
-
-ok() { echo "✅ $*"; }
-
-warn() { echo "⚠️  $*" >&2; }
-
-die() {
-    echo "❌ $*" >&2
-    exit 1
-}
 
 # ── Assertions ───────────────────────────────────────────────────────────────
 
@@ -228,6 +271,22 @@ chart_version() { yaml_top_scalar "${1:?chart_version needs a chart dir}/Chart.y
 template_name() {
     local dir="${1:?template_name needs a chart dir}"
     echo "$(chart_name "$dir")-$(fqdn_version "$(chart_version "$dir")")"
+}
+
+# list_scenarios -- one scenario stem per line, sorted.
+list_scenarios() {
+    local f
+    for f in "$SCENARIOS_DIR"/*.yaml; do
+        [[ -e "$f" ]] || continue
+        basename "$f" .yaml
+    done | sort
+}
+
+# check_scenario -- a typo should say what is available, not just refuse.
+check_scenario() {
+    [[ -f "$SERVICES_FILE" ]] && return 0
+    die "Unknown scenario '$SCENARIO' (no $SERVICES_FILE).
+Available: $(list_scenarios | tr '\n' ' ')"
 }
 
 # check_kcm_source -- guard against a typo in KCM_SOURCE.

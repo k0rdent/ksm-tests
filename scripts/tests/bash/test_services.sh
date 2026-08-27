@@ -16,40 +16,56 @@ source "$SCRIPTS_DIR/lib/common.sh"
 # shellcheck source=scripts/lib/services.sh
 source "$SCRIPTS_DIR/lib/services.sh"
 
-# ── SERVICE_SET picks the file ───────────────────────────────────────────────
+# ── SCENARIO picks the file ──────────────────────────────────────────────────
 # Unset SERVICES_FILE: this test process has already sourced common.sh, which
 # exports it, and the child would inherit it instead of deriving it.
 set_file() {
-    SERVICE_SET="$1" bash -c "unset SERVICES_FILE; source '$SCRIPTS_DIR/lib/common.sh'; echo \$SERVICES_FILE"
+    SCENARIO="$1" bash -c "unset SERVICES_FILE; source '$SCRIPTS_DIR/lib/common.sh'; echo \$SERVICES_FILE"
 }
-assert_contains "traefik is the default set" "$(set_file '')" "services-traefik.yaml"
-assert_contains "SERVICE_SET picks the kserve set" "$(set_file kserve)" "services-kserve.yaml"
+assert_contains "01_single_svc is the default" "$(set_file '')" "01_single_svc.yaml"
+assert_contains "SCENARIO picks the file" "$(set_file 02_depends_on_valid)" "02_depends_on_valid.yaml"
+assert_eq "scenarios are discovered from the directory" \
+    "01_single_svc 02_depends_on_valid" "$(list_scenarios | tr '\n' ' ' | sed 's/ $//')"
 
-for f in services-traefik services-kserve; do
-    TESTS_RUN=$((TESTS_RUN + 1))
-    if [[ -f "$CONFIG_DIR/$f.yaml" ]]; then
-        echo "  ✓ $f.yaml exists"
-    else
-        echo "  ✗ $f.yaml is missing"
-        TESTS_FAILED=$((TESTS_FAILED + 1))
-    fi
-done
+# A typo must say what is available rather than just refuse.
+out=$(SCENARIO=nope bash -c "unset SERVICES_FILE; source '$SCRIPTS_DIR/lib/common.sh'; check_scenario" 2>&1)
+assert_eq "an unknown scenario is rejected" 1 "$?"
+assert_contains "lists the available scenarios" "$out" "02_depends_on_valid"
+
+# Underscores are legal in a filename but not in a Kubernetes object name, and
+# the scenario reaches CLD_NAME and MCS_NAME.
+slug="$(SCENARIO=02_depends_on_valid bash -c "source '$SCRIPTS_DIR/lib/common.sh'; echo \$SCENARIO_SLUG")"
+assert_eq "the slug has no underscores" "02-depends-on-valid" "$slug"
+mcs="$(SCENARIO=02_depends_on_valid bash -c "unset MCS_NAME; source '$SCRIPTS_DIR/lib/common.sh'; echo \$MCS_NAME")"
+assert_not_contains "MCS_NAME has no underscores" "$mcs" "_"
+
+# Metadata and filename must agree, or `make scenarios` and CI would disagree.
+while read -r id; do
+    [[ -n "$id" ]] || continue
+    assert_eq "$id declares its own name" "$id" \
+        "$(yq -r '.name' "$SCENARIOS_DIR/$id.yaml")"
+done < <(list_scenarios)
+
+assert_eq "01 has no known failures" "0" \
+    "$(yq -r '[.knownFailures[]] | length' "$SCENARIOS_DIR/01_single_svc.yaml")"
+assert_eq "02 records the 1.11.0 defect" "rel-1-11-0" \
+    "$(yq -r '.knownFailures[0].kcm' "$SCENARIOS_DIR/02_depends_on_valid.yaml")"
 
 # Every chart must come from catalog's registry, which is what the values
 # nesting below assumes.
-all_repos="$(yq -r '.services[].repo' "$CONFIG_DIR"/services-*.yaml | grep -v '^---$' | sort -u)"
+all_repos="$(yq -r '.services[].repo' "$SCENARIOS_DIR"/*.yaml | grep -v '^---$' | sort -u)"
 assert_eq "all charts come from the catalog registry" \
     "oci://ghcr.io/k0rdent/catalog/charts" "$all_repos"
 
-# ── The traefik set ──────────────────────────────────────────────────────────
-SERVICES_FILE="$CONFIG_DIR/services-traefik.yaml"
-assert_eq "traefik set has one service" 1 "$(service_count)"
+# ── 01_single_svc ────────────────────────────────────────────────────────────
+SERVICES_FILE="$SCENARIOS_DIR/01_single_svc.yaml"
+assert_eq "01 has one service" 1 "$(service_count)"
 assert_eq "traefik has no dependsOn" "" "$(service_field traefik dependsOn)"
 assert_eq "traefik waits for its pods" "traefik-" "$(service_field traefik waitForPods)"
 
-# ── The kserve set ───────────────────────────────────────────────────────────
-SERVICES_FILE="$CONFIG_DIR/services-kserve.yaml"
-assert_eq "kserve set has three services" 3 "$(service_count)"
+# ── 02_depends_on_valid ──────────────────────────────────────────────────────
+SERVICES_FILE="$SCENARIOS_DIR/02_depends_on_valid.yaml"
+assert_eq "02 has three services" 3 "$(service_count)"
 assert_eq "declaration order puts dependencies first" \
     "cert-manager kserve-crd kserve-resources " \
     "$(services_rows | cut -d'|' -f1 | tr '\n' ' ')"
@@ -83,7 +99,7 @@ assert_contains "cert-manager values are nested under the chart name" \
 assert_contains "kserve values are nested under the chart name" \
     "$(service_values kserve-resources)" "kserve-resources:"
 
-# ── Rendering the kserve set ─────────────────────────────────────────────────
+# ── Rendering 02_depends_on_valid ────────────────────────────────────────────
 setup_mock_bin
 write_mock kubectl <<'EOF'
 #!/bin/bash

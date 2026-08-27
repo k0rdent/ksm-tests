@@ -1,0 +1,25 @@
+# The KCM builds every scenario is tested against.
+#
+# Single source of truth: scripts/lib/common.sh resolves KCM=<id> from here for
+# local runs, and the CI discover job generates its matrix from the same file.
+# Adding a version is a change to this file alone -- no workflow edit.
+#
+# The ids are what scenario files reference in their knownFailures, so a unit
+# test asserts every referenced id exists here.
+variants:
+  # Built from a checkout -- tests the code under review.
+  - id: src-main
+    name: 'src: main'
+    source: source
+    ref: main
+
+  # Published charts -- tests what users actually install.
+  - id: rel-1-11-0
+    name: 'release: 1.11.0'
+    source: release
+    releaseVersion: '1.11.0'
+
+  - id: rel-1-10-0
+    name: 'release: 1.10.0'
+    source: release
+    releaseVersion: '1.10.0'

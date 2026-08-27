@@ -10,8 +10,11 @@
 # scripts/lib/common.sh -- uncomment only what you want to change.
 
 # ── Which KCM to test ────────────────────────────────────────────────────────
-# "source" builds the images and charts from a checkout; "release" installs the
-# published chart from ghcr and needs neither Go nor a local registry.
+# KCM=<id> is the shorthand CI uses too; ids come from
+# scripts/config/kcm-variants.yaml and `make scenarios` lists them.
+# export KCM="src-main"                 # or rel-1-11-0, rel-1-10-0
+#
+# Setting these directly still wins over the variant, for an ad-hoc version:
 # export KCM_SOURCE="source"
 # export KCM_RELEASE_VERSION="1.11.0"
 
@@ -38,12 +41,10 @@
 # export KCM_PROVIDERS="cluster-api-provider-docker cluster-api-provider-k0sproject-k0smotron projectsveltos"
 # export KCM_CLUSTER_TEMPLATES="docker-hosted-cp"
 
-# ── Services deployed through a MultiClusterService ──────────────────────────
-# The set is picked by SERVICE_SET: "traefik", or "kserve" for the
-# cert-manager -> kserve-crd -> kserve-resources chain. Point SERVICES_FILE at
-# your own file to test a different set.
-# export SERVICE_SET="traefik"          # or "kserve"
-# export SERVICES_FILE="$PWD/scripts/config/services-traefik.yaml"
+# ── Scenario (services deployed through a MultiClusterService) ───────────────
+# A scenario is a file in test_scenarios/. Run `make scenarios` for the list.
+# export SCENARIO="01_single_svc"
+# export SERVICES_FILE="$PWD/test_scenarios/01_single_svc.yaml"   # or a file of your own
 # export SKIP_SERVICE_TEST="true"        # skip the ServiceTemplate/MCS steps
 
 # ── Environment names ────────────────────────────────────────────────────────

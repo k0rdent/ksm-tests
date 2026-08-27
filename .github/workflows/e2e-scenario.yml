@@ -1,0 +1,159 @@
+name: E2E scenario
+
+# Reusable: one scenario across every KCM variant. GitHub Actions has no nested
+# matrix, so the scenario dimension lives in the caller (e2e.yml) and this
+# workflow expands the versions underneath it.
+#
+# continue-on-error cannot be set on a job that calls a reusable workflow, so
+# the known-failure marker has to live here rather than in the caller.
+
+on:
+  workflow_call:
+    inputs:
+      scenario:
+        description: 'Scenario id (test_scenarios/<id>.yaml)'
+        type: string
+        required: true
+      kcm_variants:
+        description: 'JSON array of KCM variants, from the discover job'
+        type: string
+        required: true
+      known_failing_kcm:
+        description: 'Space-separated variant ids this scenario is known to fail on'
+        type: string
+        required: false
+        default: ''
+      kcm_ref:
+        description: 'Override the KCM ref (source mode only)'
+        type: string
+        required: false
+        default: ''
+      keep_cluster:
+        description: 'Skip cleanup, for debugging'
+        type: boolean
+        required: false
+        default: false
+
+jobs:
+  e2e-docker:
+    name: ${{ matrix.kcm.name }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    # Scenarios declare the versions they are known to fail on, in their own
+    # file. The leg still runs and still reports -- it just does not block.
+    continue-on-error: ${{ contains(inputs.known_failing_kcm, matrix.kcm.id) }}
+    strategy:
+      fail-fast: false
+      matrix:
+        kcm: ${{ fromJson(inputs.kcm_variants) }}
+    env:
+      # common.sh turns KCM into KCM_SOURCE/KCM_REF/KCM_RELEASE_VERSION using
+      # the same kcm-variants.yaml a local run reads, so the mapping is not
+      # duplicated here.
+      KCM: ${{ matrix.kcm.id }}
+      KCM_REF: ${{ inputs.kcm_ref }}
+      SCENARIO: ${{ inputs.scenario }}
+      TEST_MODE: docker
+      # Scenario is deliberately absent: each combination gets its own runner,
+      # and MCS_NAME already carries the scenario slug.
+      RUN_ID: ci${{ github.run_id }}-${{ matrix.kcm.id }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # The runner context is not available in job-level env, so DEBUG is set
+      # here instead: re-running with debug logging turns on verbose output.
+      - name: Enable debug output
+        if: runner.debug == '1'
+        run: echo "DEBUG=true" >> "$GITHUB_ENV"
+
+      # The Go build, two container images, k0s and the CAPD nodes together
+      # outgrow the default runner disk.
+      - name: Free disk space
+        run: |
+          df -h /
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+                      /usr/local/share/boost "$AGENT_TOOLSDIRECTORY" || true
+          sudo apt-get clean
+          df -h /
+
+      # KCM's Makefile shells out to `go env` while parsing, so go must be on
+      # PATH for the source build. The binaries themselves are built inside
+      # Docker, so a Go module cache here would not help.
+      - uses: actions/setup-go@v7
+        if: matrix.kcm.source == 'source'
+        with:
+          go-version: 'stable'
+          cache: false
+
+      - name: Install dependencies
+        run: ./scripts/deps.sh
+
+      - name: Prepare KCM
+        run: ./scripts/prepare_kcm.sh
+
+      # The local registry only serves charts we built ourselves.
+      - name: Deploy local registry
+        if: matrix.kcm.source == 'source'
+        run: ./scripts/deploy_registry.sh
+
+      - name: Deploy management cluster
+        run: ./scripts/deploy_mgmt_cluster.sh
+
+      - name: Install OpenEBS
+        run: ./scripts/install_openebs.sh
+
+      - name: Push images and charts
+        if: matrix.kcm.source == 'source'
+        run: ./scripts/push_kcm_artifacts.sh
+
+      - name: Install KCM
+        run: ./scripts/deploy_kcm.sh
+
+      - name: Apply Release and templates
+        run: ./scripts/apply_release.sh
+
+      - name: Wait for templates
+        run: ./scripts/wait_for_templates.sh
+
+      - name: Apply Management
+        run: ./scripts/apply_management.sh
+
+      - name: Wait for Management
+        run: ./scripts/wait_for_management.sh
+
+      - name: Deploy ClusterDeployment
+        run: ./scripts/deploy_cld.sh
+
+      - name: Check child cluster
+        run: ./scripts/check_child_cluster.sh
+
+      - name: Install ServiceTemplates
+        run: ./scripts/install_servicetemplate.sh
+
+      - name: Deploy services via MultiClusterService
+        run: ./scripts/deploy_mcs.sh
+
+      - name: Remove MultiClusterService
+        run: ./scripts/remove_mcs.sh
+
+      - name: Remove ClusterDeployment
+        run: ./scripts/remove_cld.sh
+
+      - name: Uninstall KCM
+        run: ./scripts/remove_kcm.sh
+
+      - name: Collect diagnostics
+        if: failure()
+        run: ./scripts/collect_logs.sh
+
+      - name: Upload diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-logs-${{ github.run_id }}-${{ inputs.scenario }}-${{ matrix.kcm.id }}
+          path: logs*/
+          retention-days: 7
+
+      - name: Cleanup
+        if: always() && !inputs.keep_cluster
+        run: ./scripts/cleanup.sh
