@@ -10,6 +10,10 @@ on:
       - 'scripts/**'
       - .github/workflows/bash-unit-tests.yml
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
 jobs:
   bash-tests:
     name: bash tests

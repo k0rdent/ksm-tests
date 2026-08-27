@@ -10,6 +10,10 @@ on:
       - '**/*.sh'
       - .github/workflows/**
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
 jobs:
   shellcheck:
     name: ShellCheck
