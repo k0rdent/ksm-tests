@@ -15,7 +15,7 @@ source "$SCRIPTS_DIR/lib/services.sh"
 require_cmd kubectl jq
 require_yq
 
-[[ -f "$SERVICES_FILE" ]] || die "No services file at $SERVICES_FILE"
+check_scenario
 
 export KUBECONFIG="$KUBECONFIG_MGMT"
 require_cluster
@@ -59,7 +59,7 @@ while IFS="$SERVICE_SEP" read -r name chart version _repo namespace dep _wait; d
     fi
 done < <(services_rows)
 
-step "Creating MultiClusterService '$MCS_NAME' (group=$CLD_GROUP_LABEL)"
+step "Scenario $SCENARIO: creating MultiClusterService '$MCS_NAME' (group=$CLD_GROUP_LABEL)"
 cat "$MANIFEST"
 kube apply -f "$MANIFEST"
 

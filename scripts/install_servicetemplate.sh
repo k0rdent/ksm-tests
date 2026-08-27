@@ -15,7 +15,7 @@ source "$SCRIPTS_DIR/lib/services.sh"
 require_cmd kubectl
 require_yq
 
-[[ -f "$SERVICES_FILE" ]] || die "No services file at $SERVICES_FILE"
+check_scenario
 
 export KUBECONFIG="$KUBECONFIG_MGMT"
 require_cluster
@@ -24,7 +24,7 @@ ensure_workdir
 MANIFEST="$WORKDIR/service-templates.rendered.yaml"
 : > "$MANIFEST"
 
-step "Rendering $(service_count) ServiceTemplate(s) from $(basename "$SERVICES_FILE")"
+step "Scenario $SCENARIO: rendering $(service_count) ServiceTemplate(s)"
 
 while IFS="$SERVICE_SEP" read -r name chart version repo namespace _dep _wait; do
     [[ -n "$name" ]] || continue

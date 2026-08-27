@@ -37,37 +37,70 @@ spent building the images and provisioning the child cluster.
 | `source` (default) | Builds the controller and telemetry images from a KCM checkout, pushes the template charts to a throwaway local registry, and installs the chart from the source tree. Tests the code under review. |
 | `release` | Installs `oci://ghcr.io/k0rdent/kcm/charts/kcm` at `KCM_RELEASE_VERSION`. No build, no registry, no Go or make needed. Tests what users actually get. |
 
-CI runs every KCM variant against every service set — six jobs in parallel:
+CI is grouped **by scenario first, KCM variant second** — six jobs:
 
-|  | traefik | kserve |
-|---|---|---|
-| **src: main** | ✔ | ✔ |
-| **release: 1.11.0** | ✔ | ✔ |
-| **release: 1.10.0** | ✔ | ✔ |
+```
+01_single_svc        / src: main | release: 1.11.0 | release: 1.10.0
+02_depends_on_valid  / src: main | release: 1.11.0 | release: 1.10.0
+```
 
-GitHub Actions has no way to fork a job mid-run and branch two "realities" off
-one cluster — each matrix combination gets its own runner and builds its own
-cluster from scratch. That costs a KCM install per leg, but it is also what
-makes the legs genuinely independent: a service set that wedges its cluster
-cannot affect the other.
+Actions has no nested matrix, so `e2e.yml` holds the scenario dimension and
+calls the reusable `e2e-scenario.yml`, which expands the versions underneath
+it. A `discover` job builds both dimensions from `test_scenarios/*.yaml` and
+`kcm-variants.yaml`, so neither adding a scenario nor adding a version needs a
+workflow edit.
+
+There is no way to fork a job mid-run and branch two "realities" off one
+cluster — each combination gets its own runner and builds its own cluster from
+scratch. That costs a KCM install per leg, but it is also what makes the legs
+independent: a scenario that wedges its cluster cannot affect the others.
 
 Both paths need the checkout, because it supplies the `Release` and template
 manifests. Release mode pins it to the matching tag and refuses to run if the
 chart version there disagrees with `KCM_RELEASE_VERSION`.
 
-### The service test
+### Scenarios
 
-After the child cluster is up, the run installs a `ServiceTemplate` per service
-in the chosen set, deploys them all through a single `MultiClusterService`,
-waits for the pods to be Ready *in the child cluster*, then removes the MCS and
-verifies the workloads are gone.
+A scenario is a file in **`test_scenarios/`** describing the services deployed
+to the child cluster and how they depend on each other. After the child cluster
+is up, the run installs a `ServiceTemplate` per service, deploys them all
+through a single `MultiClusterService`, waits for the pods to be Ready *in the
+child cluster*, then removes the MCS and verifies the workloads are gone.
 
-`SERVICE_SET` picks the set (`scripts/config/services-<set>.yaml`):
-
-| Set | Services | Notes |
+| Scenario | What it exercises | Services |
 |---|---|---|
-| `traefik` (default) | traefik 41.2.0 -> ns `traefik` | the light one |
-| `kserve` | cert-manager 1.20.2 -> kserve-crd v0.18.0 -> kserve-resources v0.18.0 | dependency chain, ns `cert-manager` and `kserve` |
+| `01_single_svc` | the baseline MCS path, no dependencies | traefik |
+| `02_depends_on_valid` | a valid `dependsOn` chain | cert-manager → kserve-crd → kserve-resources |
+
+Adding one is a drop-in: put a file in `test_scenarios/`, and both `make
+scenarios` and CI pick it up with no further edits.
+
+```yaml
+name: 02_depends_on_valid           # must match the filename
+description: ...
+knownFailures:                      # optional
+  - kcm: rel-1-11-0
+    reason: ...
+services:
+  - name: cert-manager
+    chart: cert-manager
+    version: 1.20.2
+    repo: oci://ghcr.io/k0rdent/catalog/charts
+    namespace: cert-manager
+    waitForPods: cert-manager-
+    values: |
+      cert-manager:
+        crds:
+          enabled: true
+  - name: kserve-crd
+    dependsOn: cert-manager
+    ...
+```
+
+`knownFailures` lists the KCM variants a scenario is known to fail on. CI still
+runs and reports that leg, it just does not block the workflow. Delete the
+entry once the defect is fixed upstream — a unit test checks every id there is
+a real variant, so a typo cannot silently disable the marker.
 
 Charts come from **k0rdent/catalog's registry** (`oci://ghcr.io/k0rdent/catalog/charts`),
 the same artifacts catalog's own `example` charts reference. Those are thin
@@ -75,35 +108,37 @@ wrappers that declare the upstream chart as a dependency of the same name, so
 values must be **nested one level under that name**. Flatten them and helm
 ignores the lot without complaining — there is a unit test guarding this.
 
-Skip the whole thing with `SKIP_SERVICE_TEST=true`, or point `SERVICES_FILE` at
-a set of your own.
+Skip the scenario steps entirely with `SKIP_SERVICE_TEST=true`.
 
-#### Known defect: kserve teardown on KCM 1.11.0
+### KCM variants
 
-`release: 1.11.0 / kserve` fails at `Remove MultiClusterService`, reproducibly.
-Sveltos removes `kserve-crd` before it uninstalls `kserve-resources`, whose
-release still contains a `ClusterStorageContainer`, so the uninstall fails:
+The KCM builds under test live in **`scripts/config/kcm-variants.yaml`** and are
+picked with `KCM=<id>`:
 
-```
-failed to undeploy HelmCharts
-    no matches for kind "ClusterStorageContainer" in version "serving.kserve.io/v1alpha1"
-    ensure CRDs are installed first
-```
+| Id | What it installs |
+|---|---|
+| `src-main` | built from a `main` checkout |
+| `rel-1-11-0` | published chart 1.11.0 |
+| `rel-1-10-0` | published chart 1.10.0 |
 
-Sveltos retries forever and the `MultiClusterService` finalizer never clears.
-KCM 1.10.0 and main are unaffected; k0rdent/catalog sets
-`test_remove_multiclusterservice: false` for kserve, so upstream does not
-exercise this path either. That one matrix combination is marked
-`continue-on-error`, so it still runs and still reports without blocking the
-workflow — remove the marker once KCM fixes the teardown order.
+The same file drives the CI matrix, so local runs and CI use the same ids —
+which is also what makes `knownFailures` meaningful outside the workflow.
+Setting `KCM_SOURCE` / `KCM_REF` / `KCM_RELEASE_VERSION` directly still wins,
+for an ad-hoc version that is not a declared variant.
 
 ### Parallel runs
 
 Set `RUN_ID` and several runs coexist on one machine:
 
 ```bash
-RUN_ID=src KCM_SOURCE=source  ./scripts/e2e_test.sh &
-RUN_ID=rel KCM_SOURCE=release ./scripts/e2e_test.sh &
+make e2e-parallel KCM=src-main      # every scenario at once, own cluster each
+```
+
+or by hand, for arbitrary combinations:
+
+```bash
+RUN_ID=a SCENARIO=01_single_svc       KCM=src-main   ./scripts/e2e_test.sh &
+RUN_ID=b SCENARIO=02_depends_on_valid KCM=rel-1-11-0 ./scripts/e2e_test.sh &
 wait
 ```
 
@@ -143,13 +178,37 @@ it — this project only knows `docker`.
 
 ## Running it
 
+Pick a scenario and a KCM variant; `make scenarios` lists both.
+
 ```bash
-make e2e                      # full run, then clean up
-make e2e-keep                 # leave the environment up for debugging
-make e2e-release              # same, against the published chart
-make e2e-parallel             # source and release side by side
-make e2e-kserve               # the kserve stack instead of traefik
+make scenarios                                            # what is available
+make e2e                                                  # 01_single_svc on src-main
+make e2e SCENARIO=02_depends_on_valid KCM=rel-1-11-0      # one scenario, one version
+make e2e-keep SCENARIO=02_depends_on_valid                # leave it up to poke at
 ```
+
+### Reusing one environment across scenarios
+
+Building the cluster and KCM is most of the wall clock, so for iterating
+locally do it once and run every scenario through it:
+
+```bash
+make e2e-all KCM=src-main        # env-up, every scenario, env-down
+```
+
+or drive the phases yourself:
+
+```bash
+make env-up   KCM=src-main
+make scenario SCENARIO=01_single_svc       KCM=src-main
+make scenario SCENARIO=02_depends_on_valid KCM=src-main
+make env-down KCM=src-main
+```
+
+**This is a debugging convenience, not a substitute for CI.** The scenarios
+share a cluster, so one that leaves it wedged — `02_depends_on_valid` on
+1.11.0 leaves a stuck MCS finalizer — taints whatever runs next. For a
+trustworthy result use `make e2e` (its own environment per run) or CI.
 
 To point at a specific KCM revision or a local checkout:
 
@@ -157,14 +216,14 @@ To point at a specific KCM revision or a local checkout:
 cp scripts/set_envs_template.sh set_envs.sh
 $EDITOR set_envs.sh           # KCM_REF=... or KCM_SRC_DIR=...
 source set_envs.sh
-./scripts/e2e_test.sh
+make e2e
 ```
 
 Individual steps are runnable on their own, in the order `e2e_test.sh` uses
 them. After a run with `--keep`:
 
 ```bash
-export KUBECONFIG=./kcfg_k0rdent
+export KUBECONFIG=./kcfg_k0rdent-local-src-main
 kubectl get management kcm
 kubectl get clusterdeployment -n kcm-system
 ```
@@ -185,6 +244,7 @@ environment variable. The ones worth knowing:
 
 | Variable | Default | Purpose |
 |---|---|---|
+| `KCM` | – | variant id (`src-main`, `rel-1-11-0`, …); sets the three below |
 | `KCM_SOURCE` | `source` | `source` or `release` |
 | `KCM_RELEASE_VERSION` | `1.11.0` | chart version for release mode |
 | `KCM_REF` | mode-dependent | branch, tag or SHA to check out |
@@ -192,8 +252,8 @@ environment variable. The ones worth knowing:
 | `RUN_ID` | – | isolate this run from others; see above |
 | `KCM_PROVIDERS` | CAPD, k0smotron, sveltos | providers KCM installs |
 | `KCM_CLUSTER_TEMPLATES` | `docker-hosted-cp` | cluster templates to apply |
-| `SERVICE_SET` | `traefik` | `traefik` or `kserve` |
-| `SERVICES_FILE` | derived from `SERVICE_SET` | override the services file outright |
+| `SCENARIO` | `01_single_svc` | scenario stem from `test_scenarios/` |
+| `SERVICES_FILE` | derived from `SCENARIO` | override the scenario file outright |
 | `SKIP_SERVICE_TEST` | – | `true` to skip the ServiceTemplate/MCS steps |
 | `DOCKER_NETWORK` | `kind` | CAPD's network; the management cluster joins it |
 | `WORKERS_NUMBER` | `1` | worker nodes in the child cluster |
@@ -205,9 +265,14 @@ hardcoded — they are read from the charts in the KCM checkout.
 
 ## CI
 
-* `e2e.yml` — the full run on `ubuntu-latest`; on PRs, on pushes touching
-  `scripts/**`, nightly (needs repo variable `ENABLE_CRON=1`), or manually with
-  a `kcm_ref` input. Diagnostics are uploaded as an artifact on failure.
+* `e2e.yml` — discovers the scenarios and KCM variants, then calls
+  `e2e-scenario.yml` once per scenario. Runs on PRs, on pushes touching
+  `scripts/**` or `test_scenarios/**`, nightly (needs repo variable
+  `ENABLE_CRON=1`), or manually with a `kcm_ref` input.
+* `e2e-scenario.yml` — reusable; one scenario across every KCM variant, and
+  where the `knownFailures` marker is applied. `continue-on-error` cannot be
+  set on a job that calls a reusable workflow, which is why the marker lives
+  here rather than in the caller. Diagnostics are uploaded on failure.
 * `bash-unit-tests.yml`, `lint.yml` — fast checks on every change: shellcheck
   plus actionlint, because a workflow that fails to validate never starts a job
   and so produces no logs to debug.
@@ -228,6 +293,13 @@ Two ordering details are load-bearing. `ClusterTemplate`s stay invalid until a
 `ProviderTemplate`s. And `Management.spec.core.kcm.config` has to repeat the
 Helm values, or the HelmRelease reinstalls KCM from the published image and the
 locally built one is never used.
+
+The kserve teardown defect on KCM 1.11.0 is recorded in
+`test_scenarios/02_depends_on_valid.yaml` under `knownFailures`, which is the
+single source of truth for it: sveltos removes `kserve-crd` before uninstalling
+`kserve-resources`, whose release still holds a `ClusterStorageContainer`, so
+the uninstall fails with "ensure CRDs are installed first" and the MCS
+finalizer never clears. 1.10.0 and main are unaffected.
 
 Removal deletes the k0smotron etcd PVC explicitly: `docker-hosted-cp` exposes
 `storage.etcd.autoDeletePVCs` but no template in chart 1.0.15 reads it, so the

@@ -1,5 +1,13 @@
 name: E2E
 
+# Grouped by scenario first, KCM version second. Actions has no nested matrix,
+# so the version dimension lives in the reusable e2e-scenario.yml that this
+# workflow calls once per scenario.
+#
+# Both dimensions are data: scenarios are the files in test_scenarios/, KCM
+# variants come from scripts/config/kcm-variants.yaml. Adding either is a YAML
+# change with no workflow edit.
+
 on:
   workflow_dispatch:
     inputs:
@@ -19,168 +27,72 @@ on:
       - '**'
     paths:
       - 'scripts/**'
+      - 'test_scenarios/**'
       - .github/workflows/e2e.yml
+      - .github/workflows/e2e-scenario.yml
   pull_request:
     types: [opened, synchronize, reopened]
     paths:
       - 'scripts/**'
+      - 'test_scenarios/**'
       - .github/workflows/e2e.yml
+      - .github/workflows/e2e-scenario.yml
 
 concurrency:
   group: e2e-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  e2e-docker:
-    name: ${{ matrix.kcm.name }} / ${{ matrix.service_set }}
+  discover:
+    name: discover
     runs-on: ubuntu-latest
-    timeout-minutes: 90
-    # KCM 1.11.0 cannot tear the kserve stack down: sveltos removes kserve-crd
-    # before uninstalling kserve-resources, whose release still holds a
-    # ClusterStorageContainer, so the uninstall fails with "ensure CRDs are
-    # installed first" and the MultiClusterService finalizer never clears.
-    # Reproduced on every run; 1.10.0 and main are unaffected, and catalog
-    # itself sets test_remove_multiclusterservice: false for kserve. The job
-    # still runs and still reports -- it just does not block the workflow.
-    continue-on-error: >-
-      ${{ matrix.kcm.id == 'rel-1-11-0' && matrix.service_set == 'kserve' }}
     # Nightly runs only when the repo opts in, matching k0rdent/catalog.
     if: github.event_name != 'schedule' || vars.ENABLE_CRON == '1'
-    strategy:
-      fail-fast: false
-      matrix:
-        # GitHub Actions cannot fork a job mid-run: every combination gets its
-        # own runner and builds its own cluster from scratch. That is what makes
-        # these genuinely independent -- a service set that wedges the cluster
-        # cannot affect the other one.
-        kcm:
-          # KCM built from the checkout -- tests the code under review.
-          - name: 'src: main'
-            id: src-main
-            source: source
-            ref: main
-            release_version: ''
-          # Published charts -- tests what users actually install.
-          - name: 'release: 1.11.0'
-            id: rel-1-11-0
-            source: release
-            ref: ''
-            release_version: '1.11.0'
-          - name: 'release: 1.10.0'
-            id: rel-1-10-0
-            source: release
-            ref: ''
-            release_version: '1.10.0'
-        service_set: [traefik, kserve]
-    env:
-      KCM_SOURCE: ${{ matrix.kcm.source }}
-      # Empty lets common.sh pick the tag matching KCM_RELEASE_VERSION;
-      # overriding it in release mode would trip the version check.
-      KCM_REF: ${{ github.event.inputs.kcm_ref || matrix.kcm.ref }}
-      KCM_RELEASE_VERSION: ${{ matrix.kcm.release_version }}
-      SERVICE_SET: ${{ matrix.service_set }}
-      TEST_MODE: docker
-      # Distinct per matrix leg so the jobs never share cluster or container
-      # names, even on the same runner. Must stay valid in a docker tag and a
-      # Kubernetes object name, hence the slug rather than matrix.kcm.name.
-      RUN_ID: ci${{ github.run_id }}-${{ matrix.kcm.id }}-${{ matrix.service_set }}
+    outputs:
+      scenarios: ${{ steps.scan.outputs.scenarios }}
+      kcm_variants: ${{ steps.scan.outputs.kcm_variants }}
     steps:
       - uses: actions/checkout@v7
 
-      # The runner context is not available in job-level env, so DEBUG is set
-      # here instead: re-running with debug logging turns on verbose output.
-      - name: Enable debug output
-        if: runner.debug == '1'
-        run: echo "DEBUG=true" >> "$GITHUB_ENV"
-
-      # The Go build, two container images, k0s and the CAPD nodes together
-      # outgrow the default runner disk.
-      - name: Free disk space
+      - name: Install yq
         run: |
-          df -h /
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
-                      /usr/local/share/boost "$AGENT_TOOLSDIRECTORY" || true
-          sudo apt-get clean
-          df -h /
+          sudo curl -fsSL -o /usr/local/bin/yq \
+            https://github.com/mikefarah/yq/releases/download/v4.53.3/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
 
-      # KCM's Makefile shells out to `go env` while parsing, so go must be on
-      # PATH for the source build. The binaries themselves are built inside
-      # Docker, so a Go module cache here would not help.
-      - uses: actions/setup-go@v7
-        if: matrix.kcm.source == 'source'
-        with:
-          go-version: 'stable'
-          cache: false
+      - name: Scan scenarios and KCM variants
+        id: scan
+        run: |
+          set -euo pipefail
 
-      - name: Install dependencies
-        run: ./scripts/deps.sh
+          # One entry per scenario file, carrying the versions it is known to
+          # fail on so the reusable workflow can mark that leg non-blocking.
+          scenarios='[]'
+          for f in test_scenarios/*.yaml; do
+            id="$(basename "$f" .yaml)"
+            known="$(yq -r '[.knownFailures[].kcm] | join(" ")' "$f")"
+            scenarios="$(jq -c --arg id "$id" --arg known "$known" \
+              '. + [{id: $id, knownFailingKcm: $known}]' <<< "$scenarios")"
+          done
 
-      - name: Prepare KCM
-        run: ./scripts/prepare_kcm.sh
+          variants="$(yq -o=json -I=0 '.variants' scripts/config/kcm-variants.yaml)"
 
-      # The local registry only serves charts we built ourselves.
-      - name: Deploy local registry
-        if: matrix.kcm.source == 'source'
-        run: ./scripts/deploy_registry.sh
+          echo "scenarios=$scenarios" >> "$GITHUB_OUTPUT"
+          echo "kcm_variants=$variants" >> "$GITHUB_OUTPUT"
+          echo "Scenarios:    $scenarios"
+          echo "KCM variants: $variants"
 
-      - name: Deploy management cluster
-        run: ./scripts/deploy_mgmt_cluster.sh
-
-      - name: Install OpenEBS
-        run: ./scripts/install_openebs.sh
-
-      - name: Push images and charts
-        if: matrix.kcm.source == 'source'
-        run: ./scripts/push_kcm_artifacts.sh
-
-      - name: Install KCM
-        run: ./scripts/deploy_kcm.sh
-
-      - name: Apply Release and templates
-        run: ./scripts/apply_release.sh
-
-      - name: Wait for templates
-        run: ./scripts/wait_for_templates.sh
-
-      - name: Apply Management
-        run: ./scripts/apply_management.sh
-
-      - name: Wait for Management
-        run: ./scripts/wait_for_management.sh
-
-      - name: Deploy ClusterDeployment
-        run: ./scripts/deploy_cld.sh
-
-      - name: Check child cluster
-        run: ./scripts/check_child_cluster.sh
-
-      - name: Install ServiceTemplates
-        run: ./scripts/install_servicetemplate.sh
-
-      - name: Deploy services via MultiClusterService
-        run: ./scripts/deploy_mcs.sh
-
-      - name: Remove MultiClusterService
-        run: ./scripts/remove_mcs.sh
-
-      - name: Remove ClusterDeployment
-        run: ./scripts/remove_cld.sh
-
-      - name: Uninstall KCM
-        run: ./scripts/remove_kcm.sh
-
-      - name: Collect diagnostics
-        if: failure()
-        run: ./scripts/collect_logs.sh
-
-      - name: Upload diagnostics
-        if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: e2e-logs-${{ github.run_id }}-${{ matrix.kcm.id }}-${{ matrix.service_set }}
-          path: logs*/
-          retention-days: 7
-
-      - name: Cleanup
-        if: always() && github.event.inputs.keep_cluster != 'true'
-        run: ./scripts/cleanup.sh
+  e2e:
+    name: ${{ matrix.scenario.id }}
+    needs: discover
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario: ${{ fromJson(needs.discover.outputs.scenarios) }}
+    uses: ./.github/workflows/e2e-scenario.yml
+    with:
+      scenario: ${{ matrix.scenario.id }}
+      kcm_variants: ${{ needs.discover.outputs.kcm_variants }}
+      known_failing_kcm: ${{ matrix.scenario.knownFailingKcm }}
+      kcm_ref: ${{ github.event.inputs.kcm_ref || '' }}
+      keep_cluster: ${{ github.event.inputs.keep_cluster == 'true' }}

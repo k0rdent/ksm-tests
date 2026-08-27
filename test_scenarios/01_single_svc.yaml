@@ -1,5 +1,6 @@
-# Traefik on its own -- the light service set.
-#
+name: 01_single_svc
+description: One service, no dependencies -- the baseline MultiClusterService path.
+
 # Charts come from k0rdent/catalog's registry. Those are thin wrappers that
 # declare the upstream chart as a dependency of the same name, so values must
 # be nested one level under that name, exactly as catalog's own example does.

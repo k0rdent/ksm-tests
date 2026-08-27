@@ -14,7 +14,7 @@ source "$SCRIPTS_DIR/lib/services.sh"
 require_cmd kubectl
 require_yq
 
-[[ -f "$SERVICES_FILE" ]] || die "No services file at $SERVICES_FILE"
+check_scenario
 
 export KUBECONFIG="$KUBECONFIG_MGMT"
 require_cluster
@@ -22,7 +22,7 @@ require_cluster
 if ! resource_exists MultiClusterService "$MCS_NAME"; then
     log "MultiClusterService '$MCS_NAME' does not exist -- nothing to remove"
 else
-    step "Deleting MultiClusterService '$MCS_NAME'"
+    step "Scenario $SCENARIO: deleting MultiClusterService '$MCS_NAME'"
     kube delete multiclusterservice "$MCS_NAME" --wait=false
     wait_for_absence MultiClusterService "$MCS_NAME" "" "$MCS_TIMEOUT" 5
 fi
