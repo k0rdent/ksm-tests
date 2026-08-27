@@ -115,14 +115,27 @@ if [[ -n "$ROLLED_BACK_TO" ]]; then
     # a single absent or failed reading proves nothing; only a sustained one
     # does.
     absent_for=0
-    ABSENT_GRACE="${ABSENT_GRACE:-90}"
+    broken_for=0
+    GRACE_TERMINAL="${GRACE_TERMINAL:-90}"
+
+    # Two ways this is known to end badly, both of them terminal: the release
+    # disappears, or it comes back on the old chart but in a failed state
+    # because the rollback itself did not work. Waiting out the full timeout
+    # for either just delays a verdict that is already in.
+    rollback_diag() {
+        { echo "── helm history $watch_svc -n $ns"
+          helm_child history "$watch_svc" -n "$ns" 2>&1 | tail -6
+          dump_states "$(sset_json)"
+          kcm_errors 10m; } >&2
+    }
 
     while (( elapsed < MCS_TIMEOUT )); do
         info="$(release_info "$watch_svc" "$ns")"
         if [[ -z "$info" ]]; then
+            broken_for=0
             absent_for=$(( absent_for + 5 ))
-            if (( absent_for >= ABSENT_GRACE )); then
-                { dump_states "$(sset_json)"; kcm_errors 10m; } >&2
+            if (( absent_for >= GRACE_TERMINAL )); then
+                rollback_diag
                 die "'$watch_svc' was removed instead of rolled back: no helm release in '$ns' for ${absent_for}s, though a healthy revision $before_rev existed before the upgrade"
             fi
         else
@@ -133,6 +146,15 @@ if [[ -n "$ROLLED_BACK_TO" ]]; then
             if [[ "$got" == "$ROLLED_BACK_TO" && "$status" == "deployed" ]] \
                && (( rev > before_rev )); then
                 settled=true; break
+            fi
+            if [[ "$status" == "failed" ]]; then
+                broken_for=$(( broken_for + 5 ))
+                if (( broken_for >= GRACE_TERMINAL )); then
+                    rollback_diag
+                    die "'$watch_svc' did not roll back to a healthy state: the release is on $got but 'failed' for ${broken_for}s (revision $before_rev -> $rev)"
+                fi
+            else
+                broken_for=0
             fi
         fi
         (( elapsed % 30 == 0 )) && log "⏳ '$watch_svc' release: ${info:-<absent>} (${elapsed}s)"

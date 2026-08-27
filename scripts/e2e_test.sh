@@ -93,11 +93,14 @@ if [[ "$DO_ENV" == "true" ]]; then
 fi
 
 if [[ "$DO_SCENARIO" == "true" && "${SKIP_SERVICE_TEST:-false}" != "true" ]]; then
-    "$SCRIPTS_DIR/install_servicetemplate.sh"
-    "$SCRIPTS_DIR/deploy_mcs.sh"
+    # Through ci_step.sh, with the same step names CI uses -- knownFailures
+    # entries reference them, so the two must not drift.
+    step_run() { "$SCRIPTS_DIR/ci_step.sh" "$1" "$2"; }
+    step_run "Install ServiceTemplates" "$SCRIPTS_DIR/install_servicetemplate.sh"
+    step_run "Deploy services via MultiClusterService" "$SCRIPTS_DIR/deploy_mcs.sh"
     # No-op unless the scenario has an upgrade block.
-    "$SCRIPTS_DIR/upgrade_services.sh"
-    "$SCRIPTS_DIR/remove_mcs.sh"
+    step_run "Upgrade services" "$SCRIPTS_DIR/upgrade_services.sh"
+    step_run "Remove MultiClusterService" "$SCRIPTS_DIR/remove_mcs.sh"
 fi
 
 # Only a full run owns the environment, so only it tears the cluster down.

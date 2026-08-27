@@ -41,6 +41,24 @@ template_name_for() {
     echo "$1-$(fqdn_version "$2")"
 }
 
+# ── Known failures ───────────────────────────────────────────────────────────
+# A scenario records the KCM variants it is known to fail on. The entry is
+# deliberately narrow: it names the step and a fragment of the expected error,
+# so a leg that breaks for some other reason still goes red instead of being
+# swallowed by the marker.
+
+# known_failure_field FIELD -- from the entry matching $KCM, empty otherwise.
+known_failure_field() {
+    KCMID="${KCM:-}" FIELD="$1" yq -r \
+        '.knownFailures[]? | select(.kcm == strenv(KCMID)) | .[strenv(FIELD)] // ""' "$SERVICES_FILE"
+}
+
+# is_known_failure -- true when this scenario is expected to fail on this KCM.
+is_known_failure() {
+    [[ -n "${KCM:-}" ]] || return 1
+    [[ -n "$(known_failure_field kcm)" ]]
+}
+
 # ── Upgrades ─────────────────────────────────────────────────────────────────
 # A scenario with an `upgrade:` block deploys once, changes some services, and
 # then asserts what moved and what did not.

@@ -4,8 +4,10 @@ name: E2E scenario
 # matrix, so the scenario dimension lives in the caller (e2e.yml) and this
 # workflow expands the versions underneath it.
 #
-# continue-on-error cannot be set on a job that calls a reusable workflow, so
-# the known-failure marker has to live here rather than in the caller.
+# Known failures are handled by scripts/ci_step.sh, not continue-on-error: it
+# matches the recorded step and error before excusing anything, so a leg that
+# breaks for a different reason still goes red. The marker only reaches this
+# file to label the job name.
 
 on:
   workflow_call:
@@ -38,12 +40,9 @@ on:
 
 jobs:
   e2e-docker:
-    name: ${{ matrix.kcm.name }}
+    name: ${{ matrix.kcm.name }}${{ contains(inputs.known_failing_kcm, matrix.kcm.id) && ' ⚠ known failure' || '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
-    # Scenarios declare the versions they are known to fail on, in their own
-    # file. The leg still runs and still reports -- it just does not block.
-    continue-on-error: ${{ contains(inputs.known_failing_kcm, matrix.kcm.id) }}
     strategy:
       fail-fast: false
       matrix:
@@ -130,17 +129,17 @@ jobs:
         run: ./scripts/check_child_cluster.sh
 
       - name: Install ServiceTemplates
-        run: ./scripts/install_servicetemplate.sh
+        run: ./scripts/ci_step.sh "Install ServiceTemplates" ./scripts/install_servicetemplate.sh
 
       - name: Deploy services via MultiClusterService
-        run: ./scripts/deploy_mcs.sh
+        run: ./scripts/ci_step.sh "Deploy services via MultiClusterService" ./scripts/deploy_mcs.sh
 
       # No-op unless the scenario has an upgrade block.
       - name: Upgrade services
-        run: ./scripts/upgrade_services.sh
+        run: ./scripts/ci_step.sh "Upgrade services" ./scripts/upgrade_services.sh
 
       - name: Remove MultiClusterService
-        run: ./scripts/remove_mcs.sh
+        run: ./scripts/ci_step.sh "Remove MultiClusterService" ./scripts/remove_mcs.sh
 
       - name: Remove ClusterDeployment
         run: ./scripts/remove_cld.sh
