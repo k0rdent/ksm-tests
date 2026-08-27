@@ -397,16 +397,16 @@ single source of truth for it: sveltos removes `kserve-crd` before uninstalling
 the uninstall fails with "ensure CRDs are installed first" and the MCS
 finalizer never clears. 1.10.0 and main are unaffected.
 
-The atomic-upgrade defect is recorded the same way, in
+The atomic-upgrade defect on KCM **1.10.0** is recorded the same way, in
 `test_scenarios/03upg02_invalid_atomic.yaml`. Issue #3 asks for a failed atomic
-upgrade to roll back to the previous healthy state; what happens instead is
-that the release is **removed**. Sveltos takes the install path rather than
-upgrading, so helm's rollback-on-failure deletes the release, and since the
-values are still invalid it then loops uninstall → install and never restores
-the healthy revision. The `ServiceSet` keeps reporting the service `Deployed`
-at a chart version that no longer exists in the cluster — which is why the
-upgrade checks read the helm release directly and treat the `ServiceSet` as
-one opinion rather than the truth.
+upgrade to roll back to the previous healthy state; on 1.10.0 the release is
+**removed** instead. Sveltos takes the install path rather than upgrading, so
+helm's rollback-on-failure deletes the release, and since the values are still
+invalid it then loops uninstall → install and never restores the healthy
+revision. The `ServiceSet` keeps reporting the service `Deployed` at a chart
+version that no longer exists in the cluster — which is why the upgrade checks
+read the helm release directly and treat the `ServiceSet` as one opinion rather
+than the truth. 1.11.0 and main roll back correctly.
 
 Removal deletes the k0smotron etcd PVC explicitly: `docker-hosted-cp` exposes
 `storage.etcd.autoDeletePVCs` but no template in chart 1.0.15 reads it, so the
