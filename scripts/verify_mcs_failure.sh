@@ -135,10 +135,25 @@ ok "Blocked services were never installed"
 step "Checking the services deployed before the failure were not rolled back"
 while read -r name; do
     [[ -n "$name" ]] || continue
+
+    # Not a single reading: a service that is merely being re-reconciled shows
+    # up as Provisioning for a moment, and KCM itself treats that as transient
+    # noise rather than a change. A rollback would leave it absent or Failed
+    # and it would never come back, so give it a window to settle.
+    settle=0
     st="$(state_of "$name" "$json")"
+    while [[ "$st" != "Deployed" ]] && (( settle < ${KEPT_SETTLE:-180} )); do
+        [[ "$st" == "Failed" ]] && { dump_states "$json" >&2
+            die "'$name' is Failed -- it was rolled back after '$FAILED_SVC' failed"; }
+        log "⏳ '$name' is '${st:-<unlisted>}', waiting for it to settle (${settle}s)"
+        sleep 10
+        settle=$(( settle + 10 ))
+        json="$(sset_json)"
+        st="$(state_of "$name" "$json")"
+    done
     [[ "$st" == "Deployed" ]] \
         || { dump_states "$json" >&2
-             die "'$name' is '$st' -- it was rolled back after '$FAILED_SVC' failed"; }
+             die "'$name' never came back to Deployed (last state '${st:-<unlisted>}') -- it was rolled back after '$FAILED_SVC' failed"; }
 
     ns="$(service_field "$name" namespace)"
     if [[ "${SKIP_CHILD_API_CHECK:-false}" != "true" ]]; then
