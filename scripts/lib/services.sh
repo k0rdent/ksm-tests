@@ -41,6 +41,26 @@ template_name_for() {
     echo "$1-$(fqdn_version "$2")"
 }
 
+# ── Expected failure ─────────────────────────────────────────────────────────
+# A scenario with an `expect:` block is asserting that the rollout stops rather
+# than that it completes. Without one these all return empty and the callers
+# take the normal path.
+
+# expect_field FIELD -- a scalar from the expect block.
+expect_field() {
+    FIELD="$1" yq -r '.expect[strenv(FIELD)] // ""' "$SERVICES_FILE"
+}
+
+# expect_list FIELD -- one name per line from a list in the expect block.
+expect_list() {
+    FIELD="$1" yq -r '.expect[strenv(FIELD)][]? // ""' "$SERVICES_FILE"
+}
+
+# expects_failure -- true when the scenario declares a service that must fail.
+expects_failure() {
+    [[ -n "$(expect_field failed)" ]]
+}
+
 # repo_type REPO -- flux needs spec.type=oci for OCI registries.
 repo_type() {
     [[ "$1" == oci://* ]] && echo oci || echo default

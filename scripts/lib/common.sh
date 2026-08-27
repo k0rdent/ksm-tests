@@ -177,7 +177,7 @@ export CLUSTER_NAME_SUFFIX CLD_NAME WORKERS_NUMBER CLD_GROUP_LABEL
 # dependencies. SCENARIO picks one by filename stem; SERVICES_FILE overrides
 # the path outright.
 SCENARIOS_DIR="${SCENARIOS_DIR:-$PROJECT_ROOT/test_scenarios}"
-SCENARIO="${SCENARIO:-01_single_svc}"
+SCENARIO="${SCENARIO:-01_basic}"
 SERVICES_FILE="${SERVICES_FILE:-$SCENARIOS_DIR/$SCENARIO.yaml}"
 # Scenario stems use underscores, which RFC 1123 forbids in Kubernetes object
 # names -- and the scenario reaches CLD_NAME through RUN_ID.

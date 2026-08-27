@@ -22,6 +22,17 @@ assert_eq() { # desc, expected, actual
     fi
 }
 
+assert_not_eq() { # desc, unwanted, actual
+    TESTS_RUN=$((TESTS_RUN + 1))
+    if [[ "$2" != "$3" ]]; then
+        echo "  ✓ $1"
+    else
+        echo "  ✗ $1"
+        echo "      must not be: [$2]"
+        TESTS_FAILED=$((TESTS_FAILED + 1))
+    fi
+}
+
 assert_contains() { # desc, haystack, needle
     TESTS_RUN=$((TESTS_RUN + 1))
     if [[ "$2" == *"$3"* ]]; then

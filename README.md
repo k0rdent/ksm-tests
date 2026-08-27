@@ -37,11 +37,12 @@ spent building the images and provisioning the child cluster.
 | `source` (default) | Builds the controller and telemetry images from a KCM checkout, pushes the template charts to a throwaway local registry, and installs the chart from the source tree. Tests the code under review. |
 | `release` | Installs `oci://ghcr.io/k0rdent/kcm/charts/kcm` at `KCM_RELEASE_VERSION`. No build, no registry, no Go or make needed. Tests what users actually get. |
 
-CI is grouped **by scenario first, KCM variant second** — six jobs:
+CI is grouped **by scenario first, KCM variant second** — one job per pair:
 
 ```
-01_single_svc        / src: main | release: 1.11.0 | release: 1.10.0
-02_depends_on_valid  / src: main | release: 1.11.0 | release: 1.10.0
+01_basic         / src: main | release: 1.11.0 | release: 1.10.0
+02dep01_valid    / src: main | release: 1.11.0 | release: 1.10.0
+02dep02_invalid  / src: main | release: 1.11.0 | release: 1.10.0
 ```
 
 Actions has no nested matrix, so `e2e.yml` holds the scenario dimension and
@@ -67,16 +68,23 @@ is up, the run installs a `ServiceTemplate` per service, deploys them all
 through a single `MultiClusterService`, waits for the pods to be Ready *in the
 child cluster*, then removes the MCS and verifies the workloads are gone.
 
-| Scenario | What it exercises | Services |
-|---|---|---|
-| `01_single_svc` | the baseline MCS path, no dependencies | traefik |
-| `02_depends_on_valid` | a valid `dependsOn` chain | cert-manager → kserve-crd → kserve-resources |
+Names are two-layered — a group number, then the case within it — and each file
+repeats its group as a `group:` field, which is what `make scenarios` prints as
+a heading.
+
+| Group | Scenario | What it exercises | Services |
+|---|---|---|---|
+| Basics | `01_basic` | the baseline MCS path, no dependencies | traefik |
+| Service dependencies | `02dep01_valid` | a valid `dependsOn` chain, everything lands | cert-manager → kserve-crd → kserve-resources |
+| Service dependencies | `02dep02_invalid` | an invalid link: the rollout must stop there | traefik → **cert-manager (invalid)** → kserve-crd |
+
+The `02dep*` cases are [issue #2](https://github.com/josef-hak/k0rdent-kcm-tests/issues/2).
 
 Adding one is a drop-in: put a file in `test_scenarios/`, and both `make
 scenarios` and CI pick it up with no further edits.
 
 ```yaml
-name: 02_depends_on_valid           # must match the filename
+name: 02dep01_valid           # must match the filename
 description: ...
 knownFailures:                      # optional
   - kcm: rel-1-11-0
@@ -101,6 +109,40 @@ services:
 runs and reports that leg, it just does not block the workflow. Delete the
 entry once the defect is fixed upstream — a unit test checks every id there is
 a real variant, so a typo cannot silently disable the marker.
+
+#### Scenarios that expect a failure
+
+A scenario can assert that the rollout **stops** rather than completes. Add an
+`expect:` block and `deploy_mcs.sh` hands over to `verify_mcs_failure.sh`
+instead of waiting for every service to be Ready:
+
+```yaml
+expect:
+  failed: cert-manager      # must end up in state Failed
+  deployed: [traefik]       # in front of it: must survive, no rollback
+  blocked: [kserve-crd]     # behind it: must never be installed
+  graceSeconds: 120         # how long to keep watching the blocked ones
+```
+
+Three things are then checked against the `ServiceSet` status: the named
+service reaches `Failed` and the set is not marked `deployed`; the blocked
+services never reach `Deployed` during the grace window and leave no workloads
+in the child cluster; and the already-deployed ones are still `Deployed` with
+their workloads intact afterwards.
+
+The grace window matters — a single check taken right after the failure cannot
+tell a blocked service from a slow one.
+
+The failure is triggered by **invalid values, not a missing image**. A bad image
+still yields a successful Helm release — the Deployment is created and the pods
+simply never start — so the service is reported as deployed and the chain keeps
+going, which would not exercise this behaviour at all. Values that break the
+install fail the release itself, and that is what holds back the dependants.
+
+Unit tests check that every name in `expect` is a real service, that the
+blocked ones genuinely sit behind the failing one in the `dependsOn` graph, and
+that the kept ones do not — without that, a typo would make the scenario pass
+while asserting nothing.
 
 Charts come from **k0rdent/catalog's registry** (`oci://ghcr.io/k0rdent/catalog/charts`),
 the same artifacts catalog's own `example` charts reference. Those are thin
@@ -137,8 +179,8 @@ make e2e-parallel KCM=src-main      # every scenario at once, own cluster each
 or by hand, for arbitrary combinations:
 
 ```bash
-RUN_ID=a SCENARIO=01_single_svc       KCM=src-main   ./scripts/e2e_test.sh &
-RUN_ID=b SCENARIO=02_depends_on_valid KCM=rel-1-11-0 ./scripts/e2e_test.sh &
+RUN_ID=a SCENARIO=01_basic       KCM=src-main   ./scripts/e2e_test.sh &
+RUN_ID=b SCENARIO=02dep01_valid KCM=rel-1-11-0 ./scripts/e2e_test.sh &
 wait
 ```
 
@@ -182,9 +224,9 @@ Pick a scenario and a KCM variant; `make scenarios` lists both.
 
 ```bash
 make scenarios                                            # what is available
-make e2e                                                  # 01_single_svc on src-main
-make e2e SCENARIO=02_depends_on_valid KCM=rel-1-11-0      # one scenario, one version
-make e2e-keep SCENARIO=02_depends_on_valid                # leave it up to poke at
+make e2e                                                  # 01_basic on src-main
+make e2e SCENARIO=02dep01_valid KCM=rel-1-11-0      # one scenario, one version
+make e2e-keep SCENARIO=02dep01_valid                # leave it up to poke at
 ```
 
 ### Reusing one environment across scenarios
@@ -200,13 +242,13 @@ or drive the phases yourself:
 
 ```bash
 make env-up   KCM=src-main
-make scenario SCENARIO=01_single_svc       KCM=src-main
-make scenario SCENARIO=02_depends_on_valid KCM=src-main
+make scenario SCENARIO=01_basic       KCM=src-main
+make scenario SCENARIO=02dep01_valid KCM=src-main
 make env-down KCM=src-main
 ```
 
 **This is a debugging convenience, not a substitute for CI.** The scenarios
-share a cluster, so one that leaves it wedged — `02_depends_on_valid` on
+share a cluster, so one that leaves it wedged — `02dep01_valid` on
 1.11.0 leaves a stuck MCS finalizer — taints whatever runs next. For a
 trustworthy result use `make e2e` (its own environment per run) or CI.
 
@@ -252,7 +294,7 @@ environment variable. The ones worth knowing:
 | `RUN_ID` | – | isolate this run from others; see above |
 | `KCM_PROVIDERS` | CAPD, k0smotron, sveltos | providers KCM installs |
 | `KCM_CLUSTER_TEMPLATES` | `docker-hosted-cp` | cluster templates to apply |
-| `SCENARIO` | `01_single_svc` | scenario stem from `test_scenarios/` |
+| `SCENARIO` | `01_basic` | scenario stem from `test_scenarios/` |
 | `SERVICES_FILE` | derived from `SCENARIO` | override the scenario file outright |
 | `SKIP_SERVICE_TEST` | – | `true` to skip the ServiceTemplate/MCS steps |
 | `DOCKER_NETWORK` | `kind` | CAPD's network; the management cluster joins it |
@@ -285,7 +327,7 @@ unaffected. Ids are the same ones `make scenarios` prints.
 
 ```bash
 gh workflow run e2e.yml --ref scenarios \
-  -f scenarios=01_single_svc -f kcm=src-main,rel-1-10-0
+  -f scenarios=01_basic -f kcm=src-main,rel-1-10-0
 gh run watch "$(gh run list --workflow=e2e.yml -L1 --json databaseId -q '.[0].databaseId')"
 ```
 
@@ -313,7 +355,7 @@ Helm values, or the HelmRelease reinstalls KCM from the published image and the
 locally built one is never used.
 
 The kserve teardown defect on KCM 1.11.0 is recorded in
-`test_scenarios/02_depends_on_valid.yaml` under `knownFailures`, which is the
+`test_scenarios/02dep01_valid.yaml` under `knownFailures`, which is the
 single source of truth for it: sveltos removes `kserve-crd` before uninstalling
 `kserve-resources`, whose release still holds a `ClusterStorageContainer`, so
 the uninstall fails with "ensure CRDs are installed first" and the MCS

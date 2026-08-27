@@ -4,7 +4,7 @@ SCRIPTS := scripts
 
 # A scenario is a file in test_scenarios/; a KCM variant is an id from
 # scripts/config/kcm-variants.yaml. `make scenarios` lists both.
-SCENARIO ?= 01_single_svc
+SCENARIO ?= 01_basic
 KCM      ?= src-main
 
 # Shared by env-up / scenario / env-down so they all address the same cluster.
@@ -18,7 +18,7 @@ help: ## Show this help.
 		awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-16s\033[0m %s\n", $$1, $$2}'
 	@echo
 	@echo "Pick with SCENARIO=<stem> KCM=<id>, e.g."
-	@echo "  make e2e SCENARIO=02_depends_on_valid KCM=rel-1-11-0"
+	@echo "  make e2e SCENARIO=02dep01_valid KCM=rel-1-11-0"
 
 .PHONY: scenarios
 scenarios: ## List the available scenarios and KCM variants.
