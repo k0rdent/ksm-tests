@@ -34,6 +34,14 @@ on:
         required: false
         default: false
 
+# The caller's concurrency group does not reach the jobs of a reusable
+# workflow: a second push superseded the caller but left its scenario jobs
+# running, so twelve runners were busy instead of six. Scope it per scenario
+# and ref so a new push cancels the old scenario runs too.
+concurrency:
+  group: e2e-${{ github.ref }}-${{ inputs.scenario }}
+  cancel-in-progress: true
+
 jobs:
   e2e-docker:
     name: ${{ matrix.kcm.name }}
