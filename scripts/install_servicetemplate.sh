@@ -23,7 +23,7 @@ ensure_workdir
 
 MANIFEST="$WORKDIR/service-templates.rendered.yaml"
 
-step "Scenario $SCENARIO: rendering $(all_services_rows | wc -l | tr -d ' ') ServiceTemplate(s)"
+step "Scenario $SCENARIO: rendering ServiceTemplates"
 render_templates "$MANIFEST" initial
 while IFS="$SERVICE_SEP" read -r name chart version repo namespace _dep _wait; do
     [[ -n "$name" ]] || continue
@@ -34,11 +34,23 @@ step "Applying"
 kube apply -f "$MANIFEST"
 
 step "Waiting for the ServiceTemplates to become valid"
+# Every version, not just the declared one: a chain scenario upgrades to
+# versions rendered above, and starting that before they are valid is a race.
 while IFS="$SERVICE_SEP" read -r name chart version _repo _ns _dep _wait; do
     [[ -n "$name" ]] || continue
-    wait_for_valid ServiceTemplate "$(template_name_for "$chart" "$version")" \
-        "$NAMESPACE" "$TEMPLATES_TIMEOUT"
+    for v in $({ echo "$version"; all_versions_for "$name"; } | awk 'NF && !seen[$0]++'); do
+        wait_for_valid ServiceTemplate "$(template_name_for "$chart" "$v")" \
+            "$NAMESPACE" "$TEMPLATES_TIMEOUT"
+    done
 done < <(all_services_rows)
+
+if has_template_chain; then
+    step "Creating ServiceTemplateChain '$(chain_name)'"
+    CHAIN="$WORKDIR/service-template-chain.rendered.yaml"
+    render_chain "$CHAIN"
+    cat "$CHAIN"
+    kube apply -f "$CHAIN"
+fi
 
 kube get servicetemplates -n "$NAMESPACE"
 ok "All ServiceTemplates are valid"

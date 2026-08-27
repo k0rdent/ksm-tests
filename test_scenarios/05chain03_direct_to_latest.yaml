@@ -1,0 +1,35 @@
+name: 05chain03_direct_to_latest
+group: Sequential upgrades
+description: >-
+  Issue #5, scenario 3: the chain allows a direct jump to the latest version
+  but nothing else. The intermediate version must be refused; the latest must
+  be accepted.
+
+templateChain:
+  supportedTemplates:
+    - version: 1.20.2
+      availableUpgrades:
+        - 1.21.1
+    - version: 1.21.1
+
+upgrade:
+  graceSeconds: 120
+  steps:
+    # Not reachable from 1.20.2 according to the chain, even though the
+    # ServiceTemplate for it exists.
+    - version: 1.20.3
+      expect: rejected
+    - version: 1.21.1
+      expect: applied
+
+services:
+  - name: cert-manager
+    chart: cert-manager
+    version: 1.20.2
+    repo: oci://ghcr.io/k0rdent/catalog/charts
+    namespace: cert-manager
+    waitForPods: cert-manager-
+    values: |
+      cert-manager:
+        crds:
+          enabled: true

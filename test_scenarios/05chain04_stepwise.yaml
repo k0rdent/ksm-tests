@@ -1,0 +1,67 @@
+name: 05chain04_stepwise
+group: Sequential upgrades
+description: >-
+  Issue #5, scenario 4: the chain defines the path 1.20.2 -> 1.20.3 -> 1.21.1.
+  Asking for the latest must walk through the intermediate version rather than
+  jumping straight there.
+
+# Reproduced identically on rel-1-10-0 and rel-1-11-0: the release goes
+# straight from 1.20.2 to 1.21.1 in a single helm upgrade. The chain is applied
+# and valid, all three ServiceTemplates exist, and the other three scenarios
+# confirm the chain *is* consulted -- 05chain02 and 05chain03 both get their
+# out-of-chain targets refused. So the chain constrains which versions may be
+# reached, but not the route: anything reachable through it is applied directly.
+#
+# src-main is marked on the same basis rather than from its own run. Over-
+# marking costs nothing (a passing leg stays green), under-marking turns CI red.
+knownFailures:
+  - kcm: rel-1-10-0
+    step: Upgrade along the chain
+    match: the chain says it must step through it
+    timeout: 300
+    reason: >-
+      The upgrade jumps straight to the latest version instead of passing
+      through the intermediate one the chain defines, contrary to issue #5
+      scenario 4.
+  - kcm: rel-1-11-0
+    step: Upgrade along the chain
+    match: the chain says it must step through it
+    timeout: 300
+    reason: Same as rel-1-10-0; reproduced.
+  - kcm: src-main
+    step: Upgrade along the chain
+    match: the chain says it must step through it
+    timeout: 300
+    reason: Same as rel-1-10-0; inferred, not yet run.
+
+templateChain:
+  supportedTemplates:
+    - version: 1.20.2
+      availableUpgrades:
+        - 1.20.3
+    - version: 1.20.3
+      availableUpgrades:
+        - 1.21.1
+    - version: 1.21.1
+
+upgrade:
+  steps:
+    - version: 1.21.1
+      expect: applied
+      # Every intermediate step has to show up as its own helm revision. Helm
+      # history is what makes this checkable after the fact -- watching for the
+      # intermediate version live would be a race.
+      viaVersions:
+        - 1.20.3
+
+services:
+  - name: cert-manager
+    chart: cert-manager
+    version: 1.20.2
+    repo: oci://ghcr.io/k0rdent/catalog/charts
+    namespace: cert-manager
+    waitForPods: cert-manager-
+    values: |
+      cert-manager:
+        crds:
+          enabled: true

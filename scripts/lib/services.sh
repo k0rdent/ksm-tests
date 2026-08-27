@@ -166,6 +166,11 @@ upgrade_expect_list() {
 # empty and the template name comes out as "traefik-".
 effective_version() {
     local v
+    # A chain scenario walks one step at a time, pinning the service to the
+    # version that step is trying to move to.
+    if [[ "${2:-}" == "step" && -n "${STEP_VERSION:-}" ]]; then
+        echo "$STEP_VERSION"; return
+    fi
     if [[ "${2:-}" == "upgraded" ]]; then
         v="$(upgrade_field "$1" version)"
         [[ -n "$v" ]] && { echo "$v"; return; }
@@ -187,6 +192,96 @@ effective_values() {
     service_values "$1"
 }
 
+# ── ServiceTemplateChains and stepwise upgrades ──────────────────────────────
+# A scenario can declare several versions of one application and a chain that
+# says which upgrades are allowed. Versions are written as chart versions; the
+# ServiceTemplate names are derived, so the scenario never has to spell out
+# "cert-manager-1-20-2".
+
+has_template_chain() {
+    [[ "$(yq -r '.templateChain // "" | tag' "$SERVICES_FILE")" == "!!map" ]]
+}
+
+chain_name() {
+    local n
+    n="$(yq -r '.templateChain.name // ""' "$SERVICES_FILE")"
+    echo "${n:-chain-$SCENARIO_SLUG}"
+}
+
+# chain_service -- the service the chain applies to. Chain scenarios are about
+# one application, so it is simply the first (and only) one.
+chain_service() {
+    services_rows | head -1 | cut -d'|' -f1
+}
+
+# chain_versions -- every version named in supportedTemplates.
+chain_versions() {
+    yq -r '.templateChain.supportedTemplates[]?.version // ""' "$SERVICES_FILE"
+}
+
+# chain_upgrades_for VERSION -- the versions reachable from it in one step.
+chain_upgrades_for() {
+    V="$1" yq -r \
+        '.templateChain.supportedTemplates[]? | select(.version == strenv(V)) | .availableUpgrades[]? // ""' \
+        "$SERVICES_FILE"
+}
+
+# upgrade_steps -- how many sequential upgrades the scenario performs.
+upgrade_steps() {
+    yq -r '[.upgrade.steps[]?] | length' "$SERVICES_FILE"
+}
+
+upgrade_step_field() { # upgrade_step_field IDX FIELD
+    IDX="$1" FIELD="$2" yq -r '.upgrade.steps[env(IDX)][strenv(FIELD)] // ""' "$SERVICES_FILE"
+}
+
+upgrade_step_list() { # upgrade_step_list IDX FIELD
+    IDX="$1" FIELD="$2" yq -r '.upgrade.steps[env(IDX)][strenv(FIELD)][]? // ""' "$SERVICES_FILE"
+}
+
+# all_versions_for NAME -- every version a ServiceTemplate is needed for: the
+# declared one, everything the chain names, and every upgrade target. Missing
+# any of them means the upgrade has nothing to point at.
+all_versions_for() {
+    { service_field "$1" version
+      chain_versions
+      local i
+      for (( i = 0; i < $(upgrade_steps); i++ )); do upgrade_step_field "$i" version; done
+    } | awk 'NF && !seen[$0]++'
+}
+
+# render_mcs_at_version FILE -- the MCS with the service pinned to $UPGRADE_TO.
+render_mcs_at_version() {
+    STEP_VERSION="$UPGRADE_TO" render_mcs "$1" step
+}
+
+# render_chain FILE -- the ServiceTemplateChain object.
+# shellcheck disable=SC2153 # NAMESPACE is from common.sh, not a typo
+render_chain() {
+    local out="$1" svc chart v up
+    svc="$(chain_service)"
+    chart="$(service_field "$svc" chart)"
+    cat > "$out" <<EOF
+apiVersion: k0rdent.mirantis.com/v1beta1
+kind: ServiceTemplateChain
+metadata:
+  name: $(chain_name)
+  namespace: $NAMESPACE
+spec:
+  supportedTemplates:
+EOF
+    while read -r v; do
+        [[ -n "$v" ]] || continue
+        echo "    - name: $(template_name_for "$chart" "$v")" >> "$out"
+        local first=true
+        while read -r up; do
+            [[ -n "$up" ]] || continue
+            $first && { echo "      availableUpgrades:" >> "$out"; first=false; }
+            echo "        - name: $(template_name_for "$chart" "$up")" >> "$out"
+        done < <(chain_upgrades_for "$v")
+    done < <(chain_versions)
+}
+
 # render_templates FILE MODE -- a HelmRepository and ServiceTemplate per
 # service, at its effective version. In upgraded mode the entries that did not
 # change render identically, so applying the file is a no-op for them and only
@@ -198,7 +293,14 @@ render_templates() {
     local name chart version repo _ns _dep _wait tmpl
     while IFS="$SERVICE_SEP" read -r name chart version repo _ns _dep _wait; do
         [[ -n "$name" ]] || continue
-        version="$(effective_version "$name" "$mode" "$version")"
+        # A chain scenario needs a ServiceTemplate for every version it can
+        # move between, not just the one currently selected.
+        local versions
+        versions="$({ effective_version "$name" "$mode" "$version"; all_versions_for "$name"; } \
+                    | awk 'NF && !seen[$0]++')"
+        local v
+        for v in $versions; do
+        version="$v"
         tmpl="$(template_name_for "$chart" "$version")"
         cat >> "$out" <<EOF
 ---
@@ -232,6 +334,7 @@ spec:
         kind: HelmRepository
         name: $name
 EOF
+        done
     done < <(all_services_rows)
 }
 
@@ -274,6 +377,11 @@ EOF
             echo "      - template: $(template_name_for "$chart" "$version")"
             echo "        name: $name"
             echo "        namespace: $namespace"
+            # With a chain, KCM only accepts an upgrade that the chain lists as
+            # reachable from the template currently deployed.
+            if has_template_chain; then
+                echo "        templateChain: $(chain_name)"
+            fi
             # Atomic makes helm undo a failed upgrade instead of leaving the
             # release broken, which is the whole point of the atomic scenario.
             if [[ "$atomic" == "true" ]]; then
