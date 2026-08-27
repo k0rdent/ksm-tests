@@ -11,6 +11,15 @@ name: E2E
 on:
   workflow_dispatch:
     inputs:
+      # Empty means everything, which is what the scheduled and push runs do.
+      scenarios:
+        description: 'Scenarios to run, space or comma separated (empty = all)'
+        required: false
+        default: ''
+      kcm:
+        description: 'KCM variants to run, space or comma separated (empty = all)'
+        required: false
+        default: ''
       kcm_ref:
         description: 'KCM branch, tag or SHA to test (source mode only)'
         required: false
@@ -66,20 +75,51 @@ jobs:
 
       - name: Scan scenarios and KCM variants
         id: scan
+        # Via env, not inline interpolation: these are free-text dispatch
+        # inputs and would otherwise be pasted straight into the script.
+        env:
+          WANT_SCENARIOS: ${{ github.event.inputs.scenarios }}
+          WANT_KCM: ${{ github.event.inputs.kcm }}
         run: |
           set -euo pipefail
+
+          # Empty selection means everything.
+          selected() { # selected <id> <list>
+            local id="$1" want
+            [[ -z "${2// /}" ]] && return 0
+            for want in ${2//,/ }; do [[ "$want" == "$id" ]] && return 0; done
+            return 1
+          }
 
           # One entry per scenario file, carrying the versions it is known to
           # fail on so the reusable workflow can mark that leg non-blocking.
           scenarios='[]'
+          all_scenarios=''
           for f in test_scenarios/*.yaml; do
             id="$(basename "$f" .yaml)"
+            all_scenarios+="$id "
+            selected "$id" "$WANT_SCENARIOS" || continue
             known="$(yq -r '[.knownFailures[].kcm] | join(" ")' "$f")"
             scenarios="$(jq -c --arg id "$id" --arg known "$known" \
               '. + [{id: $id, knownFailingKcm: $known}]' <<< "$scenarios")"
           done
 
-          variants="$(yq -o=json -I=0 '.variants' scripts/config/kcm-variants.yaml)"
+          variants='[]'
+          all_variants=''
+          while read -r id; do
+            all_variants+="$id "
+            selected "$id" "$WANT_KCM" || continue
+            variants="$(yq -o=json -I=0 ".variants[] | select(.id == \"$id\")" \
+              scripts/config/kcm-variants.yaml \
+              | jq -c --argjson acc "$variants" '$acc + [.]')"
+          done < <(yq -r '.variants[].id' scripts/config/kcm-variants.yaml)
+
+          # A typo would otherwise produce an empty matrix and a green run that
+          # tested nothing.
+          [[ "$scenarios" == '[]' ]] && {
+            echo "No scenario matches '$WANT_SCENARIOS'. Available: $all_scenarios" >&2; exit 1; }
+          [[ "$variants" == '[]' ]] && {
+            echo "No KCM variant matches '$WANT_KCM'. Available: $all_variants" >&2; exit 1; }
 
           echo "scenarios=$scenarios" >> "$GITHUB_OUTPUT"
           echo "kcm_variants=$variants" >> "$GITHUB_OUTPUT"

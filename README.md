@@ -268,7 +268,7 @@ hardcoded — they are read from the charts in the KCM checkout.
 * `e2e.yml` — discovers the scenarios and KCM variants, then calls
   `e2e-scenario.yml` once per scenario. Runs on PRs, on pushes touching
   `scripts/**` or `test_scenarios/**`, nightly (needs repo variable
-  `ENABLE_CRON=1`), or manually with a `kcm_ref` input.
+  `ENABLE_CRON=1`), or manually — see below.
 * `e2e-scenario.yml` — reusable; one scenario across every KCM variant, and
   where the `knownFailures` marker is applied. `continue-on-error` cannot be
   set on a job that calls a reusable workflow, which is why the marker lives
@@ -276,6 +276,24 @@ hardcoded — they are read from the charts in the KCM checkout.
 * `bash-unit-tests.yml`, `lint.yml` — fast checks on every change: shellcheck
   plus actionlint, because a workflow that fails to validate never starts a job
   and so produces no logs to debug.
+
+### Running a single combination in CI
+
+`workflow_dispatch` takes `scenarios` and `kcm` filters. Both are space or
+comma separated, and both default to everything, so a scheduled or push run is
+unaffected. Ids are the same ones `make scenarios` prints.
+
+```bash
+gh workflow run e2e.yml --ref scenarios \
+  -f scenarios=01_single_svc -f kcm=src-main,rel-1-10-0
+gh run watch "$(gh run list --workflow=e2e.yml -L1 --json databaseId -q '.[0].databaseId')"
+```
+
+Or from the Actions tab: **E2E → Run workflow**, then fill the two fields.
+
+An id that matches nothing fails the `discover` job with the list of available
+values, rather than producing an empty matrix and a green run that tested
+nothing.
 
 ## Design notes
 
