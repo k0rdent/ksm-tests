@@ -39,12 +39,12 @@ while read -r id; do
     fi
 
     desc="$(yq -r '.description // ""' "$file" 2>/dev/null | tr '\n' ' ')"
-    printf '    %-20s %s\n' "$id" "${desc:0:96}"
+    printf '    %-24s %s\n' "$id" "${desc:0:96}"
     # Each on its own line, so a long description cannot push them out of sight.
     known="$(yq -r '[.knownFailures[].kcm] | join(", ")' "$file" 2>/dev/null)"
-    [[ -n "$known" ]] && printf '    %-20s ⚠️  known to fail on: %s\n' "" "$known"
+    [[ -n "$known" ]] && printf '    %-24s ⚠️  known to fail on: %s\n' "" "$known"
     failed="$(yq -r '.expect.failed // ""' "$file" 2>/dev/null)"
-    [[ -n "$failed" ]] && printf '    %-20s ⛔ expects "%s" to fail\n' "" "$failed"
+    [[ -n "$failed" ]] && printf '    %-24s ⛔ expects "%s" to fail\n' "" "$failed"
 done < <(list_scenarios)
 
 echo

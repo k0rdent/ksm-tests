@@ -77,8 +77,11 @@ a heading.
 | Basics | `01_basic` | the baseline MCS path, no dependencies | traefik |
 | Service dependencies | `02dep01_valid` | a valid `dependsOn` chain, everything lands | cert-manager → kserve-crd → kserve-resources |
 | Service dependencies | `02dep02_invalid` | an invalid link: the rollout must stop there | traefik → **cert-manager (invalid)** → kserve-crd |
+| Service upgrades | `03upg01_valid` | upgrading one service must not disturb the others | traefik → **cert-manager 1.20.2→1.20.3** → kserve-crd |
+| Service upgrades | `03upg02_invalid_atomic` | an invalid upgrade with `atomic` must roll back | traefik → **cert-manager (invalid upgrade)** → kserve-crd |
 
-The `02dep*` cases are [issue #2](https://github.com/josef-hak/k0rdent-kcm-tests/issues/2).
+The `02dep*` cases are [issue #2](https://github.com/josef-hak/k0rdent-kcm-tests/issues/2),
+the `03upg*` cases [issue #3](https://github.com/josef-hak/k0rdent-kcm-tests/issues/3).
 
 Adding one is a drop-in: put a file in `test_scenarios/`, and both `make
 scenarios` and CI pick it up with no further edits.
@@ -143,6 +146,39 @@ Unit tests check that every name in `expect` is a real service, that the
 blocked ones genuinely sit behind the failing one in the `dependsOn` graph, and
 that the kept ones do not — without that, a typo would make the scenario pass
 while asserting nothing.
+
+#### Scenarios that upgrade
+
+An `upgrade:` block adds a second phase: deploy everything, change some of it,
+then assert what moved. `upgrade_services.sh` runs between `deploy_mcs.sh` and
+`remove_mcs.sh`, and does nothing at all when the block is absent.
+
+```yaml
+upgrade:
+  atomic: true              # sets helmOptions.atomic on the services
+  services:
+    - name: cert-manager
+      version: 1.20.3       # new chart version, or…
+      values: |             # …new values (replaces the original outright)
+        ...
+  expect:
+    rolledOut: [cert-manager]
+    untouched: [traefik, kserve-crd]
+    failed: cert-manager    # atomic case: the upgrade must fail…
+    rolledBackTo: 1.20.2    # …and leave the release healthy on this version
+```
+
+`untouched` is the interesting assertion, and it is checked two ways: the helm
+release must still report the same chart version, **and** the pods must have
+the same UIDs. Pod UIDs are the stronger signal — a service that was genuinely
+re-rolled gets new pods. If the helm revision moves while the chart and pods do
+not, the run warns rather than fails: nothing was actually rolled out, but the
+provider re-ran helm for a service the scenario never touched, which is worth
+seeing.
+
+Overrides apply **only in the upgrade phase**. The first deploy always uses the
+version and values from `services:`, otherwise there would be nothing to
+upgrade — there is a unit test for exactly that.
 
 Charts come from **k0rdent/catalog's registry** (`oci://ghcr.io/k0rdent/catalog/charts`),
 the same artifacts catalog's own `example` charts reference. Those are thin
@@ -360,6 +396,17 @@ single source of truth for it: sveltos removes `kserve-crd` before uninstalling
 `kserve-resources`, whose release still holds a `ClusterStorageContainer`, so
 the uninstall fails with "ensure CRDs are installed first" and the MCS
 finalizer never clears. 1.10.0 and main are unaffected.
+
+The atomic-upgrade defect is recorded the same way, in
+`test_scenarios/03upg02_invalid_atomic.yaml`. Issue #3 asks for a failed atomic
+upgrade to roll back to the previous healthy state; what happens instead is
+that the release is **removed**. Sveltos takes the install path rather than
+upgrading, so helm's rollback-on-failure deletes the release, and since the
+values are still invalid it then loops uninstall → install and never restores
+the healthy revision. The `ServiceSet` keeps reporting the service `Deployed`
+at a chart version that no longer exists in the cluster — which is why the
+upgrade checks read the helm release directly and treat the `ServiceSet` as
+one opinion rather than the truth.
 
 Removal deletes the k0smotron etcd PVC explicitly: `docker-hosted-cp` exposes
 `storage.etcd.autoDeletePVCs` but no template in chart 1.0.15 reads it, so the

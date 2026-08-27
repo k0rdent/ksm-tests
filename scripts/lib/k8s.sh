@@ -11,6 +11,48 @@ kube_child() {
     kubectl --kubeconfig "$KUBECONFIG_CHILD" "$@"
 }
 
+# helm_child ... -- helm against the child cluster. Release state there is the
+# ground truth for an upgrade: the ServiceSet says what KCM intended, the helm
+# revision and chart say what actually happened.
+helm_child() {
+    helm --kubeconfig "$KUBECONFIG_CHILD" "$@"
+}
+
+# release_info NAME NAMESPACE -- "revision|chart|status", empty if no release.
+# -a matters: without it helm hides pending-install releases, so a chart still
+# running its post-install hooks reads as absent.
+release_info() {
+    helm_child list -a -n "$2" -o json 2>/dev/null \
+        | jq -r --arg n "$1" '.[] | select(.name == $n) | "\(.revision)|\(.chart)|\(.status)"'
+}
+
+# wait_release NAME NAMESPACE TIMEOUT -- until helm reports the release
+# deployed. Checking the namespace instead is not enough: namespaces outlive
+# the services that created them, so a leftover one passes instantly and a
+# CRD-only service is never verified at all.
+wait_release() {
+    local name="$1" ns="$2" timeout="${3:-600}" elapsed=0 info status
+    while (( elapsed < timeout )); do
+        info="$(release_info "$name" "$ns")"
+        status="$(cut -d'|' -f3 <<< "$info")"
+        [[ "$status" == "deployed" ]] && { log "── $name: $info"; return 0; }
+        if (( elapsed % 30 == 0 )); then
+            log "⏳ helm release '$name' in '$ns' is '${status:-<absent>}' (${elapsed}s)"
+        fi
+        sleep 5
+        elapsed=$(( elapsed + 5 ))
+    done
+    warn "helm release '$name' in '$ns' never reached deployed: ${info:-<absent>}"
+    return 1
+}
+
+# pod_uids NAMESPACE -- one uid per line, sorted. Unchanged uids are the
+# strongest evidence a service was left alone: a rollout replaces the pods.
+pod_uids() {
+    kube_child get pods -n "$1" -o jsonpath='{range .items[*]}{.metadata.uid}{"\n"}{end}' \
+        2>/dev/null | sort
+}
+
 # require_cluster -- fail loudly if the API is unreachable. Without this a
 # "does not exist, nothing to do" check silently passes against a dead cluster.
 require_cluster() {

@@ -135,6 +135,10 @@ jobs:
       - name: Deploy services via MultiClusterService
         run: ./scripts/deploy_mcs.sh
 
+      # No-op unless the scenario has an upgrade block.
+      - name: Upgrade services
+        run: ./scripts/upgrade_services.sh
+
       - name: Remove MultiClusterService
         run: ./scripts/remove_mcs.sh
 
