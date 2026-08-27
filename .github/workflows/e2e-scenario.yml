@@ -34,15 +34,7 @@ on:
         required: false
         default: false
 
-# Best-effort second line of defence. The caller already has a concurrency
-# group, but it has been observed to leave a superseded run's scenario jobs
-# running. This does NOT help against the case seen most often here -- GitHub
-# occasionally delivers the same push twice within seconds, and both runs clear
-# the concurrency check before either registers, so twelve runners end up busy.
-# Nothing in Actions prevents that race; the duplicates simply burn runners.
-concurrency:
-  group: e2e-${{ github.ref }}-${{ inputs.scenario }}
-  cancel-in-progress: true
+# No concurrency group here on purpose: the caller's cancels these jobs too.
 
 jobs:
   e2e-docker:

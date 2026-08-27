@@ -38,8 +38,12 @@ on:
       - .github/workflows/e2e.yml
       - .github/workflows/e2e-scenario.yml
 
+# A push to a branch with an open PR fires both `push` and `pull_request`, and
+# github.ref differs between them (refs/heads/x vs refs/pull/N/merge), so a
+# plain github.ref group ran the whole matrix twice. head_ref/ref_name is the
+# branch either way, so the two collapse into one run.
 concurrency:
-  group: e2e-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
