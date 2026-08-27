@@ -23,12 +23,12 @@ ensure_workdir
 
 MANIFEST="$WORKDIR/service-templates.rendered.yaml"
 
-step "Scenario $SCENARIO: rendering $(service_count) ServiceTemplate(s)"
+step "Scenario $SCENARIO: rendering $(all_services_rows | wc -l | tr -d ' ') ServiceTemplate(s)"
 render_templates "$MANIFEST" initial
 while IFS="$SERVICE_SEP" read -r name chart version repo namespace _dep _wait; do
     [[ -n "$name" ]] || continue
     log "$(template_name_for "$chart" "$version")  <-  $repo  (namespace $namespace)"
-done < <(services_rows)
+done < <(all_services_rows)
 
 step "Applying"
 kube apply -f "$MANIFEST"
@@ -38,7 +38,7 @@ while IFS="$SERVICE_SEP" read -r name chart version _repo _ns _dep _wait; do
     [[ -n "$name" ]] || continue
     wait_for_valid ServiceTemplate "$(template_name_for "$chart" "$version")" \
         "$NAMESPACE" "$TEMPLATES_TIMEOUT"
-done < <(services_rows)
+done < <(all_services_rows)
 
 kube get servicetemplates -n "$NAMESPACE"
 ok "All ServiceTemplates are valid"

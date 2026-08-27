@@ -1,0 +1,39 @@
+name: 04mcs02_invalid_dependency
+group: MultiClusterService dependencies
+description: >-
+  Issue #4, scenario 2: the MultiClusterService that others depend on declares
+  an invalid service, so it never becomes healthy. The dependent one must never
+  be rolled out at all.
+
+multiClusterServices:
+  - name: base
+    services:
+      - name: cert-manager
+        chart: cert-manager
+        version: 1.20.2
+        repo: oci://ghcr.io/k0rdent/catalog/charts
+        namespace: cert-manager
+        # Same rejected value as the other invalid scenarios: the API server
+        # refuses a negative replica count, so the release never installs.
+        values: |
+          cert-manager:
+            crds:
+              enabled: true
+            replicaCount: -1
+
+  - name: dependent
+    dependsOn:
+      - base
+    services:
+      - name: traefik
+        chart: traefik
+        version: 41.2.0
+        repo: oci://ghcr.io/k0rdent/catalog/charts
+        namespace: traefik
+        waitForPods: traefik-
+
+expect:
+  # No ServiceSet for it, ever, and nothing of its own in the child cluster.
+  neverDeployed:
+    - dependent
+  graceSeconds: 180

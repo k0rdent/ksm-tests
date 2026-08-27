@@ -17,6 +17,10 @@ require_yq
 
 check_scenario
 
+# Scenarios with several MultiClusterServices are about how those interact,
+# which needs its own choreography.
+if is_multi_mcs; then exec "$SCRIPTS_DIR/deploy_mcs_group.sh"; fi
+
 export KUBECONFIG="$KUBECONFIG_MGMT"
 require_cluster
 ensure_workdir

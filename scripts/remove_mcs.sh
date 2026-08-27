@@ -19,36 +19,46 @@ check_scenario
 export KUBECONFIG="$KUBECONFIG_MGMT"
 require_cluster
 
-if ! resource_exists MultiClusterService "$MCS_NAME"; then
-    log "MultiClusterService '$MCS_NAME' does not exist -- nothing to remove"
-else
-    step "Scenario $SCENARIO: deleting MultiClusterService '$MCS_NAME'"
-    kube delete multiclusterservice "$MCS_NAME" --wait=false
-    wait_for_absence MultiClusterService "$MCS_NAME" "" "$MCS_TIMEOUT" 5
-fi
+# remove_one MCS_OBJECT_NAME -- delete it and wait for its ServiceSet to go.
+remove_one() {
+    local mcs="$1" sset elapsed=0
 
-step "Checking the ServiceSet is gone"
-# Only the MCS-owned one: the ClusterDeployment keeps a ServiceSet of its own
-# for as long as the cluster exists.
-elapsed=0
-while (( elapsed < MCS_TIMEOUT )); do
-    sset="$(kube get serviceset -n "$NAMESPACE" \
-        -o jsonpath="{.items[?(@.spec.multiClusterService==\"$MCS_NAME\")].metadata.name}" 2>/dev/null || true)"
-    [[ -z "$sset" ]] && break
-    if (( elapsed > 0 && elapsed % ${DIAG_INTERVAL:-120} == 0 )); then
-        warn "ServiceSet '$sset' still present after ${elapsed}s -- diagnostics:"
-        { describe_stuck ServiceSet "$sset" "$NAMESPACE"; kcm_errors 5m; } >&2
-    elif (( elapsed % 30 == 0 )); then
-        log "⏳ ServiceSet '$sset' still present (${elapsed}s)"
+    if ! resource_exists MultiClusterService "$mcs"; then
+        log "MultiClusterService '$mcs' does not exist -- nothing to remove"
+    else
+        step "Scenario $SCENARIO: deleting MultiClusterService '$mcs'"
+        kube delete multiclusterservice "$mcs" --wait=false
+        wait_for_absence MultiClusterService "$mcs" "" "$MCS_TIMEOUT" 5
     fi
-    sleep 5
-    elapsed=$(( elapsed + 5 ))
+
+    step "Checking the ServiceSet of '$mcs' is gone"
+    # Only the MCS-owned one: the ClusterDeployment keeps a ServiceSet of its
+    # own for as long as the cluster exists.
+    while (( elapsed < MCS_TIMEOUT )); do
+        sset="$(kube get serviceset -n "$NAMESPACE" \
+            -o jsonpath="{.items[?(@.spec.multiClusterService==\"$mcs\")].metadata.name}" 2>/dev/null || true)"
+        [[ -z "$sset" ]] && break
+        if (( elapsed > 0 && elapsed % ${DIAG_INTERVAL:-120} == 0 )); then
+            warn "ServiceSet '$sset' still present after ${elapsed}s -- diagnostics:"
+            { describe_stuck ServiceSet "$sset" "$NAMESPACE"; kcm_errors 5m; } >&2
+        elif (( elapsed % 30 == 0 )); then
+            log "⏳ ServiceSet '$sset' still present (${elapsed}s)"
+        fi
+        sleep 5
+        elapsed=$(( elapsed + 5 ))
+    done
+    if [[ -n "${sset:-}" ]]; then
+        { describe_stuck ServiceSet "$sset" "$NAMESPACE"; kcm_errors 20m; } >&2
+        die "ServiceSet '$sset' survived the MultiClusterService"
+    fi
+    ok "No ServiceSet left for '$mcs'"
+}
+
+# Dependants first: deleting a dependency out from under one that is still
+# running is not what the scenario set up.
+for (( i = $(mcs_count) - 1; i >= 0; i-- )); do
+    remove_one "$(mcs_object_name "$i")"
 done
-if [[ -n "${sset:-}" ]]; then
-    { describe_stuck ServiceSet "$sset" "$NAMESPACE"; kcm_errors 20m; } >&2
-    die "ServiceSet '$sset' survived the MultiClusterService"
-fi
-ok "No ServiceSet left"
 
 if [[ "${SKIP_CHILD_API_CHECK:-false}" == "true" ]]; then
     warn "SKIP_CHILD_API_CHECK=true -- not verifying removal in the child cluster"
@@ -78,7 +88,7 @@ else
             exit 1
         fi
         log "✅ '$ns' has no workloads left"
-    done < <(service_namespaces)
+    done < <(all_service_namespaces)
 fi
 
 step "Removing the ServiceTemplates"
@@ -93,6 +103,6 @@ while IFS="$SERVICE_SEP" read -r name chart version _repo _ns _dep _wait; do
             -n "$NAMESPACE" --ignore-not-found
     fi
     kube delete helmrepository "$name" -n "$NAMESPACE" --ignore-not-found
-done < <(services_rows)
+done < <(all_services_rows)
 
 ok "Service lifecycle completed"

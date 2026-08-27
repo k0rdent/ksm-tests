@@ -45,6 +45,8 @@ CI is grouped **by scenario first, KCM variant second** — one job per pair:
 02dep02_invalid         / src: main | release: 1.11.0 | release: 1.10.0
 03upg01_valid           / src: main | release: 1.11.0 | release: 1.10.0
 03upg02_invalid_atomic  / src: main | release: 1.11.0 | release: 1.10.0
+04mcs01_valid           / src: main | release: 1.11.0 | release: 1.10.0
+04mcs02_invalid_dependency / src: main | release: 1.11.0 | release: 1.10.0
 ```
 
 Actions has no nested matrix, so `e2e.yml` holds the scenario dimension and
@@ -81,9 +83,12 @@ a heading.
 | Service dependencies | `02dep02_invalid` | an invalid link: the rollout must stop there | traefik → **cert-manager (invalid)** → kserve-crd |
 | Service upgrades | `03upg01_valid` | upgrading one service must not disturb the others | traefik → **cert-manager 1.20.2→1.21.1** → kserve-crd |
 | Service upgrades | `03upg02_invalid_atomic` | an invalid upgrade with `atomic` must roll back | traefik → **cert-manager (invalid upgrade)** → kserve-crd |
+| MCS dependencies | `04mcs01_valid` | a dependent MCS waits for its dependency to be healthy | `base` (cert-manager) → `dependent` (traefik) |
+| MCS dependencies | `04mcs02_invalid_dependency` | a broken dependency MCS holds the dependent back for good | `base` (**invalid**) → `dependent` |
 
 The `02dep*` cases are [issue #2](https://github.com/josef-hak/k0rdent-kcm-tests/issues/2),
-the `03upg*` cases [issue #3](https://github.com/josef-hak/k0rdent-kcm-tests/issues/3).
+the `03upg*` cases [issue #3](https://github.com/josef-hak/k0rdent-kcm-tests/issues/3),
+the `04mcs*` cases [issue #4](https://github.com/josef-hak/k0rdent-kcm-tests/issues/4).
 
 Adding one is a drop-in: put a file in `test_scenarios/`, and both `make
 scenarios` and CI pick it up with no further edits.
@@ -177,6 +182,38 @@ Unit tests check that every name in `expect` is a real service, that the
 blocked ones genuinely sit behind the failing one in the `dependsOn` graph, and
 that the kept ones do not — without that, a typo would make the scenario pass
 while asserting nothing.
+
+#### Scenarios with several MultiClusterServices
+
+Dependencies *between* MCSs need more than one, so those scenarios replace the
+flat `services:` list with `multiClusterServices:`. Everything else in the
+harness keeps working on the flat form, which is what the other scenarios use.
+
+```yaml
+multiClusterServices:
+  - name: base
+    services: [...]
+  - name: dependent
+    dependsOn: [base]       # becomes spec.dependsOn on the MCS
+    services: [...]
+
+expect:
+  orderedAfterDependencies: [dependent]   # must not start before base is deployed
+  neverDeployed: [dependent]              # must never start at all
+  graceSeconds: 180
+```
+
+`deploy_mcs_group.sh` creates them all in **one apply**, so creation order
+cannot be what sequences them — only `spec.dependsOn` can. It then records when
+each MCS first gets a ServiceSet and when it first reports every service
+deployed, and compares those two moments. Checking a "was it blocked?" state
+directly would be racy; comparing timestamps is not.
+
+`neverDeployed` is the broken-dependency case: the run sits out the grace
+window and fails if a ServiceSet ever appears for that MCS.
+
+Teardown goes in reverse declaration order, so a dependency is never deleted
+out from under something still using it.
 
 #### Scenarios that upgrade
 

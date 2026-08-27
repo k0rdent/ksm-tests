@@ -1,9 +1,55 @@
 #!/bin/bash
 # Helpers for reading $SERVICES_FILE. Expects common.sh to be sourced first.
 
+# ── One or several MultiClusterServices ──────────────────────────────────────
+# Most scenarios declare a flat `services:` list and get one MCS. Scenarios
+# about dependencies *between* MCSs declare `multiClusterServices:` instead,
+# and every accessor below then reads the one selected by $MCS_IDX. Keeping the
+# flat form working means the existing scenarios need no changes.
+
+is_multi_mcs() {
+    [[ "$(yq -r '.multiClusterServices // "" | tag' "$SERVICES_FILE")" == "!!seq" ]]
+}
+
+# mcs_count -- how many MultiClusterServices the scenario declares.
+mcs_count() {
+    if is_multi_mcs; then yq -r '.multiClusterServices | length' "$SERVICES_FILE"; else echo 1; fi
+}
+
+# mcs_root -- the yq path prefix for the currently selected MCS.
+mcs_root() {
+    if is_multi_mcs; then echo ".multiClusterServices[${MCS_IDX:-0}]"; else echo ""; fi
+}
+
+# mcs_key IDX -- the short name the scenario gave this MCS, empty in flat form.
+mcs_key() {
+    is_multi_mcs || return 0
+    IDX="$1" yq -r '.multiClusterServices[env(IDX)].name' "$SERVICES_FILE"
+}
+
+# mcs_object_name IDX -- the Kubernetes name, unique per run and scenario.
+mcs_object_name() {
+    local key
+    key="$(mcs_key "$1")"
+    [[ -n "$key" ]] && echo "$MCS_NAME-$key" || echo "$MCS_NAME"
+}
+
+# mcs_depends_on IDX -- the MCS keys this one depends on, one per line.
+mcs_depends_on() {
+    is_multi_mcs || return 0
+    IDX="$1" yq -r '.multiClusterServices[env(IDX)].dependsOn[]? // ""' "$SERVICES_FILE"
+}
+
+# mcs_index_of KEY -- position of the MCS with this short name.
+mcs_index_of() {
+    KEY="$1" yq -r \
+        '.multiClusterServices | to_entries[] | select(.value.name == strenv(KEY)) | .key' \
+        "$SERVICES_FILE"
+}
+
 # service_count -- how many services are declared.
 service_count() {
-    yq -r '.services | length' "$SERVICES_FILE"
+    yq -r "$(mcs_root).services | length" "$SERVICES_FILE"
 }
 
 # SERVICE_SEP must not be whitespace: `read` with a whitespace IFS collapses
@@ -15,24 +61,39 @@ SERVICE_SEP='|'
 # services_rows -- one line per service, SERVICE_SEP separated:
 #   name|chart|version|repo|namespace|dependsOn|waitForPods
 services_rows() {
-    yq -r '.services[] | [.name, .chart, .version, .repo, .namespace,
-                          (.dependsOn // ""), (.waitForPods // "")] | join("|")' "$SERVICES_FILE"
+    yq -r "$(mcs_root).services[] | [.name, .chart, .version, .repo, .namespace,
+                          (.dependsOn // \"\"), (.waitForPods // \"\")] | join(\"|\")" "$SERVICES_FILE"
+}
+
+# all_services_rows -- every service across every MCS, for the steps that have
+# to touch the whole scenario at once (templates, teardown).
+all_services_rows() {
+    local i
+    if ! is_multi_mcs; then services_rows; return; fi
+    for (( i = 0; i < $(mcs_count); i++ )); do
+        MCS_IDX="$i" services_rows
+    done
 }
 
 # service_namespaces -- each target namespace once, in declaration order.
 service_namespaces() {
-    yq -r '.services[].namespace' "$SERVICES_FILE" | awk '!seen[$0]++'
+    yq -r "$(mcs_root).services[].namespace" "$SERVICES_FILE" | awk '!seen[$0]++'
+}
+
+# all_service_namespaces -- likewise across every MCS.
+all_service_namespaces() {
+    all_services_rows | cut -d'|' -f5 | awk 'NF && !seen[$0]++'
 }
 
 # service_values NAME -- the values block for one service, empty if it has none.
 service_values() {
-    NAME="$1" yq -r '.services[] | select(.name == strenv(NAME)) | .values // ""' "$SERVICES_FILE"
+    NAME="$1" yq -r "$(mcs_root).services[] | select(.name == strenv(NAME)) | .values // \"\"" "$SERVICES_FILE"
 }
 
 # service_field NAME FIELD
 service_field() {
     NAME="$1" FIELD="$2" yq -r \
-        '.services[] | select(.name == strenv(NAME)) | .[strenv(FIELD)] // ""' "$SERVICES_FILE"
+        "$(mcs_root).services[] | select(.name == strenv(NAME)) | .[strenv(FIELD)] // \"\"" "$SERVICES_FILE"
 }
 
 # template_name_for CHART VERSION -- the ServiceTemplate name, matching the
@@ -95,15 +156,23 @@ upgrade_expect_list() {
     FIELD="$1" yq -r '.upgrade.expect[strenv(FIELD)][]? // ""' "$SERVICES_FILE"
 }
 
-# effective_version NAME MODE -- the chart version this service should be at.
-# MODE=upgraded applies the override; anything else keeps the declared version.
+# effective_version NAME MODE [FALLBACK] -- the chart version this service
+# should be at. MODE=upgraded applies the override; anything else keeps the
+# declared version.
+#
+# FALLBACK matters for the multi-MCS scenarios: service_field only sees the
+# currently selected MCS, so a caller iterating across all of them must pass the
+# version it already has from the row. Without it the lookup silently returns
+# empty and the template name comes out as "traefik-".
 effective_version() {
     local v
     if [[ "${2:-}" == "upgraded" ]]; then
         v="$(upgrade_field "$1" version)"
         [[ -n "$v" ]] && { echo "$v"; return; }
     fi
-    service_field "$1" version
+    v="$(service_field "$1" version)"
+    [[ -n "$v" ]] && { echo "$v"; return; }
+    echo "${3:-}"
 }
 
 # effective_values NAME MODE -- likewise for the values block. An override
@@ -129,7 +198,7 @@ render_templates() {
     local name chart version repo _ns _dep _wait tmpl
     while IFS="$SERVICE_SEP" read -r name chart version repo _ns _dep _wait; do
         [[ -n "$name" ]] || continue
-        version="$(effective_version "$name" "$mode")"
+        version="$(effective_version "$name" "$mode" "$version")"
         tmpl="$(template_name_for "$chart" "$version")"
         cat >> "$out" <<EOF
 ---
@@ -163,7 +232,7 @@ spec:
         kind: HelmRepository
         name: $name
 EOF
-    done < <(services_rows)
+    done < <(all_services_rows)
 }
 
 # render_mcs FILE MODE -- the MultiClusterService manifest. Shared by the
@@ -176,11 +245,23 @@ render_mcs() {
 apiVersion: k0rdent.mirantis.com/v1beta1
 kind: MultiClusterService
 metadata:
-  name: $MCS_NAME
+  name: $(mcs_object_name "${MCS_IDX:-0}")
 spec:
   clusterSelector:
     matchLabels:
       group: $CLD_GROUP_LABEL
+EOF
+
+    # An MCS-level dependsOn holds this whole MCS back until the ones it names
+    # are deployed and healthy -- KCM does not even create its ServiceSet.
+    local dep first=true
+    while read -r dep; do
+        [[ -n "$dep" ]] || continue
+        $first && { echo "  dependsOn:" >> "$out"; first=false; }
+        echo "    - $(mcs_object_name "$(mcs_index_of "$dep")")" >> "$out"
+    done < <(mcs_depends_on "${MCS_IDX:-0}")
+
+    cat >> "$out" <<EOF
   serviceSpec:
     services:
 EOF
@@ -188,7 +269,7 @@ EOF
     local name chart version _repo namespace dep _wait values
     while IFS="$SERVICE_SEP" read -r name chart version _repo namespace dep _wait; do
         [[ -n "$name" ]] || continue
-        version="$(effective_version "$name" "$mode")"
+        version="$(effective_version "$name" "$mode" "$version")"
         {
             echo "      - template: $(template_name_for "$chart" "$version")"
             echo "        name: $name"
