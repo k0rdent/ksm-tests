@@ -20,17 +20,31 @@ if command -v yq >/dev/null 2>&1 && yq --version 2>&1 | grep -qi mikefarah; then
 fi
 
 echo "Scenarios (test_scenarios/, pick with SCENARIO=<id>):"
+# Two layers: the group heading, then its cases. Groups appear in the order
+# their first scenario does, which the numeric stems already sort correctly.
+last_group=""
 while read -r id; do
     [[ -n "$id" ]] || continue
     if [[ "$have_yq" != "true" ]]; then
         echo "  $id"
         continue
     fi
-    desc="$(yq -r '.description // ""' "$SCENARIOS_DIR/$id.yaml" 2>/dev/null | tr '\n' ' ')"
-    printf '  %-22s %s\n' "$id" "${desc:0:100}"
-    # Its own line, so a long description cannot push it out of sight.
-    known="$(yq -r '[.knownFailures[].kcm] | join(", ")' "$SCENARIOS_DIR/$id.yaml" 2>/dev/null)"
-    [[ -n "$known" ]] && printf '  %-22s ⚠️  known to fail on: %s\n' "" "$known"
+    file="$SCENARIOS_DIR/$id.yaml"
+
+    group="$(yq -r '.group // "Ungrouped"' "$file" 2>/dev/null)"
+    if [[ "$group" != "$last_group" ]]; then
+        echo
+        echo "  $group"
+        last_group="$group"
+    fi
+
+    desc="$(yq -r '.description // ""' "$file" 2>/dev/null | tr '\n' ' ')"
+    printf '    %-20s %s\n' "$id" "${desc:0:96}"
+    # Each on its own line, so a long description cannot push them out of sight.
+    known="$(yq -r '[.knownFailures[].kcm] | join(", ")' "$file" 2>/dev/null)"
+    [[ -n "$known" ]] && printf '    %-20s ⚠️  known to fail on: %s\n' "" "$known"
+    failed="$(yq -r '.expect.failed // ""' "$file" 2>/dev/null)"
+    [[ -n "$failed" ]] && printf '    %-20s ⛔ expects "%s" to fail\n' "" "$failed"
 done < <(list_scenarios)
 
 echo
@@ -41,4 +55,4 @@ while read -r id; do
 done < <(list_kcm_variants)
 
 echo
-echo "Example: make e2e SCENARIO=02_depends_on_valid KCM=rel-1-11-0"
+echo "Example: make e2e SCENARIO=02dep01_valid KCM=rel-1-11-0"

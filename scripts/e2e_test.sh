@@ -14,7 +14,7 @@ set -euo pipefail
 # scenarios locally. CI does not do this: there every combination gets its own
 # runner, which is what keeps the scenarios independent.
 #
-#   SCENARIO=02_depends_on_valid KCM=rel-1-11-0 ./scripts/e2e_test.sh
+#   SCENARIO=02dep01_valid KCM=rel-1-11-0 ./scripts/e2e_test.sh
 
 # shellcheck source=scripts/lib/common.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"

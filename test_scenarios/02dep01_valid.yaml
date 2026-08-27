@@ -1,7 +1,9 @@
-name: 02_depends_on_valid
+name: 02dep01_valid
+group: Service dependencies
 description: >-
   A valid dependsOn chain: cert-manager provides the webhook certificates, the
   CRDs must exist before the controller. Same chain as catalog's apps/kserve.
+  Issue #2, scenario 1: every service is valid, so all of them must land.
 
 # KCM versions where this scenario is known to fail. CI still runs the leg and
 # still reports it, but it does not block the workflow. Drop an entry once the

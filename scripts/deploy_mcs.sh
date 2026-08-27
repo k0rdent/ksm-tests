@@ -100,6 +100,12 @@ if [[ "${SKIP_CHILD_API_CHECK:-false}" == "true" ]]; then
     exit 0
 fi
 
+# Scenarios that assert the rollout stops have their own checks: waiting for
+# every service to be Ready would just time out on the one meant to fail.
+if expects_failure; then
+    SERVICE_SET="$sset" exec "$SCRIPTS_DIR/verify_mcs_failure.sh"
+fi
+
 [[ -f "$KUBECONFIG_CHILD" ]] \
     || die "No child kubeconfig at $KUBECONFIG_CHILD. Run ./scripts/check_child_cluster.sh first."
 

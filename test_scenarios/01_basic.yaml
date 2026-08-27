@@ -1,4 +1,5 @@
-name: 01_single_svc
+name: 01_basic
+group: Basics
 description: One service, no dependencies -- the baseline MultiClusterService path.
 
 # Charts come from k0rdent/catalog's registry. Those are thin wrappers that

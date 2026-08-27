@@ -43,8 +43,8 @@
 
 # ── Scenario (services deployed through a MultiClusterService) ───────────────
 # A scenario is a file in test_scenarios/. Run `make scenarios` for the list.
-# export SCENARIO="01_single_svc"
-# export SERVICES_FILE="$PWD/test_scenarios/01_single_svc.yaml"   # or a file of your own
+# export SCENARIO="01_basic"
+# export SERVICES_FILE="$PWD/test_scenarios/01_basic.yaml"   # or a file of your own
 # export SKIP_SERVICE_TEST="true"        # skip the ServiceTemplate/MCS steps
 
 # ── Environment names ────────────────────────────────────────────────────────

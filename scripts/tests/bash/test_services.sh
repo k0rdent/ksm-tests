@@ -22,21 +22,21 @@ source "$SCRIPTS_DIR/lib/services.sh"
 set_file() {
     SCENARIO="$1" bash -c "unset SERVICES_FILE; source '$SCRIPTS_DIR/lib/common.sh'; echo \$SERVICES_FILE"
 }
-assert_contains "01_single_svc is the default" "$(set_file '')" "01_single_svc.yaml"
-assert_contains "SCENARIO picks the file" "$(set_file 02_depends_on_valid)" "02_depends_on_valid.yaml"
+assert_contains "01_basic is the default" "$(set_file '')" "01_basic.yaml"
+assert_contains "SCENARIO picks the file" "$(set_file 02dep01_valid)" "02dep01_valid.yaml"
 assert_eq "scenarios are discovered from the directory" \
-    "01_single_svc 02_depends_on_valid" "$(list_scenarios | tr '\n' ' ' | sed 's/ $//')"
+    "01_basic 02dep01_valid 02dep02_invalid" "$(list_scenarios | tr '\n' ' ' | sed 's/ $//')"
 
 # A typo must say what is available rather than just refuse.
 out=$(SCENARIO=nope bash -c "unset SERVICES_FILE; source '$SCRIPTS_DIR/lib/common.sh'; check_scenario" 2>&1)
 assert_eq "an unknown scenario is rejected" 1 "$?"
-assert_contains "lists the available scenarios" "$out" "02_depends_on_valid"
+assert_contains "lists the available scenarios" "$out" "02dep01_valid"
 
 # Underscores are legal in a filename but not in a Kubernetes object name, and
 # the scenario reaches CLD_NAME and MCS_NAME.
-slug="$(SCENARIO=02_depends_on_valid bash -c "source '$SCRIPTS_DIR/lib/common.sh'; echo \$SCENARIO_SLUG")"
-assert_eq "the slug has no underscores" "02-depends-on-valid" "$slug"
-mcs="$(SCENARIO=02_depends_on_valid bash -c "unset MCS_NAME; source '$SCRIPTS_DIR/lib/common.sh'; echo \$MCS_NAME")"
+slug="$(SCENARIO=02dep01_valid bash -c "source '$SCRIPTS_DIR/lib/common.sh'; echo \$SCENARIO_SLUG")"
+assert_eq "the slug has no underscores" "02dep01-valid" "$slug"
+mcs="$(SCENARIO=02dep01_valid bash -c "unset MCS_NAME; source '$SCRIPTS_DIR/lib/common.sh'; echo \$MCS_NAME")"
 assert_not_contains "MCS_NAME has no underscores" "$mcs" "_"
 
 # Metadata and filename must agree, or `make scenarios` and CI would disagree.
@@ -44,12 +44,21 @@ while read -r id; do
     [[ -n "$id" ]] || continue
     assert_eq "$id declares its own name" "$id" \
         "$(yq -r '.name' "$SCENARIOS_DIR/$id.yaml")"
+    # The group is the outer layer of the hierarchy; without it a scenario
+    # silently lands under "Ungrouped".
+    assert_not_eq "$id declares a group" "" \
+        "$(yq -r '.group // ""' "$SCENARIOS_DIR/$id.yaml")"
 done < <(list_scenarios)
 
+assert_eq "the dependency cases share one group" "Service dependencies" \
+    "$(yq -r '.group' "$SCENARIOS_DIR/02dep01_valid.yaml")"
+assert_eq "both dependency cases are in it" "Service dependencies" \
+    "$(yq -r '.group' "$SCENARIOS_DIR/02dep02_invalid.yaml")"
+
 assert_eq "01 has no known failures" "0" \
-    "$(yq -r '[.knownFailures[]] | length' "$SCENARIOS_DIR/01_single_svc.yaml")"
+    "$(yq -r '[.knownFailures[]] | length' "$SCENARIOS_DIR/01_basic.yaml")"
 assert_eq "02 records the 1.11.0 defect" "rel-1-11-0" \
-    "$(yq -r '.knownFailures[0].kcm' "$SCENARIOS_DIR/02_depends_on_valid.yaml")"
+    "$(yq -r '.knownFailures[0].kcm' "$SCENARIOS_DIR/02dep01_valid.yaml")"
 
 # Every chart must come from catalog's registry, which is what the values
 # nesting below assumes.
@@ -57,14 +66,14 @@ all_repos="$(yq -r '.services[].repo' "$SCENARIOS_DIR"/*.yaml | grep -v '^---$' 
 assert_eq "all charts come from the catalog registry" \
     "oci://ghcr.io/k0rdent/catalog/charts" "$all_repos"
 
-# ── 01_single_svc ────────────────────────────────────────────────────────────
-SERVICES_FILE="$SCENARIOS_DIR/01_single_svc.yaml"
+# ── 01_basic ────────────────────────────────────────────────────────────
+SERVICES_FILE="$SCENARIOS_DIR/01_basic.yaml"
 assert_eq "01 has one service" 1 "$(service_count)"
 assert_eq "traefik has no dependsOn" "" "$(service_field traefik dependsOn)"
 assert_eq "traefik waits for its pods" "traefik-" "$(service_field traefik waitForPods)"
 
-# ── 02_depends_on_valid ──────────────────────────────────────────────────────
-SERVICES_FILE="$SCENARIOS_DIR/02_depends_on_valid.yaml"
+# ── 02dep01_valid ──────────────────────────────────────────────────────
+SERVICES_FILE="$SCENARIOS_DIR/02dep01_valid.yaml"
 assert_eq "02 has three services" 3 "$(service_count)"
 assert_eq "declaration order puts dependencies first" \
     "cert-manager kserve-crd kserve-resources " \
@@ -99,7 +108,60 @@ assert_contains "cert-manager values are nested under the chart name" \
 assert_contains "kserve values are nested under the chart name" \
     "$(service_values kserve-resources)" "kserve-resources:"
 
-# ── Rendering 02_depends_on_valid ────────────────────────────────────────────
+# ── 02dep02_invalid: the expect block ────────────────────────────────────────
+SERVICES_FILE="$SCENARIOS_DIR/01_basic.yaml"
+assert_eq "01_basic expects no failure" "1" "$(expects_failure && echo 0 || echo 1)"
+SERVICES_FILE="$SCENARIOS_DIR/02dep01_valid.yaml"
+assert_eq "the valid chain expects no failure" "1" "$(expects_failure && echo 0 || echo 1)"
+
+SERVICES_FILE="$SCENARIOS_DIR/02dep02_invalid.yaml"
+assert_eq "the invalid chain expects a failure" "0" "$(expects_failure && echo 0 || echo 1)"
+assert_eq "it names the failing service" "cert-manager" "$(expect_field failed)"
+assert_eq "graceSeconds is set" "120" "$(expect_field graceSeconds)"
+assert_eq "one blocked service" "kserve-crd" "$(expect_list blocked | tr '\n' ' ' | sed 's/ $//')"
+assert_eq "one already-deployed service" "traefik" "$(expect_list deployed | tr '\n' ' ' | sed 's/ $//')"
+
+# A name that is not a service in the file would make the whole scenario
+# vacuous: nothing would ever be checked and the run would go green.
+known_services="$(services_rows | cut -d'|' -f1)"
+check_names() { # check_names FIELD < names
+    while read -r n; do
+        [[ -n "$n" ]] || continue
+        assert_contains "expect.$1 '$n' is a declared service" "$known_services" "$n"
+    done
+}
+expect_field failed | check_names failed
+expect_list blocked | check_names blocked
+expect_list deployed | check_names deployed
+
+# depends_transitively CHILD ANCESTOR -- follow dependsOn up the chain.
+depends_transitively() {
+    local cur="$1" guard=0
+    while [[ -n "$cur" ]] && (( guard < 10 )); do
+        cur="$(service_field "$cur" dependsOn)"
+        [[ "$cur" == "$2" ]] && return 0
+        guard=$(( guard + 1 ))
+    done
+    return 1
+}
+
+# The claims only mean something if the graph actually has this shape: blocked
+# services must sit behind the failure, kept ones in front of it.
+while read -r n; do
+    [[ -n "$n" ]] || continue
+    assert_eq "blocked '$n' really depends on the failing service" "0" \
+        "$(depends_transitively "$n" "$(expect_field failed)" && echo 0 || echo 1)"
+done < <(expect_list blocked)
+
+while read -r n; do
+    [[ -n "$n" ]] || continue
+    assert_eq "kept '$n' does not depend on the failing service" "1" \
+        "$(depends_transitively "$n" "$(expect_field failed)" && echo 0 || echo 1)"
+done < <(expect_list deployed)
+
+# ── Rendering 02dep01_valid ────────────────────────────────────────────
+# Back to the valid chain: the block above pointed SERVICES_FILE elsewhere.
+SERVICES_FILE="$SCENARIOS_DIR/02dep01_valid.yaml"
 setup_mock_bin
 write_mock kubectl <<'EOF'
 #!/bin/bash
