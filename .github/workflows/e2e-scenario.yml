@@ -138,6 +138,10 @@ jobs:
       - name: Upgrade services
         run: ./scripts/ci_step.sh "Upgrade services" ./scripts/upgrade_services.sh
 
+      # No-op unless the scenario declares upgrade.steps.
+      - name: Upgrade along the chain
+        run: ./scripts/ci_step.sh "Upgrade along the chain" ./scripts/upgrade_chain.sh
+
       - name: Remove MultiClusterService
         run: ./scripts/ci_step.sh "Remove MultiClusterService" ./scripts/remove_mcs.sh
 

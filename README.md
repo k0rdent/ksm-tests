@@ -47,6 +47,10 @@ CI is grouped **by scenario first, KCM variant second** — one job per pair:
 03upg02_invalid_atomic  / src: main | release: 1.11.0 | release: 1.10.0
 04mcs01_valid           / src: main | release: 1.11.0 | release: 1.10.0
 04mcs02_invalid_dependency / src: main | release: 1.11.0 | release: 1.10.0
+05chain01_no_chain      / src: main | release: 1.11.0 | release: 1.10.0
+05chain02_boundary      / src: main | release: 1.11.0 | release: 1.10.0
+05chain03_direct_to_latest / src: main | release: 1.11.0 | release: 1.10.0
+05chain04_stepwise      / src: main | release: 1.11.0 | release: 1.10.0
 ```
 
 Actions has no nested matrix, so `e2e.yml` holds the scenario dimension and
@@ -85,10 +89,15 @@ a heading.
 | Service upgrades | `03upg02_invalid_atomic` | an invalid upgrade with `atomic` must roll back | traefik → **cert-manager (invalid upgrade)** → kserve-crd |
 | MCS dependencies | `04mcs01_valid` | a dependent MCS waits for its dependency to be healthy | `base` (cert-manager) → `dependent` (traefik) |
 | MCS dependencies | `04mcs02_invalid_dependency` | a broken dependency MCS holds the dependent back for good | `base` (**invalid**) → `dependent` |
+| Sequential upgrades | `05chain01_no_chain` | with no chain, any version is reachable | cert-manager 1.20.2 → 1.21.1 |
+| Sequential upgrades | `05chain02_boundary` | a chain offering nothing refuses every upgrade | cert-manager 1.20.2 |
+| Sequential upgrades | `05chain03_direct_to_latest` | only what the chain lists is accepted | cert-manager 1.20.2 → 1.21.1 |
+| Sequential upgrades | `05chain04_stepwise` | a multi-hop chain must be walked, not skipped | cert-manager 1.20.2 → 1.20.3 → 1.21.1 |
 
 The `02dep*` cases are [issue #2](https://github.com/josef-hak/k0rdent-kcm-tests/issues/2),
 the `03upg*` cases [issue #3](https://github.com/josef-hak/k0rdent-kcm-tests/issues/3),
-the `04mcs*` cases [issue #4](https://github.com/josef-hak/k0rdent-kcm-tests/issues/4).
+the `04mcs*` cases [issue #4](https://github.com/josef-hak/k0rdent-kcm-tests/issues/4),
+the `05chain*` cases [issue #5](https://github.com/josef-hak/k0rdent-kcm-tests/issues/5).
 
 Adding one is a drop-in: put a file in `test_scenarios/`, and both `make
 scenarios` and CI pick it up with no further edits.
@@ -214,6 +223,40 @@ window and fails if a ServiceSet ever appears for that MCS.
 
 Teardown goes in reverse declaration order, so a dependency is never deleted
 out from under something still using it.
+
+#### Scenarios with a ServiceTemplateChain
+
+A `ServiceTemplateChain` says which upgrades are allowed. Scenarios declare it
+in chart versions; the `ServiceTemplate` names are derived, so nothing has to
+spell out `cert-manager-1-20-2`.
+
+```yaml
+templateChain:
+  supportedTemplates:
+    - version: 1.20.2
+      availableUpgrades: [1.20.3]
+    - version: 1.20.3
+      availableUpgrades: [1.21.1]
+    - version: 1.21.1
+
+upgrade:
+  graceSeconds: 120
+  steps:
+    - version: 1.20.3
+      expect: rejected          # the release must not move at all
+    - version: 1.21.1
+      expect: applied
+      viaVersions: [1.20.3]     # and must have passed through this
+```
+
+`upgrade_chain.sh` walks the steps one at a time. A rejection is the *absence*
+of a change, so it can only be established by watching for the grace window;
+`viaVersions` is checked against helm history afterwards, because watching for
+an intermediate version live would be a race.
+
+A ServiceTemplate is created for every version the scenario names — the initial
+one, everything in the chain, and every step target — otherwise an upgrade would
+point at something that does not exist.
 
 #### Scenarios that upgrade
 
@@ -476,6 +519,14 @@ revision. The `ServiceSet` keeps reporting the service `Deployed` at a chart
 version that no longer exists in the cluster — which is why the upgrade checks
 read the helm release directly and treat the `ServiceSet` as one opinion rather
 than the truth. 1.11.0 and main roll back correctly.
+
+The stepwise-upgrade gap is recorded in
+`test_scenarios/05chain04_stepwise.yaml`. A `ServiceTemplateChain` constrains
+**which** versions may be reached but not the route taken: a chain defining
+1.20.2 → 1.20.3 → 1.21.1 still gets a single helm upgrade straight to 1.21.1.
+That the chain is consulted at all is not in doubt — `05chain02` and
+`05chain03` both have their out-of-chain targets refused. Reproduced on 1.10.0
+and 1.11.0.
 
 Removal deletes the k0smotron etcd PVC explicitly: `docker-hosted-cp` exposes
 `storage.etcd.autoDeletePVCs` but no template in chart 1.0.15 reads it, so the

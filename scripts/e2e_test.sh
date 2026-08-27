@@ -100,6 +100,8 @@ if [[ "$DO_SCENARIO" == "true" && "${SKIP_SERVICE_TEST:-false}" != "true" ]]; th
     step_run "Deploy services via MultiClusterService" "$SCRIPTS_DIR/deploy_mcs.sh"
     # No-op unless the scenario has an upgrade block.
     step_run "Upgrade services" "$SCRIPTS_DIR/upgrade_services.sh"
+    # No-op unless the scenario declares upgrade.steps.
+    step_run "Upgrade along the chain" "$SCRIPTS_DIR/upgrade_chain.sh"
     step_run "Remove MultiClusterService" "$SCRIPTS_DIR/remove_mcs.sh"
 fi
 

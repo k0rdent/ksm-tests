@@ -105,4 +105,10 @@ while IFS="$SERVICE_SEP" read -r name chart version _repo _ns _dep _wait; do
     kube delete helmrepository "$name" -n "$NAMESPACE" --ignore-not-found
 done < <(all_services_rows)
 
+if has_template_chain; then
+    # Chains are cluster-scoped leftovers otherwise: running another scenario
+    # on the same cluster would find a stale one still lying around.
+    kube delete servicetemplatechain "$(chain_name)" -n "$NAMESPACE" --ignore-not-found
+fi
+
 ok "Service lifecycle completed"

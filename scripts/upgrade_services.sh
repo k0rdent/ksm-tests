@@ -31,6 +31,13 @@ if ! has_upgrade; then
     exit 0
 fi
 
+# Chain scenarios describe their upgrade as a sequence of steps and are walked
+# by upgrade_chain.sh instead.
+if (( $(upgrade_steps) > 0 )); then
+    log "Scenario $SCENARIO upgrades along a chain -- handled by upgrade_chain.sh"
+    exit 0
+fi
+
 export KUBECONFIG="$KUBECONFIG_MGMT"
 require_cluster
 ensure_workdir

@@ -1,0 +1,30 @@
+name: 05chain02_boundary
+group: Sequential upgrades
+description: >-
+  Issue #5, scenario 2: the chain lists only the version already deployed, so
+  it offers no upgrades at all. Any upgrade must be refused and the service
+  must stay where it is.
+
+templateChain:
+  supportedTemplates:
+    - version: 1.20.2      # deliberately no availableUpgrades
+
+upgrade:
+  steps:
+    - version: 1.21.1
+      expect: rejected
+  # How long to keep watching before calling a refusal a refusal rather than
+  # something merely slow.
+  graceSeconds: 120
+
+services:
+  - name: cert-manager
+    chart: cert-manager
+    version: 1.20.2
+    repo: oci://ghcr.io/k0rdent/catalog/charts
+    namespace: cert-manager
+    waitForPods: cert-manager-
+    values: |
+      cert-manager:
+        crds:
+          enabled: true
