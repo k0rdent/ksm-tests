@@ -1,0 +1,41 @@
+name: 04mcs01_valid
+group: MultiClusterService dependencies
+description: >-
+  Issue #4, scenario 1: two MultiClusterServices target the same cluster and
+  one depends on the other. Both are valid, so both must end up deployed -- but
+  the dependent one must not start until its dependency is deployed and
+  healthy.
+
+# Both are created at the same time on purpose. Creation order must not be what
+# sequences them; spec.dependsOn must.
+multiClusterServices:
+  - name: base
+    services:
+      - name: cert-manager
+        chart: cert-manager
+        version: 1.20.2
+        repo: oci://ghcr.io/k0rdent/catalog/charts
+        namespace: cert-manager
+        waitForPods: cert-manager-
+        values: |
+          cert-manager:
+            crds:
+              enabled: true
+
+  - name: dependent
+    dependsOn:
+      - base
+    services:
+      - name: traefik
+        chart: traefik
+        version: 41.2.0
+        repo: oci://ghcr.io/k0rdent/catalog/charts
+        namespace: traefik
+        waitForPods: traefik-
+
+expect:
+  # The dependent MCS must get no ServiceSet at all until base reports every
+  # service deployed. Checked by comparing when each first happened, so a fast
+  # base cannot make the assertion pass by accident.
+  orderedAfterDependencies:
+    - dependent
