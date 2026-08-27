@@ -11,7 +11,9 @@ description: >-
 upgrade:
   services:
     - name: cert-manager
-      version: 1.20.3
+      # A minor bump rather than a patch, so the upgrade is visible in the
+      # rendered template name and in the release chart.
+      version: 1.21.1
   expect:
     rolledOut:
       - cert-manager
