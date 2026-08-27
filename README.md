@@ -40,9 +40,11 @@ spent building the images and provisioning the child cluster.
 CI is grouped **by scenario first, KCM variant second** — one job per pair:
 
 ```
-01_basic         / src: main | release: 1.11.0 | release: 1.10.0
-02dep01_valid    / src: main | release: 1.11.0 | release: 1.10.0
-02dep02_invalid  / src: main | release: 1.11.0 | release: 1.10.0
+01_basic                / src: main | release: 1.11.0 | release: 1.10.0
+02dep01_valid           / src: main | release: 1.11.0 | release: 1.10.0
+02dep02_invalid         / src: main | release: 1.11.0 | release: 1.10.0
+03upg01_valid           / src: main | release: 1.11.0 | release: 1.10.0
+03upg02_invalid_atomic  / src: main | release: 1.11.0 | release: 1.10.0
 ```
 
 Actions has no nested matrix, so `e2e.yml` holds the scenario dimension and
@@ -77,7 +79,7 @@ a heading.
 | Basics | `01_basic` | the baseline MCS path, no dependencies | traefik |
 | Service dependencies | `02dep01_valid` | a valid `dependsOn` chain, everything lands | cert-manager → kserve-crd → kserve-resources |
 | Service dependencies | `02dep02_invalid` | an invalid link: the rollout must stop there | traefik → **cert-manager (invalid)** → kserve-crd |
-| Service upgrades | `03upg01_valid` | upgrading one service must not disturb the others | traefik → **cert-manager 1.20.2→1.20.3** → kserve-crd |
+| Service upgrades | `03upg01_valid` | upgrading one service must not disturb the others | traefik → **cert-manager 1.20.2→1.21.1** → kserve-crd |
 | Service upgrades | `03upg02_invalid_atomic` | an invalid upgrade with `atomic` must roll back | traefik → **cert-manager (invalid upgrade)** → kserve-crd |
 
 The `02dep*` cases are [issue #2](https://github.com/josef-hak/k0rdent-kcm-tests/issues/2),
@@ -154,11 +156,12 @@ then assert what moved. `upgrade_services.sh` runs between `deploy_mcs.sh` and
 `remove_mcs.sh`, and does nothing at all when the block is absent.
 
 ```yaml
+helmOptions:
+  atomic: true              # provider config, applied from the first deploy on
 upgrade:
-  atomic: true              # sets helmOptions.atomic on the services
   services:
     - name: cert-manager
-      version: 1.20.3       # new chart version, or…
+      version: 1.21.1       # new chart version, or…
       values: |             # …new values (replaces the original outright)
         ...
   expect:

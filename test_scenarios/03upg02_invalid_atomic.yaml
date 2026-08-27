@@ -32,10 +32,15 @@ knownFailures:
 upgrade:
   services:
     - name: cert-manager
-      # Same rejected value as 02dep02_invalid, so the two scenarios differ
-      # only in whether a previous revision exists.
+      # A real version bump, as in 03upg01_valid, with one rejected value on
+      # top: the upgrade is what fails, not a bare values edit. crds.enabled is
+      # repeated because an override replaces the original block outright, and
+      # only replicaCount should differ from the healthy deployment.
+      version: 1.21.1
       values: |
         cert-manager:
+          crds:
+            enabled: true
           replicaCount: -1
   expect:
     failed: cert-manager

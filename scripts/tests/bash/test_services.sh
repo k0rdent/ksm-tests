@@ -167,13 +167,13 @@ assert_eq "01_basic has no upgrade block" "1" "$(has_upgrade && echo 0 || echo 1
 SERVICES_FILE="$SCENARIOS_DIR/03upg01_valid.yaml"
 assert_eq "the valid upgrade has one" "0" "$(has_upgrade && echo 0 || echo 1)"
 assert_eq "it upgrades cert-manager" "cert-manager" "$(upgrade_names | tr '\n' ' ' | sed 's/ $//')"
-assert_eq "to a version that exists" "1.20.3" "$(upgrade_field cert-manager version)"
+assert_eq "to a version that exists" "1.21.1" "$(upgrade_field cert-manager version)"
 assert_eq "it is not atomic" "false" "$(scenario_atomic)"
 # The override must apply only in upgraded mode, or the first deploy would
 # already install the new version and there would be nothing to upgrade.
 assert_eq "the initial deploy keeps the old version" "1.20.2" \
     "$(effective_version cert-manager initial)"
-assert_eq "the upgrade moves to the new one" "1.20.3" \
+assert_eq "the upgrade moves to the new one" "1.21.1" \
     "$(effective_version cert-manager upgraded)"
 assert_eq "services with no override are unaffected" "41.2.0" \
     "$(effective_version traefik upgraded)"
@@ -183,7 +183,7 @@ before="$(mktemp)"; after="$(mktemp)"
 render_mcs "$before" initial; render_mcs "$after" upgraded
 assert_eq "the initial MCS pins the old template" "cert-manager-1-20-2" \
     "$(yq -r '.spec.serviceSpec.services[] | select(.name=="cert-manager") | .template' "$before")"
-assert_eq "the upgraded MCS pins the new one" "cert-manager-1-20-3" \
+assert_eq "the upgraded MCS pins the new one" "cert-manager-1-21-1" \
     "$(yq -r '.spec.serviceSpec.services[] | select(.name=="cert-manager") | .template' "$after")"
 assert_eq "untouched services keep their template" "traefik-41-2-0" \
     "$(yq -r '.spec.serviceSpec.services[] | select(.name=="traefik") | .template' "$after")"
@@ -198,16 +198,23 @@ assert_eq "the rollback target is the deployed version" \
     "$(service_field cert-manager version)" "$(upgrade_expect_field rolledBackTo)"
 assert_contains "the values override applies" "$(effective_values cert-manager upgraded)" \
     "replicaCount: -1"
-# Replaced, not merged: crds.enabled came from the original block and must be gone.
-assert_not_contains "the override replaces rather than merges" \
+# The upgrade must be a real version change too, not a bare values edit --
+# otherwise it exercises a different code path in the provider.
+assert_eq "the atomic upgrade also bumps the version" "1.21.1" \
+    "$(effective_version cert-manager upgraded)"
+assert_eq "and starts from the rollback target" "1.20.2" \
+    "$(effective_version cert-manager initial)"
+# The override replaces rather than merges, so anything that must survive the
+# upgrade has to be repeated in it. Only replicaCount should differ.
+assert_contains "the override repeats what must survive" \
     "$(effective_values cert-manager upgraded)" "crds:"
-assert_contains "the initial deploy still uses the original values" \
-    "$(effective_values cert-manager initial)" "crds:"
+assert_not_contains "the initial values are not invalid" \
+    "$(effective_values cert-manager initial)" "replicaCount"
 
 render_mcs "$after" upgraded
 assert_eq "atomic reaches every service in the MCS" "true" \
     "$(yq -r '.spec.serviceSpec.services[] | select(.name=="cert-manager") | .helmOptions.atomic' "$after")"
-assert_eq "the atomic upgrade keeps the chart version" "cert-manager-1-20-2" \
+assert_eq "the atomic upgrade pins the new chart version" "cert-manager-1-21-1" \
     "$(yq -r '.spec.serviceSpec.services[] | select(.name=="cert-manager") | .template' "$after")"
 assert_contains "the invalid values are rendered" "$(cat "$after")" "replicaCount: -1"
 rm -f "$before" "$after"
