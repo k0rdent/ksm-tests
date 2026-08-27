@@ -41,6 +41,165 @@ template_name_for() {
     echo "$1-$(fqdn_version "$2")"
 }
 
+# ── Upgrades ─────────────────────────────────────────────────────────────────
+# A scenario with an `upgrade:` block deploys once, changes some services, and
+# then asserts what moved and what did not.
+
+has_upgrade() {
+    [[ "$(yq -r '.upgrade // "" | tag' "$SERVICES_FILE")" == "!!map" ]]
+}
+
+# upgrade_names -- the services the upgrade touches, one per line.
+upgrade_names() {
+    yq -r '.upgrade.services[]?.name // ""' "$SERVICES_FILE"
+}
+
+# upgrade_field NAME FIELD -- an override for one service, empty if unset.
+upgrade_field() {
+    NAME="$1" FIELD="$2" yq -r \
+        '.upgrade.services[]? | select(.name == strenv(NAME)) | .[strenv(FIELD)] // ""' "$SERVICES_FILE"
+}
+
+# scenario_atomic -- "true" when the scenario runs with helmOptions.atomic.
+# It is a property of the whole scenario, not of the upgrade: the issue calls
+# for atomic to be part of the provider configuration, and adding it only at
+# upgrade time changes the spec in a way that makes sveltos uninstall and
+# reinstall instead of upgrading, which is a different test entirely.
+scenario_atomic() {
+    yq -r '.helmOptions.atomic // false' "$SERVICES_FILE"
+}
+
+upgrade_expect_field() {
+    FIELD="$1" yq -r '.upgrade.expect[strenv(FIELD)] // ""' "$SERVICES_FILE"
+}
+
+upgrade_expect_list() {
+    FIELD="$1" yq -r '.upgrade.expect[strenv(FIELD)][]? // ""' "$SERVICES_FILE"
+}
+
+# effective_version NAME MODE -- the chart version this service should be at.
+# MODE=upgraded applies the override; anything else keeps the declared version.
+effective_version() {
+    local v
+    if [[ "${2:-}" == "upgraded" ]]; then
+        v="$(upgrade_field "$1" version)"
+        [[ -n "$v" ]] && { echo "$v"; return; }
+    fi
+    service_field "$1" version
+}
+
+# effective_values NAME MODE -- likewise for the values block. An override
+# replaces the original outright rather than merging: a merge would make it
+# impossible to remove a key, and every override here is a whole block anyway.
+effective_values() {
+    local v
+    if [[ "${2:-}" == "upgraded" ]]; then
+        v="$(upgrade_field "$1" values)"
+        [[ -n "$v" ]] && { echo "$v"; return; }
+    fi
+    service_values "$1"
+}
+
+# render_templates FILE MODE -- a HelmRepository and ServiceTemplate per
+# service, at its effective version. In upgraded mode the entries that did not
+# change render identically, so applying the file is a no-op for them and only
+# the new chart version is added.
+# shellcheck disable=SC2153 # NAMESPACE is from common.sh, not a typo for $_ns
+render_templates() {
+    local out="$1" mode="${2:-initial}"
+    : > "$out"
+    local name chart version repo _ns _dep _wait tmpl
+    while IFS="$SERVICE_SEP" read -r name chart version repo _ns _dep _wait; do
+        [[ -n "$name" ]] || continue
+        version="$(effective_version "$name" "$mode")"
+        tmpl="$(template_name_for "$chart" "$version")"
+        cat >> "$out" <<EOF
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: $name
+  namespace: $NAMESPACE
+  labels:
+    # KCM runs flux with --watch-label-selector=k0rdent.mirantis.com/managed=true.
+    # Without this label source-controller never sees the repository, and the
+    # HelmChart fails with a misleading "HelmRepository not found".
+    k0rdent.mirantis.com/managed: "true"
+spec:
+  type: $(repo_type "$repo")
+  interval: 10m0s
+  url: $repo
+---
+apiVersion: k0rdent.mirantis.com/v1beta1
+kind: ServiceTemplate
+metadata:
+  name: $tmpl
+  namespace: $NAMESPACE
+spec:
+  helm:
+    chartSpec:
+      chart: $chart
+      version: $version
+      interval: 10m0s
+      sourceRef:
+        kind: HelmRepository
+        name: $name
+EOF
+    done < <(services_rows)
+}
+
+# render_mcs FILE MODE -- the MultiClusterService manifest. Shared by the
+# initial deploy and the upgrade so the two cannot drift apart.
+render_mcs() {
+    local out="$1" mode="${2:-initial}" atomic
+    atomic="$(scenario_atomic)"
+
+    cat > "$out" <<EOF
+apiVersion: k0rdent.mirantis.com/v1beta1
+kind: MultiClusterService
+metadata:
+  name: $MCS_NAME
+spec:
+  clusterSelector:
+    matchLabels:
+      group: $CLD_GROUP_LABEL
+  serviceSpec:
+    services:
+EOF
+
+    local name chart version _repo namespace dep _wait values
+    while IFS="$SERVICE_SEP" read -r name chart version _repo namespace dep _wait; do
+        [[ -n "$name" ]] || continue
+        version="$(effective_version "$name" "$mode")"
+        {
+            echo "      - template: $(template_name_for "$chart" "$version")"
+            echo "        name: $name"
+            echo "        namespace: $namespace"
+            # Atomic makes helm undo a failed upgrade instead of leaving the
+            # release broken, which is the whole point of the atomic scenario.
+            if [[ "$atomic" == "true" ]]; then
+                echo "        helmOptions:"
+                echo "          atomic: true"
+            fi
+            if [[ -n "$dep" ]]; then
+                # KCM waits for the dependency to be deployed before starting
+                # this one: kserve needs cert-manager's webhooks and its own
+                # CRDs first.
+                echo "        dependsOn:"
+                echo "          - name: $dep"
+                echo "            namespace: $(service_field "$dep" namespace)"
+            fi
+        } >> "$out"
+
+        values="$(effective_values "$name" "$mode")"
+        if [[ -n "$values" ]]; then
+            echo "        values: |" >> "$out"
+            # shellcheck disable=SC2001 # per-line prefix, not a substring replace
+            sed 's/^/          /' <<< "$values" >> "$out"
+        fi
+    done < <(services_rows)
+}
+
 # ── Expected failure ─────────────────────────────────────────────────────────
 # A scenario with an `expect:` block is asserting that the rollout stops rather
 # than that it completes. Without one these all return empty and the callers

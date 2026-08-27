@@ -12,7 +12,7 @@ source "$SCRIPTS_DIR/lib/k8s.sh"
 # shellcheck source=scripts/lib/services.sh
 source "$SCRIPTS_DIR/lib/services.sh"
 
-require_cmd kubectl jq
+require_cmd kubectl helm jq
 require_yq
 
 check_scenario
@@ -22,42 +22,7 @@ require_cluster
 ensure_workdir
 
 MANIFEST="$WORKDIR/service-mcs.rendered.yaml"
-
-cat > "$MANIFEST" <<EOF
-apiVersion: k0rdent.mirantis.com/v1beta1
-kind: MultiClusterService
-metadata:
-  name: $MCS_NAME
-spec:
-  clusterSelector:
-    matchLabels:
-      group: $CLD_GROUP_LABEL
-  serviceSpec:
-    services:
-EOF
-
-while IFS="$SERVICE_SEP" read -r name chart version _repo namespace dep _wait; do
-    [[ -n "$name" ]] || continue
-    {
-        echo "      - template: $(template_name_for "$chart" "$version")"
-        echo "        name: $name"
-        echo "        namespace: $namespace"
-        if [[ -n "$dep" ]]; then
-            # KCM waits for the dependency to be deployed before starting this
-            # one: kserve needs cert-manager's webhooks and its own CRDs first.
-            echo "        dependsOn:"
-            echo "          - name: $dep"
-            echo "            namespace: $(service_field "$dep" namespace)"
-        fi
-    } >> "$MANIFEST"
-
-    values="$(service_values "$name")"
-    if [[ -n "$values" ]]; then
-        echo "        values: |" >> "$MANIFEST"
-        # shellcheck disable=SC2001 # per-line prefix, not a substring replace
-        sed 's/^/          /' <<< "$values" >> "$MANIFEST"
-    fi
-done < <(services_rows)
+render_mcs "$MANIFEST" initial
 
 step "Scenario $SCENARIO: creating MultiClusterService '$MCS_NAME' (group=$CLD_GROUP_LABEL)"
 cat "$MANIFEST"
@@ -116,18 +81,12 @@ while IFS="$SERVICE_SEP" read -r name _chart _version _repo namespace _dep waitf
     # nothing to wait for beyond the namespace.
     log "── $name -> namespace '$namespace'"
 
-    elapsed=0
-    while (( elapsed < MCS_TIMEOUT )); do
-        kube_child get namespace "$namespace" >/dev/null 2>&1 && break
-        if (( elapsed % 30 == 0 )); then
-            log "⏳ Namespace '$namespace' not in the child cluster yet (${elapsed}s)"
-        fi
-        sleep 5
-        elapsed=$(( elapsed + 5 ))
-    done
-    if ! kube_child get namespace "$namespace" >/dev/null 2>&1; then
+    # The helm release, not the namespace: namespaces linger after a previous
+    # scenario, so "namespace exists" passes instantly and would never catch a
+    # service that was not installed at all.
+    if ! wait_release "$name" "$namespace" "$MCS_TIMEOUT"; then
         { describe_stuck MultiClusterService "$MCS_NAME" ""; kcm_errors 20m; } >&2
-        die "Namespace '$namespace' never appeared in the child cluster (service '$name')"
+        die "Service '$name' has no deployed helm release in the child cluster"
     fi
 
     [[ -n "$waitfor" ]] || { log "no waitForPods for '$name', namespace is enough"; continue; }

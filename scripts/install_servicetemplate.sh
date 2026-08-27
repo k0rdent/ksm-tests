@@ -22,47 +22,12 @@ require_cluster
 ensure_workdir
 
 MANIFEST="$WORKDIR/service-templates.rendered.yaml"
-: > "$MANIFEST"
 
 step "Scenario $SCENARIO: rendering $(service_count) ServiceTemplate(s)"
-
+render_templates "$MANIFEST" initial
 while IFS="$SERVICE_SEP" read -r name chart version repo namespace _dep _wait; do
     [[ -n "$name" ]] || continue
-    tmpl="$(template_name_for "$chart" "$version")"
-    log "$tmpl  <-  $repo  (namespace $namespace)"
-
-    cat >> "$MANIFEST" <<EOF
----
-apiVersion: source.toolkit.fluxcd.io/v1
-kind: HelmRepository
-metadata:
-  name: $name
-  namespace: $NAMESPACE
-  labels:
-    # KCM runs flux with --watch-label-selector=k0rdent.mirantis.com/managed=true.
-    # Without this label source-controller never sees the repository, and the
-    # HelmChart fails with a misleading "HelmRepository not found".
-    k0rdent.mirantis.com/managed: "true"
-spec:
-  type: $(repo_type "$repo")
-  interval: 10m0s
-  url: $repo
----
-apiVersion: k0rdent.mirantis.com/v1beta1
-kind: ServiceTemplate
-metadata:
-  name: $tmpl
-  namespace: $NAMESPACE
-spec:
-  helm:
-    chartSpec:
-      chart: $chart
-      version: $version
-      interval: 10m0s
-      sourceRef:
-        kind: HelmRepository
-        name: $name
-EOF
+    log "$(template_name_for "$chart" "$version")  <-  $repo  (namespace $namespace)"
 done < <(services_rows)
 
 step "Applying"

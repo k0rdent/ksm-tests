@@ -86,6 +86,12 @@ while IFS="$SERVICE_SEP" read -r name chart version _repo _ns _dep _wait; do
     [[ -n "$name" ]] || continue
     kube delete servicetemplate "$(template_name_for "$chart" "$version")" \
         -n "$NAMESPACE" --ignore-not-found
+    # An upgrade scenario also left a template for the newer version behind.
+    upgraded="$(effective_version "$name" upgraded)"
+    if [[ "$upgraded" != "$version" ]]; then
+        kube delete servicetemplate "$(template_name_for "$chart" "$upgraded")" \
+            -n "$NAMESPACE" --ignore-not-found
+    fi
     kube delete helmrepository "$name" -n "$NAMESPACE" --ignore-not-found
 done < <(services_rows)
 

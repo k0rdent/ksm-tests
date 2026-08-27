@@ -1,0 +1,47 @@
+name: 03upg01_valid
+group: Service upgrades
+description: >-
+  Issue #3, scenario 1: a deployed dependsOn chain where one service is then
+  upgraded. Only that service may roll out; the one in front of it and the one
+  behind it must both stay exactly as they were.
+
+# cert-manager sits in the middle deliberately: it checks both directions at
+# once, that an upgrade disturbs neither the service it depends on nor the one
+# that depends on it.
+upgrade:
+  services:
+    - name: cert-manager
+      version: 1.20.3
+  expect:
+    rolledOut:
+      - cert-manager
+    untouched:
+      - traefik
+      - kserve-crd
+
+services:
+  - name: traefik
+    chart: traefik
+    version: 41.2.0
+    repo: oci://ghcr.io/k0rdent/catalog/charts
+    namespace: traefik
+    waitForPods: traefik-
+
+  - name: cert-manager
+    chart: cert-manager
+    version: 1.20.2
+    repo: oci://ghcr.io/k0rdent/catalog/charts
+    namespace: cert-manager
+    dependsOn: traefik
+    waitForPods: cert-manager-
+    values: |
+      cert-manager:
+        crds:
+          enabled: true
+
+  - name: kserve-crd
+    chart: kserve-crd
+    version: v0.18.0
+    repo: oci://ghcr.io/k0rdent/catalog/charts
+    namespace: kserve
+    dependsOn: cert-manager

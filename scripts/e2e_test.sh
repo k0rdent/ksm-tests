@@ -95,6 +95,8 @@ fi
 if [[ "$DO_SCENARIO" == "true" && "${SKIP_SERVICE_TEST:-false}" != "true" ]]; then
     "$SCRIPTS_DIR/install_servicetemplate.sh"
     "$SCRIPTS_DIR/deploy_mcs.sh"
+    # No-op unless the scenario has an upgrade block.
+    "$SCRIPTS_DIR/upgrade_services.sh"
     "$SCRIPTS_DIR/remove_mcs.sh"
 fi
 

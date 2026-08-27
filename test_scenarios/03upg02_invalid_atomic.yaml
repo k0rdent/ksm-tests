@@ -1,0 +1,82 @@
+name: 03upg02_invalid_atomic
+group: Service upgrades
+description: >-
+  Issue #3, scenario 2: the same chain deploys cleanly, then one service gets
+  an invalid upgrade with helmOptions.atomic set. Helm must undo it and leave
+  the release on the previous healthy version, and the rest of the chain must
+  not move.
+
+# The difference from 02dep02_invalid is that here there IS a previous healthy
+# state. An install with no prior revision has nothing to roll back to; only a
+# failed *upgrade* can be undone, which is what atomic is for.
+#
+# atomic is set from the very first deploy, not introduced at upgrade time:
+# the issue describes it as provider configuration, and adding it later changes
+# the service spec enough that sveltos uninstalls and reinstalls rather than
+# upgrading -- which would make the rollback untestable.
+helmOptions:
+  atomic: true
+
+# Reproduced on rel-1-10-0: instead of rolling back, the service is removed.
+# Sveltos takes the install path rather than upgrading, so helm's
+# rollback-on-failure deletes the release, and because the values stay invalid
+# it then loops uninstall -> install and never restores the healthy revision.
+# The ServiceSet meanwhile still reports the service Deployed at 1.20.2, a
+# version that no longer exists in the cluster.
+#
+# The same "uninstalled due to rollback-on-failure being set" path shows up in
+# src-main logs too, so all three variants are marked; drop any entry CI proves
+# is unaffected.
+knownFailures:
+  - kcm: rel-1-10-0
+    reason: >-
+      Atomic upgrade failure removes the release instead of rolling back to the
+      previous healthy state, contrary to issue #3 scenario 2.
+  - kcm: rel-1-11-0
+    reason: Same as rel-1-10-0.
+  - kcm: src-main
+    reason: Same as rel-1-10-0.
+
+upgrade:
+  services:
+    - name: cert-manager
+      # Same rejected value as 02dep02_invalid, so the two scenarios differ
+      # only in whether a previous revision exists.
+      values: |
+        cert-manager:
+          replicaCount: -1
+  expect:
+    failed: cert-manager
+    # After the rollback the release must be serving this chart version again,
+    # healthy, rather than sitting in a failed upgrade.
+    rolledBackTo: 1.20.2
+    untouched:
+      - traefik
+      - kserve-crd
+
+services:
+  - name: traefik
+    chart: traefik
+    version: 41.2.0
+    repo: oci://ghcr.io/k0rdent/catalog/charts
+    namespace: traefik
+    waitForPods: traefik-
+
+  - name: cert-manager
+    chart: cert-manager
+    version: 1.20.2
+    repo: oci://ghcr.io/k0rdent/catalog/charts
+    namespace: cert-manager
+    dependsOn: traefik
+    waitForPods: cert-manager-
+    values: |
+      cert-manager:
+        crds:
+          enabled: true
+
+  - name: kserve-crd
+    chart: kserve-crd
+    version: v0.18.0
+    repo: oci://ghcr.io/k0rdent/catalog/charts
+    namespace: kserve
+    dependsOn: cert-manager

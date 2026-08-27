@@ -25,7 +25,8 @@ set_file() {
 assert_contains "01_basic is the default" "$(set_file '')" "01_basic.yaml"
 assert_contains "SCENARIO picks the file" "$(set_file 02dep01_valid)" "02dep01_valid.yaml"
 assert_eq "scenarios are discovered from the directory" \
-    "01_basic 02dep01_valid 02dep02_invalid" "$(list_scenarios | tr '\n' ' ' | sed 's/ $//')"
+    "01_basic 02dep01_valid 02dep02_invalid 03upg01_valid 03upg02_invalid_atomic" \
+    "$(list_scenarios | tr '\n' ' ' | sed 's/ $//')"
 
 # A typo must say what is available rather than just refuse.
 out=$(SCENARIO=nope bash -c "unset SERVICES_FILE; source '$SCRIPTS_DIR/lib/common.sh'; check_scenario" 2>&1)
@@ -158,6 +159,67 @@ while read -r n; do
     assert_eq "kept '$n' does not depend on the failing service" "1" \
         "$(depends_transitively "$n" "$(expect_field failed)" && echo 0 || echo 1)"
 done < <(expect_list deployed)
+
+# ── Upgrades ─────────────────────────────────────────────────────────────────
+SERVICES_FILE="$SCENARIOS_DIR/01_basic.yaml"
+assert_eq "01_basic has no upgrade block" "1" "$(has_upgrade && echo 0 || echo 1)"
+
+SERVICES_FILE="$SCENARIOS_DIR/03upg01_valid.yaml"
+assert_eq "the valid upgrade has one" "0" "$(has_upgrade && echo 0 || echo 1)"
+assert_eq "it upgrades cert-manager" "cert-manager" "$(upgrade_names | tr '\n' ' ' | sed 's/ $//')"
+assert_eq "to a version that exists" "1.20.3" "$(upgrade_field cert-manager version)"
+assert_eq "it is not atomic" "false" "$(scenario_atomic)"
+# The override must apply only in upgraded mode, or the first deploy would
+# already install the new version and there would be nothing to upgrade.
+assert_eq "the initial deploy keeps the old version" "1.20.2" \
+    "$(effective_version cert-manager initial)"
+assert_eq "the upgrade moves to the new one" "1.20.3" \
+    "$(effective_version cert-manager upgraded)"
+assert_eq "services with no override are unaffected" "41.2.0" \
+    "$(effective_version traefik upgraded)"
+
+# An upgrade that changes nothing would pass every check while testing nothing.
+before="$(mktemp)"; after="$(mktemp)"
+render_mcs "$before" initial; render_mcs "$after" upgraded
+assert_eq "the initial MCS pins the old template" "cert-manager-1-20-2" \
+    "$(yq -r '.spec.serviceSpec.services[] | select(.name=="cert-manager") | .template' "$before")"
+assert_eq "the upgraded MCS pins the new one" "cert-manager-1-20-3" \
+    "$(yq -r '.spec.serviceSpec.services[] | select(.name=="cert-manager") | .template' "$after")"
+assert_eq "untouched services keep their template" "traefik-41-2-0" \
+    "$(yq -r '.spec.serviceSpec.services[] | select(.name=="traefik") | .template' "$after")"
+
+SERVICES_FILE="$SCENARIOS_DIR/03upg02_invalid_atomic.yaml"
+assert_eq "the atomic scenario sets atomic" "true" "$(scenario_atomic)"
+assert_eq "it expects a failure" "cert-manager" "$(upgrade_expect_field failed)"
+assert_eq "and a rollback target" "1.20.2" "$(upgrade_expect_field rolledBackTo)"
+# The rollback target must be the version actually deployed first, otherwise
+# the assertion could pass against a version that was never running.
+assert_eq "the rollback target is the deployed version" \
+    "$(service_field cert-manager version)" "$(upgrade_expect_field rolledBackTo)"
+assert_contains "the values override applies" "$(effective_values cert-manager upgraded)" \
+    "replicaCount: -1"
+# Replaced, not merged: crds.enabled came from the original block and must be gone.
+assert_not_contains "the override replaces rather than merges" \
+    "$(effective_values cert-manager upgraded)" "crds:"
+assert_contains "the initial deploy still uses the original values" \
+    "$(effective_values cert-manager initial)" "crds:"
+
+render_mcs "$after" upgraded
+assert_eq "atomic reaches every service in the MCS" "true" \
+    "$(yq -r '.spec.serviceSpec.services[] | select(.name=="cert-manager") | .helmOptions.atomic' "$after")"
+assert_eq "the atomic upgrade keeps the chart version" "cert-manager-1-20-2" \
+    "$(yq -r '.spec.serviceSpec.services[] | select(.name=="cert-manager") | .template' "$after")"
+assert_contains "the invalid values are rendered" "$(cat "$after")" "replicaCount: -1"
+rm -f "$before" "$after"
+
+# Every name in upgrade.expect must be a real service, same trap as expect:.
+known_services="$(services_rows | cut -d'|' -f1)"
+for f in rolledOut untouched; do
+    while read -r n; do
+        [[ -n "$n" ]] || continue
+        assert_contains "upgrade.expect.$f '$n' is a declared service" "$known_services" "$n"
+    done < <(upgrade_expect_list "$f")
+done
 
 # ── Rendering 02dep01_valid ────────────────────────────────────────────
 # Back to the valid chain: the block above pointed SERVICES_FILE elsewhere.
