@@ -110,10 +110,39 @@ services:
     ...
 ```
 
-`knownFailures` lists the KCM variants a scenario is known to fail on. CI still
-runs and reports that leg, it just does not block the workflow. Delete the
-entry once the defect is fixed upstream — a unit test checks every id there is
-a real variant, so a typo cannot silently disable the marker.
+#### Known failures
+
+`knownFailures` lists the KCM variants a scenario is known to fail on:
+
+```yaml
+knownFailures:
+  - kcm: rel-1-11-0
+    step: Remove MultiClusterService        # which step must fail
+    match: ensure CRDs are installed first  # and with what in its output
+    timeout: 300                            # shorten the waits on this leg
+    reason: ...
+```
+
+`scripts/ci_step.sh` wraps the scenario steps and applies this. The marker is
+deliberately **narrow**: the failure has to happen in the named step *and*
+print the recorded string. Without that, the entry would excuse any failure on
+that leg and a real regression would vanish behind a known defect. A mismatch
+fails the step as usual and says why.
+
+When it does match, the step exits 0 and the failure is reported as a warning
+annotation plus a job-summary entry, so the run is green and the defect stays
+visible. Actions has no yellow job state — `neutral` conclusions exist only in
+the Checks API, which needs a separate token — so a green job with a warning is
+as close as it gets natively. The job name also carries `⚠ known failure`.
+
+`timeout` is what stops these legs sitting out the full 15-minute wait for
+something that is never going to happen. The waits are shortened only for the
+step that is expected to fail; the ones before it keep their normal budget, and
+the diagnostics are still printed before the step gives up.
+
+Delete the entry once the defect is fixed upstream — unit tests check that every
+`kcm` is a real variant and that every marker carries a `step` and a `match`, so
+neither a typo nor an over-broad entry can slip through.
 
 #### Scenarios that expect a failure
 
