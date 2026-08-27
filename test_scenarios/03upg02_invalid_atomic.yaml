@@ -17,25 +17,17 @@ description: >-
 helmOptions:
   atomic: true
 
-# Reproduced on rel-1-10-0: instead of rolling back, the service is removed.
-# Sveltos takes the install path rather than upgrading, so helm's
-# rollback-on-failure deletes the release, and because the values stay invalid
-# it then loops uninstall -> install and never restores the healthy revision.
-# The ServiceSet meanwhile still reports the service Deployed at 1.20.2, a
-# version that no longer exists in the cluster.
-#
-# The same "uninstalled due to rollback-on-failure being set" path shows up in
-# src-main logs too, so all three variants are marked; drop any entry CI proves
-# is unaffected.
+# 1.11.0 and main roll back correctly; only 1.10.0 does not.
 knownFailures:
   - kcm: rel-1-10-0
     reason: >-
-      Atomic upgrade failure removes the release instead of rolling back to the
-      previous healthy state, contrary to issue #3 scenario 2.
-  - kcm: rel-1-11-0
-    reason: Same as rel-1-10-0.
-  - kcm: src-main
-    reason: Same as rel-1-10-0.
+      The failed atomic upgrade removes the release instead of rolling back to
+      the previous healthy state, contrary to issue #3 scenario 2. Sveltos
+      takes the install path rather than upgrading, so helm's
+      rollback-on-failure deletes the release, and because the values stay
+      invalid it then loops uninstall -> install and never restores the healthy
+      revision. The ServiceSet meanwhile still reports the service Deployed at
+      1.20.2, a version that no longer exists in the cluster. Fixed in 1.11.0.
 
 upgrade:
   services:
