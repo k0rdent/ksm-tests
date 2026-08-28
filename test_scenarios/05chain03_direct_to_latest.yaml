@@ -15,8 +15,7 @@ templateChain:
 upgrade:
   graceSeconds: 120
   steps:
-    # Not reachable from 1.20.2 according to the chain, even though the
-    # ServiceTemplate for it exists.
+    # Not reachable per the chain, though its ServiceTemplate exists.
     - version: 1.20.3
       expect: rejected
     - version: 1.21.1

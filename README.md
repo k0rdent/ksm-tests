@@ -15,6 +15,10 @@ the same approach [k0rdent/catalog](https://github.com/k0rdent/catalog) uses.
 | Management reaches Ready with the expected providers | `apply_management.sh`, `wait_for_management.sh` |
 | ClusterDeployment provisions a working cluster | `deploy_cld.sh`, `check_child_cluster.sh` |
 | Services reach the child cluster, in dependency order, and can be removed | `install_servicetemplate.sh`, `deploy_mcs.sh`, `remove_mcs.sh` |
+| Upgrading one service leaves the others alone, and a failed one rolls back | `upgrade_services.sh` |
+| A `ServiceTemplateChain` gates which upgrades are accepted | `upgrade_chain.sh` |
+| One `MultiClusterService` waits for another it depends on | `deploy_mcs_group.sh` |
+| A rollout stops at an invalid service instead of carrying on | `verify_mcs_failure.sh` |
 | Deletion cleans up, including CAPD containers | `remove_cld.sh`, `wait_for_cluster_removal.sh` |
 | Uninstall leaves nothing running | `remove_kcm.sh` |
 
@@ -72,9 +76,10 @@ chart version there disagrees with `KCM_RELEASE_VERSION`.
 
 A scenario is a file in **`test_scenarios/`** describing the services deployed
 to the child cluster and how they depend on each other. After the child cluster
-is up, the run installs a `ServiceTemplate` per service, deploys them all
-through a single `MultiClusterService`, waits for the pods to be Ready *in the
-child cluster*, then removes the MCS and verifies the workloads are gone.
+is up, the run installs a `ServiceTemplate` per service, deploys them through a
+`MultiClusterService` — or several, for the scenarios about dependencies
+between them — waits for the pods to be Ready *in the child cluster*, then
+removes the MCS and verifies the workloads are gone.
 
 Names are two-layered — a group number, then the case within it — and each file
 repeats its group as a `group:` field, which is what `make scenarios` prints as
@@ -456,16 +461,19 @@ hardcoded — they are read from the charts in the KCM checkout.
 ## CI
 
 * `e2e.yml` — discovers the scenarios and KCM variants, then calls
-  `e2e-scenario.yml` once per scenario. Runs on PRs, on pushes touching
-  `scripts/**` or `test_scenarios/**`, nightly (needs repo variable
-  `ENABLE_CRON=1`), or manually — see below.
-* `e2e-scenario.yml` — reusable; one scenario across every KCM variant, and
-  where the `knownFailures` marker is applied. `continue-on-error` cannot be
-  set on a job that calls a reusable workflow, which is why the marker lives
-  here rather than in the caller. Diagnostics are uploaded on failure.
+  `e2e-scenario.yml` once per scenario. Runs on pull requests, on pushes to
+  `main`, nightly (needs repo variable `ENABLE_CRON=1`), or manually.
+* `e2e-scenario.yml` — reusable; one scenario across every KCM variant.
+  Diagnostics are uploaded on failure.
 * `bash-unit-tests.yml`, `lint.yml` — fast checks on every change: shellcheck
   plus actionlint, because a workflow that fails to validate never starts a job
   and so produces no logs to debug.
+
+**Pushes run CI only on `main`.** Everywhere else it is the pull request that
+triggers it. A branch with an open PR fires both events, and the duplicate run
+that the concurrency group then cancels still shows on the PR as a failed
+check — so a branch is expected to have a PR before CI has anything to say
+about it. To run something on a branch without one, use `workflow_dispatch`.
 
 ### Running a single combination in CI
 

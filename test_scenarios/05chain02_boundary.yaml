@@ -13,8 +13,7 @@ upgrade:
   steps:
     - version: 1.21.1
       expect: rejected
-  # How long to keep watching before calling a refusal a refusal rather than
-  # something merely slow.
+  # Long enough to tell a refusal from something merely slow.
   graceSeconds: 120
 
 services:

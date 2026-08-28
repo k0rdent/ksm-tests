@@ -1,17 +1,14 @@
 name: E2E
 
-# Grouped by scenario first, KCM version second. Actions has no nested matrix,
-# so the version dimension lives in the reusable e2e-scenario.yml that this
-# workflow calls once per scenario.
-#
-# Both dimensions are data: scenarios are the files in test_scenarios/, KCM
-# variants come from scripts/config/kcm-variants.yaml. Adding either is a YAML
+# Scenario first, KCM version second. Actions has no nested matrix, so the
+# versions live in the reusable e2e-scenario.yml. Both dimensions are data --
+# test_scenarios/*.yaml and kcm-variants.yaml -- so adding either is a YAML
 # change with no workflow edit.
 
 on:
   workflow_dispatch:
     inputs:
-      # Empty means everything, which is what the scheduled and push runs do.
+      # Empty means everything.
       scenarios:
         description: 'Scenarios to run, space or comma separated (empty = all)'
         required: false
@@ -31,9 +28,10 @@ on:
         default: false
   schedule:
     - cron: '0 2 * * *'   # 02:00 UTC
+  # Only main: on a branch with an open PR a push runs everything a second
+  # time, and the cancelled duplicate still shows on the PR as a failed check.
   push:
-    branches:
-      - '**'
+    branches: [main]
     paths:
       - 'scripts/**'
       - 'test_scenarios/**'
@@ -47,10 +45,7 @@ on:
       - .github/workflows/e2e.yml
       - .github/workflows/e2e-scenario.yml
 
-# A push to a branch with an open PR fires both `push` and `pull_request`, and
-# github.ref differs between them (refs/heads/x vs refs/pull/N/merge), so a
-# plain github.ref group ran the whole matrix twice. head_ref/ref_name is the
-# branch either way, so the two collapse into one run.
+# Grouped by branch, not github.ref, so a second push to a PR cancels the first.
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
@@ -75,8 +70,7 @@ jobs:
 
       - name: Scan scenarios and KCM variants
         id: scan
-        # Via env, not inline interpolation: these are free-text dispatch
-        # inputs and would otherwise be pasted straight into the script.
+        # Via env, not inline interpolation: free-text dispatch input.
         env:
           WANT_SCENARIOS: ${{ github.event.inputs.scenarios }}
           WANT_KCM: ${{ github.event.inputs.kcm }}
@@ -91,8 +85,8 @@ jobs:
             return 1
           }
 
-          # One entry per scenario file, carrying the versions it is known to
-          # fail on so the reusable workflow can mark that leg non-blocking.
+          # Each entry carries the versions it is known to fail on, for the
+          # job name.
           scenarios='[]'
           all_scenarios=''
           for f in test_scenarios/*.yaml; do
@@ -114,7 +108,7 @@ jobs:
               | jq -c --argjson acc "$variants" '$acc + [.]')"
           done < <(yq -r '.variants[].id' scripts/config/kcm-variants.yaml)
 
-          # A typo would otherwise produce an empty matrix and a green run that
+          # A typo would otherwise mean an empty matrix and a green run that
           # tested nothing.
           [[ "$scenarios" == '[]' ]] && {
             echo "No scenario matches '$WANT_SCENARIOS'. Available: $all_scenarios" >&2; exit 1; }

@@ -6,14 +6,9 @@ description: >-
   the release on the previous healthy version, and the rest of the chain must
   not move.
 
-# The difference from 02dep02_invalid is that here there IS a previous healthy
-# state. An install with no prior revision has nothing to roll back to; only a
-# failed *upgrade* can be undone, which is what atomic is for.
-#
-# atomic is set from the very first deploy, not introduced at upgrade time:
-# the issue describes it as provider configuration, and adding it later changes
-# the service spec enough that sveltos uninstalls and reinstalls rather than
-# upgrading -- which would make the rollback untestable.
+# Unlike 02dep02_invalid there IS a previous healthy state to roll back to.
+# atomic is set from the first deploy, not added at upgrade time: adding it
+# later makes sveltos reinstall rather than upgrade.
 helmOptions:
   atomic: true
 
@@ -36,10 +31,8 @@ knownFailures:
 upgrade:
   services:
     - name: cert-manager
-      # A real version bump, as in 03upg01_valid, with one rejected value on
-      # top: the upgrade is what fails, not a bare values edit. crds.enabled is
-      # repeated because an override replaces the original block outright, and
-      # only replicaCount should differ from the healthy deployment.
+      # A real version bump with one rejected value on top, so the upgrade is
+      # what fails. crds.enabled is repeated because an override replaces.
       version: 1.21.1
       values: |
         cert-manager:

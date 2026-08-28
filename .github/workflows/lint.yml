@@ -1,7 +1,9 @@
 name: Lint
 
 on:
+  # Only main; pull_request covers branches. See e2e.yml.
   push:
+    branches: [main]
     paths:
       - '**/*.sh'
       - .github/workflows/**

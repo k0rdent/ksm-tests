@@ -1,15 +1,10 @@
 #!/bin/bash
 set -euo pipefail
 
-# Verify a scenario whose `expect:` block says the rollout must stop.
-#
-# Three separate claims, and all of them have to hold:
-#   1. the service named in expect.failed reaches state Failed
-#   2. expect.blocked services are never installed -- the graph stops there
-#   3. expect.deployed services stay deployed -- KCM must not roll them back
-#
-# Called by deploy_mcs.sh with SERVICE_SET set; standalone it finds the
-# ServiceSet itself, which is handy when re-checking a cluster by hand.
+# Verify a scenario whose `expect:` block says the rollout must stop:
+# expect.failed reaches Failed, expect.blocked is never installed, and
+# expect.deployed survives. Called by deploy_mcs.sh, or standalone to re-check
+# a cluster by hand.
 
 # shellcheck source=scripts/lib/common.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
@@ -39,10 +34,8 @@ sset_json() {
     kube get serviceset "$SERVICE_SET" -n "$NAMESPACE" -o json 2>/dev/null || echo '{}'
 }
 
-# state_of NAME JSON -- the reported state, or empty if the service is not in
-# the status at all. That is the normal case for a blocked service: KCM leaves
-# it out of .status.services entirely rather than listing it as Pending, so an
-# empty state here means "never got as far as being installed".
+# state_of NAME JSON -- empty when the service is absent from the status, which
+# is how KCM reports a blocked one: it is left out, not listed as Pending.
 state_of() {
     jq -r --arg n "$1" '.status.services[]? | select(.name == $n) | .state // ""' <<< "$2"
 }
@@ -64,8 +57,7 @@ while (( elapsed < MCS_TIMEOUT )); do
     json="$(sset_json)"
     state="$(state_of "$FAILED_SVC" "$json")"
     [[ "$state" == "Failed" ]] && break
-    # Deployed is terminal and wrong: the values were supposed to be rejected,
-    # so the scenario is no longer testing what it claims to.
+    # Terminal and wrong: the values were supposed to be rejected.
     if [[ "$state" == "Deployed" ]]; then
         dump_states "$json" >&2
         die "'$FAILED_SVC' deployed successfully -- the scenario's invalid values no longer fail"
@@ -96,8 +88,7 @@ deployed_flag="$(jq -r '.status.deployed // false' <<< "$json")"
 ok "ServiceSet is not marked deployed"
 
 # ── 2. Nothing behind the failure may be installed ───────────────────────────
-# Checked repeatedly over the grace window: a service that is merely slow would
-# pass a single check taken too early.
+# Over the whole window: a slow service would pass a single early check.
 step "Watching for ${GRACE}s that the blocked services stay uninstalled"
 elapsed=0
 while (( elapsed < GRACE )); do
@@ -110,7 +101,7 @@ while (( elapsed < GRACE )); do
             die "'$name' was installed even though its dependency '$FAILED_SVC' failed"
         fi
     done < <(expect_list blocked)
-    # Otherwise this window looks like a hang for its whole duration.
+    # Otherwise the window looks like a hang.
     (( elapsed % 30 == 0 )) && log "⏳ still blocked (${elapsed}/${GRACE}s)"
     sleep 10
     elapsed=$(( elapsed + 10 ))
@@ -136,10 +127,9 @@ step "Checking the services deployed before the failure were not rolled back"
 while read -r name; do
     [[ -n "$name" ]] || continue
 
-    # Not a single reading: a service that is merely being re-reconciled shows
-    # up as Provisioning for a moment, and KCM itself treats that as transient
-    # noise rather than a change. A rollback would leave it absent or Failed
-    # and it would never come back, so give it a window to settle.
+    # Not a single reading: a re-reconcile shows up as Provisioning for a
+    # moment, which KCM itself treats as transient. A real rollback leaves the
+    # service absent or Failed and it never comes back.
     settle=0
     st="$(state_of "$name" "$json")"
     while [[ "$st" != "Deployed" ]] && (( settle < ${KEPT_SETTLE:-180} )); do

@@ -1,19 +1,14 @@
 #!/bin/bash
 set -euo pipefail
 
-# Walk a scenario's `upgrade.steps` and check each one against what the
-# ServiceTemplateChain allows.
-#
-# A step either lands or is refused:
+# Walk a scenario's upgrade.steps against what the ServiceTemplateChain allows.
 #
 #   expect: applied   -- the helm release ends on that chart version
-#   expect: rejected  -- the release stays where it was for the whole grace
-#                        window; KCM keeps the stored version rather than
-#                        erroring, so "nothing changed" is the observable
-#
-# A step may also declare viaVersions: versions the release must have passed
-# through on the way. Helm history records every revision, so this is checked
-# after the fact rather than by watching for a moment that may be brief.
+#   expect: rejected  -- it stays put for the grace window; KCM keeps the
+#                        stored version rather than erroring, so the observable
+#                        is that nothing changed
+#   viaVersions       -- checked against helm history, since an intermediate
+#                        version may be too brief to catch live
 
 # shellcheck source=scripts/lib/common.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
@@ -91,8 +86,7 @@ for (( i = 0; i < STEPS; i++ )); do
             settled=true; break
         fi
         if [[ "$want" == "rejected" ]]; then
-            # A refusal is the absence of a change, so it can only be
-            # established by watching for a while.
+            # A refusal is the absence of a change, so it needs the window.
             [[ "$now" != "$before" ]] && {
                 { helm_child history "$SVC" -n "$NS" 2>&1 | tail -5; } >&2
                 die "'$SVC' moved $before -> $now, but the chain does not allow $target"

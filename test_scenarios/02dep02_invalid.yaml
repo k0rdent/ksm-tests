@@ -5,12 +5,8 @@ description: >-
   The rollout must stop there -- everything before it stays deployed, the
   ServiceSet is stamped failed, and nothing behind it is ever installed.
 
-# The failure is invalid *values*, not a missing image, on purpose. A bad image
-# still produces a successful Helm release (the Deployment is created, the pods
-# simply never start), so sveltos reports the service as deployed and the chain
-# carries on -- which would not exercise the behaviour this scenario is about.
-# Values that break the install fail the release itself, which is what blocks
-# the dependants.
+# Invalid values, not a missing image: a bad image still yields a successful
+# release, so the chain would carry on and nothing would be tested.
 expect:
   failed: cert-manager
   # Deployed before the failure, and must survive it: no rollback.
@@ -19,8 +15,7 @@ expect:
   # Behind the failure in the graph, so they must never be installed.
   blocked:
     - kserve-crd
-  # How long to keep watching after the failure before calling the blocked
-  # services genuinely blocked rather than merely slow.
+  # Long enough to tell blocked from merely slow.
   graceSeconds: 120
 
 services:
@@ -37,9 +32,7 @@ services:
     repo: oci://ghcr.io/k0rdent/catalog/charts
     namespace: cert-manager
     dependsOn: traefik
-    # replicaCount is an integer the chart passes straight to .spec.replicas.
-    # A negative one is rejected -- by the chart's values schema if it has one,
-    # by the API server otherwise -- so the release fails either way.
+    # A negative replica count is rejected, so the release fails.
     values: |
       cert-manager:
         replicaCount: -1

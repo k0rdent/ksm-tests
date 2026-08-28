@@ -1,26 +1,13 @@
 #!/bin/bash
 set -uo pipefail
 
-# Run one pipeline step, and turn a *recorded* failure into a warning.
+# Run one pipeline step, turning a recorded failure into a warning.
 #
 #   ./scripts/ci_step.sh "Remove MultiClusterService" ./scripts/remove_mcs.sh
 #
-# When the scenario lists the current $KCM under knownFailures, two things
-# change:
-#
-#   the waits are shortened, so the leg stops as soon as it has printed the
-#   diagnostics rather than sitting out the full timeout;
-#
-#   a failure that matches the recorded one is reported as a warning and the
-#   step exits 0, so the job stays green with a yellow annotation instead of
-#   going red.
-#
-# The match is on purpose. Without it the marker would excuse *any* failure on
-# that leg, and a real regression would disappear behind a known defect.
-#
-# Actions has no yellow job state -- neutral conclusions only exist in the
-# Checks API -- so a warning annotation plus the job summary is as close as it
-# gets natively.
+# When the scenario lists the current $KCM under knownFailures the waits are
+# shortened and a matching failure exits 0 with a warning annotation. The match
+# is what stops the marker from excusing an unrelated regression on that leg.
 
 STEP_NAME="${1:?usage: ci_step.sh NAME COMMAND...}"
 shift
@@ -41,8 +28,7 @@ if [[ -f "$SERVICES_FILE" ]] && command -v yq >/dev/null 2>&1 \
     KF_TIMEOUT="${KF_TIMEOUT:-${KNOWN_FAILURE_TIMEOUT:-300}}"
 
     if [[ -z "$KF_STEP" || "$KF_STEP" == "$STEP_NAME" ]]; then
-        # Only the step that is expected to fail gets the short leash; the ones
-        # before it still need their normal budget to get that far.
+        # Only the failing step: the ones before it need their normal budget.
         export MCS_TIMEOUT="$KF_TIMEOUT" CLD_REMOVAL_TIMEOUT="$KF_TIMEOUT"
         export DIAG_INTERVAL="${DIAG_INTERVAL_KNOWN:-60}"
         warn "'$STEP_NAME' is a known failure on $KCM -- waits shortened to ${KF_TIMEOUT}s"
@@ -73,7 +59,6 @@ if [[ -n "$KF_MATCH" ]] && ! grep -qF -- "$KF_MATCH" "$out"; then
     fail_hard "'$STEP_NAME' failed, but not with the known defect (no '$KF_MATCH' in the output)"
 fi
 
-# Matched: report, do not fail.
 summary="known failure on $KCM in '$STEP_NAME' -- $(tr '\n' ' ' <<< "$KF_REASON")"
 if [[ -n "${GITHUB_ACTIONS:-}" ]]; then
     echo "::warning title=Known failure ($SCENARIO / $KCM)::$summary"

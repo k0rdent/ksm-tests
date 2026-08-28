@@ -1,18 +1,12 @@
 #!/bin/bash
 set -euo pipefail
 
-# Upgrade some of the services of an already-deployed MultiClusterService and
-# check what moved.
+# Upgrade some services of a deployed MultiClusterService and check what moved.
+# A no-op without an `upgrade:` block, so it can sit in the pipeline always.
 #
-# Scenarios without an `upgrade:` block exit straight away, so this can sit
-# unconditionally in the pipeline.
-#
-# Two shapes, both driven by upgrade.expect:
-#   valid    -- rolledOut services reach the new chart version, untouched ones
-#               keep their version and their pods
-#   atomic   -- the upgrade fails and helm undoes it, so the release ends back
-#               on rolledBackTo and healthy, with the rest of the chain still
-#               untouched
+#   rolledOut    -- reaches the new chart version
+#   untouched    -- keeps its version and its pods
+#   rolledBackTo -- the failed upgrade is undone and the release ends healthy
 
 # shellcheck source=scripts/lib/common.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
@@ -31,8 +25,7 @@ if ! has_upgrade; then
     exit 0
 fi
 
-# Chain scenarios describe their upgrade as a sequence of steps and are walked
-# by upgrade_chain.sh instead.
+# Chain scenarios are walked by upgrade_chain.sh instead.
 if (( $(upgrade_steps) > 0 )); then
     log "Scenario $SCENARIO upgrades along a chain -- handled by upgrade_chain.sh"
     exit 0
@@ -50,7 +43,7 @@ fi
     || die "No child kubeconfig at $KUBECONFIG_CHILD. Run ./scripts/check_child_cluster.sh first."
 
 # ── Snapshot ─────────────────────────────────────────────────────────────────
-# Taken before anything changes: every later claim is relative to this.
+# Every later claim is relative to this.
 step "Scenario $SCENARIO: recording the state before the upgrade"
 declare -A BEFORE_REL BEFORE_PODS
 while IFS="$SERVICE_SEP" read -r name _chart _version _repo namespace _dep _wait; do
@@ -94,9 +87,8 @@ dump_states() {
     jq -r '.status.services[]? | "    \(.name): \(.state)\(if .failureMessage != "" and .failureMessage != null then " -- " + .failureMessage else "" end)"' <<< "$1"
 }
 
-# chart_version CHART_FIELD -- "cert-manager-1.20.3" carries the chart name as
-# a prefix, and chart names contain dashes, so strip the known name rather than
-# splitting on the last dash.
+# chart_version -- chart names contain dashes, so strip the known prefix rather
+# than splitting on the last one.
 chart_version() { # chart_version RELEASE_CHART CHART_NAME
     echo "${1#"$2"-}"
 }
@@ -105,10 +97,8 @@ EXPECT_FAILED="$(upgrade_expect_field failed)"
 ROLLED_BACK_TO="$(upgrade_expect_field rolledBackTo)"
 
 # ── Wait for the upgrade to settle ───────────────────────────────────────────
-# Both shapes watch the helm release rather than the ServiceSet state. The
-# ServiceSet has been seen reporting a service Deployed at a version whose
-# release no longer exists in the cluster, so it cannot be the sole authority
-# on whether an upgrade landed.
+# Watching the helm release, not the ServiceSet: the ServiceSet has been seen
+# reporting Deployed at a version whose release no longer existed.
 settled=false
 elapsed=0
 
@@ -118,17 +108,14 @@ if [[ -n "$ROLLED_BACK_TO" ]]; then
     ns="$(service_field "$watch_svc" namespace)"
     chart="$(service_field "$watch_svc" chart)"
     before_rev="$(cut -d'|' -f1 <<< "${BEFORE_REL[$watch_svc]}")"
-    # Helm briefly reports the release failed before it undoes the upgrade, so
-    # a single absent or failed reading proves nothing; only a sustained one
-    # does.
+    # Helm briefly reports failed before undoing the upgrade, so only a
+    # sustained reading proves anything.
     absent_for=0
     broken_for=0
     GRACE_TERMINAL="${GRACE_TERMINAL:-90}"
 
-    # Two ways this is known to end badly, both of them terminal: the release
-    # disappears, or it comes back on the old chart but in a failed state
-    # because the rollback itself did not work. Waiting out the full timeout
-    # for either just delays a verdict that is already in.
+    # Two terminal bad endings: the release disappears, or it returns on the
+    # old chart but failed. Waiting out the timeout only delays the verdict.
     rollback_diag() {
         { echo "── helm history $watch_svc -n $ns"
           helm_child history "$watch_svc" -n "$ns" 2>&1 | tail -6
@@ -228,8 +215,7 @@ if [[ -n "$ROLLED_BACK_TO" ]]; then
 
     [[ "$got" == "$ROLLED_BACK_TO" ]] \
         || die "'$name' should have rolled back to $ROLLED_BACK_TO but the release is on '$got'"
-    # A rollback that leaves the release failed is not a rollback to a healthy
-    # state, which is what the scenario asserts.
+    # A release left failed is not a rollback to a healthy state.
     [[ "$status" == "deployed" ]] \
         || die "'$name' rolled back to $ROLLED_BACK_TO but the release is '$status', not healthy"
 
@@ -268,9 +254,8 @@ while read -r name; do
     before_rev="$(cut -d'|' -f1 <<< "$before")"
     after_rev="$(cut -d'|' -f1 <<< "$after")"
     if [[ "$before_rev" != "$after_rev" ]]; then
-        # Not fatal: the pods are the same, so nothing was actually rolled out.
-        # Worth saying out loud though, because it means the provider re-ran
-        # helm for a service the scenario never changed.
+        # Not fatal -- same pods, so nothing rolled out -- but it means helm
+        # re-ran for a service the scenario never changed.
         warn "'$name' kept its pods and chart but its helm revision moved $before_rev -> $after_rev"
     fi
     log "── untouched: $name at $after_ver, $(wc -l <<< "$after_pods" | tr -d ' ') pod(s) unchanged"

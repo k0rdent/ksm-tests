@@ -93,8 +93,7 @@ if [[ "$DO_ENV" == "true" ]]; then
 fi
 
 if [[ "$DO_SCENARIO" == "true" && "${SKIP_SERVICE_TEST:-false}" != "true" ]]; then
-    # Through ci_step.sh, with the same step names CI uses -- knownFailures
-    # entries reference them, so the two must not drift.
+    # Same step names as CI: knownFailures entries reference them.
     step_run() { "$SCRIPTS_DIR/ci_step.sh" "$1" "$2"; }
     step_run "Install ServiceTemplates" "$SCRIPTS_DIR/install_servicetemplate.sh"
     step_run "Deploy services via MultiClusterService" "$SCRIPTS_DIR/deploy_mcs.sh"
