@@ -162,18 +162,24 @@ else
     chart="$(service_field "$watch_svc" chart)"
     want="$(effective_version "$watch_svc" upgraded)"
 
+    # The status matters as much as the version: helm writes the new revision
+    # with status pending-upgrade the moment the upgrade starts, so waiting on
+    # the version alone lets this through while the upgrade is still running,
+    # and the checks below then see pending-upgrade.
     while (( elapsed < MCS_TIMEOUT )); do
         json="$(sset_json)"
         info="$(release_info "$watch_svc" "$ns")"
         got="$(chart_version "$(cut -d'|' -f2 <<< "$info")" "$chart")"
-        if [[ "$(state_of "$watch_svc" "$json")" == "Deployed" && "$got" == "$want" ]]; then
+        status="$(cut -d'|' -f3 <<< "$info")"
+        if [[ "$(state_of "$watch_svc" "$json")" == "Deployed" \
+              && "$got" == "$want" && "$status" == "deployed" ]]; then
             settled=true; break
         fi
         if (( elapsed > 0 && elapsed % ${DIAG_INTERVAL:-120} == 0 )); then
-            warn "'$watch_svc' is at '${got:-<absent>}' after ${elapsed}s -- diagnostics:"
+            warn "'$watch_svc' is at '${got:-<absent>}' (${status:-<absent>}) after ${elapsed}s -- diagnostics:"
             { dump_states "$json"; kcm_errors 5m; } >&2
         elif (( elapsed % 30 == 0 )); then
-            log "⏳ '$watch_svc' is at '${got:-<absent>}', want $want (${elapsed}s)"
+            log "⏳ '$watch_svc' is at '${got:-<absent>}' (${status:-<absent>}), want $want (${elapsed}s)"
         fi
         sleep 5
         elapsed=$(( elapsed + 5 ))
