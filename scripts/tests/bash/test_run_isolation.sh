@@ -39,6 +39,6 @@ plain="$(names_for '')"
 assert_contains "no RUN_ID keeps the plain cluster name" "$plain" "kcm-mgmt|"
 assert_contains "no RUN_ID keeps the plain registry name" "$plain" "kcm-test-registry|"
 assert_contains "no RUN_ID keeps the plain kubeconfig" "$plain" "/kcfg_k0rdent|"
-assert_contains "no RUN_ID keeps the default cluster name" "$plain" "docker-e2e|"
+assert_contains "no RUN_ID keeps the default cluster name" "$plain" "adopted-e2e|"
 
 finish

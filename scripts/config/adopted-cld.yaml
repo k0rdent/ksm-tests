@@ -1,18 +1,18 @@
-# ClusterDeployment under test: k0s on Docker with a k0smotron-hosted control
-# plane. The template name is resolved from the chart version by deploy_cld.sh.
+# The adopted cluster as KCM sees it. No provisioning: the chart only creates a
+# SveltosCluster from the kubeconfig in the Credential.
+# NOTE: envsubst expands variables inside comments too, so keep them out.
 apiVersion: k0rdent.mirantis.com/v1beta1
 kind: ClusterDeployment
 metadata:
   name: ${CLD_NAME}
   namespace: ${NAMESPACE}
   labels:
-    ksm-tests/scenario: docker
+    ksm-tests/scenario: adopted
     # What the MultiClusterService selects on.
     group: ${CLD_GROUP_LABEL}
 spec:
   template: ${CLD_TEMPLATE}
-  credential: docker-stub-credential
+  credential: ${ADOPTED_CREDENTIAL_NAME}
   config:
-    workersNumber: ${WORKERS_NUMBER}
     clusterLabels: {}
     clusterAnnotations: {}

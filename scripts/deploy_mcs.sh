@@ -76,7 +76,7 @@ if expects_failure; then
 fi
 
 [[ -f "$KUBECONFIG_CHILD" ]] \
-    || die "No child kubeconfig at $KUBECONFIG_CHILD. Run ./scripts/check_child_cluster.sh first."
+    || die "No child kubeconfig at $KUBECONFIG_CHILD. Run ./scripts/deploy_adopted_cluster.sh first."
 
 step "Waiting for the workloads in the child cluster"
 while IFS="$SERVICE_SEP" read -r name _chart _version _repo namespace _dep waitfor; do

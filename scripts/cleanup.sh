@@ -9,22 +9,14 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
 step "Cleaning up"
 
 if command -v docker >/dev/null 2>&1; then
-    # CAPD node containers first -- they are children of the management cluster.
-    orphans="$(docker ps -a --filter "name=^$CLD_NAME-" --format '{{.Names}}')"
-    if [[ -n "$orphans" ]]; then
-        log "Removing CAPD containers: $(echo "$orphans" | tr '\n' ' ')"
-        # shellcheck disable=SC2086 # deliberate word splitting of the name list
-        docker rm -vf $orphans >/dev/null 2>&1
-    fi
-
-    for container in "$MGMT_CLUSTER_NAME" "$REGISTRY_NAME"; do
+    for container in "$ADOPTED_CLUSTER_NAME" "$MGMT_CLUSTER_NAME" "$REGISTRY_NAME"; do
         if docker ps -a --format '{{.Names}}' | grep -qx "$container"; then
             log "Removing container '$container'"
             docker rm -vf "$container" >/dev/null 2>&1
         fi
     done
 
-    # Only remove the network if we are the last user; CAPD and kind share it.
+    # Only remove the network if we are the last user; kind shares it.
     if docker network inspect "$DOCKER_NETWORK" >/dev/null 2>&1; then
         attached="$(docker network inspect "$DOCKER_NETWORK" --format '{{range .Containers}}{{.Name}} {{end}}' | tr -d ' ')"
         if [[ -z "$attached" ]]; then

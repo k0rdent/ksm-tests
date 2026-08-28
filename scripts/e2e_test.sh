@@ -77,7 +77,6 @@ if [[ "$DO_ENV" == "true" ]]; then
     fi
 
     "$SCRIPTS_DIR/deploy_mgmt_cluster.sh"
-    "$SCRIPTS_DIR/install_openebs.sh"
 
     if [[ "$KCM_SOURCE" == "source" ]]; then
         "$SCRIPTS_DIR/push_kcm_artifacts.sh"
@@ -88,8 +87,8 @@ if [[ "$DO_ENV" == "true" ]]; then
     "$SCRIPTS_DIR/wait_for_templates.sh"
     "$SCRIPTS_DIR/apply_management.sh"
     "$SCRIPTS_DIR/wait_for_management.sh"
-    "$SCRIPTS_DIR/deploy_cld.sh"
-    "$SCRIPTS_DIR/check_child_cluster.sh"
+    "$SCRIPTS_DIR/deploy_adopted_cluster.sh"
+    "$SCRIPTS_DIR/adopt_cluster.sh"
 fi
 
 if [[ "$DO_SCENARIO" == "true" && "${SKIP_SERVICE_TEST:-false}" != "true" ]]; then

@@ -34,7 +34,7 @@ on:
 # No concurrency group here on purpose: the caller's cancels these jobs too.
 
 jobs:
-  e2e-docker:
+  e2e:
     name: ${{ matrix.kcm.name }}${{ contains(inputs.known_failing_kcm, matrix.kcm.id) && ' ⚠ known failure' || '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
@@ -48,7 +48,7 @@ jobs:
       KCM: ${{ matrix.kcm.id }}
       KCM_REF: ${{ inputs.kcm_ref }}
       SCENARIO: ${{ inputs.scenario }}
-      TEST_MODE: docker
+      TEST_MODE: adopted
       # No scenario here: each combination has its own runner, and MCS_NAME
       # already carries the scenario slug.
       RUN_ID: ci${{ github.run_id }}-${{ matrix.kcm.id }}
@@ -60,7 +60,7 @@ jobs:
         if: runner.debug == '1'
         run: echo "DEBUG=true" >> "$GITHUB_ENV"
 
-      # The build, two images, k0s and the CAPD nodes outgrow the runner disk.
+      # The build, two images and two k0s clusters outgrow the runner disk.
       - name: Free disk space
         run: |
           df -h /
@@ -91,9 +91,6 @@ jobs:
       - name: Deploy management cluster
         run: ./scripts/deploy_mgmt_cluster.sh
 
-      - name: Install OpenEBS
-        run: ./scripts/install_openebs.sh
-
       - name: Push images and charts
         if: matrix.kcm.source == 'source'
         run: ./scripts/push_kcm_artifacts.sh
@@ -113,11 +110,11 @@ jobs:
       - name: Wait for Management
         run: ./scripts/wait_for_management.sh
 
-      - name: Deploy ClusterDeployment
-        run: ./scripts/deploy_cld.sh
+      - name: Deploy the cluster to adopt
+        run: ./scripts/deploy_adopted_cluster.sh
 
-      - name: Check child cluster
-        run: ./scripts/check_child_cluster.sh
+      - name: Adopt the cluster
+        run: ./scripts/adopt_cluster.sh
 
       - name: Install ServiceTemplates
         run: ./scripts/ci_step.sh "Install ServiceTemplates" ./scripts/install_servicetemplate.sh

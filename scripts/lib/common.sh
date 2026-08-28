@@ -120,15 +120,21 @@ IMG="${IMG:-localhost/kcm/controller:${RUN_ID:-latest}}"
 IMG_TELEMETRY="${IMG_TELEMETRY:-localhost/kcm/telemetry:${RUN_ID:-latest}}"
 export IMG IMG_TELEMETRY
 
-# ── Management cluster (k0s in Docker) ───────────────────────────────────────
+# ── Clusters (k0s in Docker) ─────────────────────────────────────────────────
 MGMT_CLUSTER_NAME="${MGMT_CLUSTER_NAME:-kcm-mgmt$RUN_SUFFIX}"
 MGMT_API_PORT="${MGMT_API_PORT:-6443}"
 K0S_IMAGE="${K0S_IMAGE:-docker.io/k0sproject/k0s:v1.36.3-k0s.0}"
-# CAPD creates the workload-cluster containers on the "kind" network by default,
-# so the management cluster has to live there too. Parallel runs share it:
-# cluster names are unique, so their containers never collide.
+# Both clusters share a network so KCM can reach the adopted one by container
+# name. Parallel runs share it too: the names are unique.
 DOCKER_NETWORK="${DOCKER_NETWORK:-kind}"
 export MGMT_CLUSTER_NAME MGMT_API_PORT K0S_IMAGE DOCKER_NETWORK
+
+# The cluster KCM adopts. Its API is published on the host as well, which is the
+# whole point: the checks run from the host, and a NodePort inside the docker
+# network is not routable from macOS.
+ADOPTED_CLUSTER_NAME="${ADOPTED_CLUSTER_NAME:-adopted$RUN_SUFFIX}"
+ADOPTED_API_PORT="${ADOPTED_API_PORT:-6444}"
+export ADOPTED_CLUSTER_NAME ADOPTED_API_PORT
 
 # ── Local OCI registry for the template charts (source mode only) ────────────
 REGISTRY_NAME="${REGISTRY_NAME:-kcm-test-registry$RUN_SUFFIX}"
@@ -150,27 +156,27 @@ export TEMPLATES_REPO_URL INSECURE_REGISTRY
 # ── Kubernetes ───────────────────────────────────────────────────────────────
 NAMESPACE="${NAMESPACE:-kcm-system}"
 KCM_HELM_RELEASE_NAME="${KCM_HELM_RELEASE_NAME:-kcm}"
-TEST_MODE="${TEST_MODE:-docker}"
+TEST_MODE="${TEST_MODE:-adopted}"
 KUBECONFIG_MGMT="${KUBECONFIG_MGMT:-$PROJECT_ROOT/kcfg_k0rdent$RUN_SUFFIX}"
 KUBECONFIG_CHILD="${KUBECONFIG_CHILD:-$PROJECT_ROOT/kcfg_$TEST_MODE$RUN_SUFFIX}"
 export NAMESPACE KCM_HELM_RELEASE_NAME TEST_MODE KUBECONFIG_MGMT KUBECONFIG_CHILD
 
 # ── What KCM actually installs ───────────────────────────────────────────────
-# Only these providers stay in the Release and Management; every one dropped is
-# a Helm chart KCM need not reconcile, which is most of the install time.
-# docker-hosted-cp requires CAPD + k0smotron (control plane and bootstrap).
-KCM_PROVIDERS="${KCM_PROVIDERS:-cluster-api-provider-docker cluster-api-provider-k0sproject-k0smotron projectsveltos}"
-KCM_CLUSTER_TEMPLATES="${KCM_CLUSTER_TEMPLATES:-docker-hosted-cp}"
+# Only these stay in the Release and Management; every provider dropped is a
+# Helm chart KCM need not reconcile, which is most of the install time. The
+# adopted-cluster template requires no provider of its own -- it only creates a
+# SveltosCluster -- so sveltos is the whole list.
+KCM_PROVIDERS="${KCM_PROVIDERS:-projectsveltos}"
+KCM_CLUSTER_TEMPLATES="${KCM_CLUSTER_TEMPLATES:-adopted-cluster}"
 export KCM_PROVIDERS KCM_CLUSTER_TEMPLATES
 
 # ── ClusterDeployment under test ─────────────────────────────────────────────
 CLUSTER_NAME_SUFFIX="${CLUSTER_NAME_SUFFIX:-${RUN_ID:-e2e}}"
 CLD_NAME="${CLD_NAME:-$TEST_MODE-$CLUSTER_NAME_SUFFIX}"
-WORKERS_NUMBER="${WORKERS_NUMBER:-1}"
 # MCS selects the cluster by this label, set on the ClusterDeployment. It is
 # per-run so a MultiClusterService never reaches another run's cluster.
 CLD_GROUP_LABEL="${CLD_GROUP_LABEL:-e2e-${RUN_ID:-default}}"
-export CLUSTER_NAME_SUFFIX CLD_NAME WORKERS_NUMBER CLD_GROUP_LABEL
+export CLUSTER_NAME_SUFFIX CLD_NAME CLD_GROUP_LABEL
 
 # ── Scenario under test ──────────────────────────────────────────────────────
 # A scenario is a file in test_scenarios/ describing the services and their

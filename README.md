@@ -8,9 +8,11 @@ Everything is a shell script, so CI runs exactly what you run locally.
 
 ## What it tests
 
-Each scenario builds a throwaway environment — a k0s management cluster in
-Docker, a CAPD child cluster — installs KCM, exercises one KSM behaviour and
-tears it all down. No cloud credentials, no cost.
+Each scenario builds a throwaway environment — two k0s clusters in Docker, one
+running KCM and one it adopts — exercises one KSM behaviour and tears it all
+down. Nothing is provisioned through CAPI: KCM is handed the second cluster's
+kubeconfig, which is what the `adopted-cluster` template is for. No cloud
+credentials, no cost.
 
 | Scenario | Asserts |
 |---|---|
@@ -58,8 +60,10 @@ Needs `docker`, `git`, `curl`, `tar`, `envsubst`, plus `go` and `make` for
 Sharing one environment across scenarios is a debugging convenience, not a
 substitute for CI — scenarios are not isolated from each other that way.
 
-On macOS the child cluster's API is unreachable from the host, so set
-`SKIP_CHILD_API_CHECK=true`; everything up to the CAPI-side checks still runs.
+The adopted cluster publishes its API on the host, so the checks that read it —
+helm releases, pod UIDs, workloads — work on macOS as they do on Linux. KCM
+reaches the same cluster by its address on the docker network, which is why
+there are two kubeconfigs: `kcfg_adopted*` for you, and one in a Secret for KCM.
 
 ## Adding a scenario
 
