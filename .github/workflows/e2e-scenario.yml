@@ -1,13 +1,8 @@
 name: E2E scenario
 
-# Reusable: one scenario across every KCM variant. GitHub Actions has no nested
-# matrix, so the scenario dimension lives in the caller (e2e.yml) and this
-# workflow expands the versions underneath it.
-#
-# Known failures are handled by scripts/ci_step.sh, not continue-on-error: it
-# matches the recorded step and error before excusing anything, so a leg that
-# breaks for a different reason still goes red. The marker only reaches this
-# file to label the job name.
+# Reusable: one scenario across every KCM variant, called once per scenario by
+# e2e.yml. Known failures are handled by scripts/ci_step.sh, not
+# continue-on-error; the marker reaches this file only to label the job name.
 
 on:
   workflow_call:
@@ -48,27 +43,24 @@ jobs:
       matrix:
         kcm: ${{ fromJson(inputs.kcm_variants) }}
     env:
-      # common.sh turns KCM into KCM_SOURCE/KCM_REF/KCM_RELEASE_VERSION using
-      # the same kcm-variants.yaml a local run reads, so the mapping is not
-      # duplicated here.
+      # common.sh expands KCM via kcm-variants.yaml, the same file a local run
+      # reads, so the mapping is not duplicated here.
       KCM: ${{ matrix.kcm.id }}
       KCM_REF: ${{ inputs.kcm_ref }}
       SCENARIO: ${{ inputs.scenario }}
       TEST_MODE: docker
-      # Scenario is deliberately absent: each combination gets its own runner,
-      # and MCS_NAME already carries the scenario slug.
+      # No scenario here: each combination has its own runner, and MCS_NAME
+      # already carries the scenario slug.
       RUN_ID: ci${{ github.run_id }}-${{ matrix.kcm.id }}
     steps:
       - uses: actions/checkout@v7
 
-      # The runner context is not available in job-level env, so DEBUG is set
-      # here instead: re-running with debug logging turns on verbose output.
+      # runner.* is not available in job-level env, so DEBUG is set here.
       - name: Enable debug output
         if: runner.debug == '1'
         run: echo "DEBUG=true" >> "$GITHUB_ENV"
 
-      # The Go build, two container images, k0s and the CAPD nodes together
-      # outgrow the default runner disk.
+      # The build, two images, k0s and the CAPD nodes outgrow the runner disk.
       - name: Free disk space
         run: |
           df -h /
@@ -77,9 +69,8 @@ jobs:
           sudo apt-get clean
           df -h /
 
-      # KCM's Makefile shells out to `go env` while parsing, so go must be on
-      # PATH for the source build. The binaries themselves are built inside
-      # Docker, so a Go module cache here would not help.
+      # KCM's Makefile shells out to `go env` while parsing. The binaries are
+      # built inside Docker, so a module cache here would not help.
       - uses: actions/setup-go@v7
         if: matrix.kcm.source == 'source'
         with:

@@ -13,8 +13,7 @@ multiClusterServices:
         version: 1.20.2
         repo: oci://ghcr.io/k0rdent/catalog/charts
         namespace: cert-manager
-        # Same rejected value as the other invalid scenarios: the API server
-        # refuses a negative replica count, so the release never installs.
+        # A negative replica count is refused, so the release never installs.
         values: |
           cert-manager:
             crds:
@@ -33,7 +32,6 @@ multiClusterServices:
         waitForPods: traefik-
 
 expect:
-  # No ServiceSet for it, ever, and nothing of its own in the child cluster.
   neverDeployed:
     - dependent
   graceSeconds: 180

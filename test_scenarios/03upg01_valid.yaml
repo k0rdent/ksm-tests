@@ -5,14 +5,11 @@ description: >-
   upgraded. Only that service may roll out; the one in front of it and the one
   behind it must both stay exactly as they were.
 
-# cert-manager sits in the middle deliberately: it checks both directions at
-# once, that an upgrade disturbs neither the service it depends on nor the one
-# that depends on it.
+# cert-manager is in the middle so both directions are checked at once.
 upgrade:
   services:
     - name: cert-manager
-      # A minor bump rather than a patch, so the upgrade is visible in the
-      # rendered template name and in the release chart.
+      # A minor bump, so the change is visible in the template and chart names.
       version: 1.21.1
   expect:
     rolledOut:

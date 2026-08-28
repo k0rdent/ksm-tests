@@ -1,18 +1,13 @@
 #!/bin/bash
 set -euo pipefail
 
-# Deploy a scenario that declares several MultiClusterServices and check how
-# the dependencies between them behave.
+# Deploy a scenario with several MultiClusterServices and check the
+# dependencies between them.
 #
-# All of them are created in one apply, deliberately: creation order must not
-# be what sequences the rollout, spec.dependsOn must. What the run then watches
-# is when each MCS first gets a ServiceSet and when it first reports every
-# service deployed, and it compares those moments.
-#
-# Two claims, from the scenario's expect block:
-#   orderedAfterDependencies -- this MCS got no ServiceSet before every MCS it
-#                               depends on was fully deployed
-#   neverDeployed            -- this MCS never got a ServiceSet at all
+# They are created in one apply so that creation order cannot be what sequences
+# them -- only spec.dependsOn can. The run records when each MCS first gets a
+# ServiceSet and when it first reports everything deployed, then compares those
+# moments against expect.orderedAfterDependencies and expect.neverDeployed.
 
 # shellcheck source=scripts/lib/common.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
@@ -82,8 +77,7 @@ while (( elapsed < LIMIT )); do
         [[ -n "${DEPLOYED_AT[$key]:-}" ]] || all_done=false
     done
 
-    # With a neverDeployed expectation the point is to sit out the window, so
-    # everything being up early is not a reason to stop.
+    # A neverDeployed run has to sit out the window whatever happens.
     if [[ -z "${NEVER// /}" ]] && [[ "$all_done" == "true" ]]; then break; fi
 
     if (( elapsed > 0 && elapsed % ${DIAG_INTERVAL:-120} == 0 )); then
@@ -102,7 +96,6 @@ for key in $NEVER; do
     fi
     obj="$(mcs_object_name "$(mcs_index_of "$key")")"
     log "── $key: no ServiceSet after ${LIMIT}s, as expected"
-    # The MCS should say why, rather than just sitting there silently.
     msg="$(kube get multiclusterservice "$obj" -o json 2>/dev/null \
         | jq -r '[.status.conditions[]?.message] | join(" ")' 2>/dev/null || true)"
     [[ -n "$msg" ]] && log "   status: $msg"

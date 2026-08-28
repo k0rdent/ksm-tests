@@ -1,7 +1,9 @@
 name: Bash Unit Tests
 
 on:
+  # Only main; pull_request covers branches. See e2e.yml.
   push:
+    branches: [main]
     paths:
       - 'scripts/**'
       - .github/workflows/bash-unit-tests.yml

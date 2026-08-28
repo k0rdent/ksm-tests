@@ -6,8 +6,7 @@ description: >-
   the dependent one must not start until its dependency is deployed and
   healthy.
 
-# Both are created at the same time on purpose. Creation order must not be what
-# sequences them; spec.dependsOn must.
+# Created together on purpose: dependsOn must be what sequences them.
 multiClusterServices:
   - name: base
     services:
@@ -34,8 +33,7 @@ multiClusterServices:
         waitForPods: traefik-
 
 expect:
-  # The dependent MCS must get no ServiceSet at all until base reports every
-  # service deployed. Checked by comparing when each first happened, so a fast
-  # base cannot make the assertion pass by accident.
+  # Checked by comparing when each first happened, so a fast base cannot make
+  # this pass by accident.
   orderedAfterDependencies:
     - dependent

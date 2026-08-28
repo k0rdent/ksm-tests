@@ -5,8 +5,7 @@ description: >-
   ServiceTemplateChain constrains them. Moving the service straight to the
   latest version must simply work.
 
-# Without a chain KCM offers the service only itself as an upgrade target, so
-# nothing is gated and any declared template is accepted.
+# Without a chain nothing is gated and any declared template is accepted.
 upgrade:
   steps:
     - version: 1.21.1

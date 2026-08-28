@@ -2,10 +2,8 @@
 # Helpers for reading $SERVICES_FILE. Expects common.sh to be sourced first.
 
 # ── One or several MultiClusterServices ──────────────────────────────────────
-# Most scenarios declare a flat `services:` list and get one MCS. Scenarios
-# about dependencies *between* MCSs declare `multiClusterServices:` instead,
-# and every accessor below then reads the one selected by $MCS_IDX. Keeping the
-# flat form working means the existing scenarios need no changes.
+# A flat `services:` list gives one MCS; `multiClusterServices:` gives several,
+# and the accessors below then read the one selected by $MCS_IDX.
 
 is_multi_mcs() {
     [[ "$(yq -r '.multiClusterServices // "" | tag' "$SERVICES_FILE")" == "!!seq" ]]
@@ -52,9 +50,8 @@ service_count() {
     yq -r "$(mcs_root).services | length" "$SERVICES_FILE"
 }
 
-# SERVICE_SEP must not be whitespace: `read` with a whitespace IFS collapses
-# runs of it, which silently drops empty fields and shifts every later value
-# left. Optional fields like dependsOn are routinely empty.
+# Not whitespace: a whitespace IFS collapses runs and drops empty fields, which
+# shifted every value after an empty dependsOn.
 # shellcheck disable=SC2034 # used by the scripts that source this
 SERVICE_SEP='|'
 
@@ -65,8 +62,7 @@ services_rows() {
                           (.dependsOn // \"\"), (.waitForPods // \"\")] | join(\"|\")" "$SERVICES_FILE"
 }
 
-# all_services_rows -- every service across every MCS, for the steps that have
-# to touch the whole scenario at once (templates, teardown).
+# all_services_rows -- every service across every MCS (templates, teardown).
 all_services_rows() {
     local i
     if ! is_multi_mcs; then services_rows; return; fi
@@ -103,10 +99,8 @@ template_name_for() {
 }
 
 # ── Known failures ───────────────────────────────────────────────────────────
-# A scenario records the KCM variants it is known to fail on. The entry is
-# deliberately narrow: it names the step and a fragment of the expected error,
-# so a leg that breaks for some other reason still goes red instead of being
-# swallowed by the marker.
+# The entry names a step and a fragment of the expected error, so a leg that
+# breaks for another reason still goes red rather than being swallowed.
 
 # known_failure_field FIELD -- from the entry matching $KCM, empty otherwise.
 known_failure_field() {
@@ -121,8 +115,8 @@ is_known_failure() {
 }
 
 # ── Upgrades ─────────────────────────────────────────────────────────────────
-# A scenario with an `upgrade:` block deploys once, changes some services, and
-# then asserts what moved and what did not.
+# An `upgrade:` block deploys once, changes some services, then asserts what
+# moved and what did not.
 
 has_upgrade() {
     [[ "$(yq -r '.upgrade // "" | tag' "$SERVICES_FILE")" == "!!map" ]]
@@ -139,11 +133,8 @@ upgrade_field() {
         '.upgrade.services[]? | select(.name == strenv(NAME)) | .[strenv(FIELD)] // ""' "$SERVICES_FILE"
 }
 
-# scenario_atomic -- "true" when the scenario runs with helmOptions.atomic.
-# It is a property of the whole scenario, not of the upgrade: the issue calls
-# for atomic to be part of the provider configuration, and adding it only at
-# upgrade time changes the spec in a way that makes sveltos uninstall and
-# reinstall instead of upgrading, which is a different test entirely.
+# scenario_atomic -- set for the whole scenario, not just the upgrade: adding
+# helmOptions later makes sveltos reinstall instead of upgrade.
 scenario_atomic() {
     yq -r '.helmOptions.atomic // false' "$SERVICES_FILE"
 }
@@ -156,14 +147,9 @@ upgrade_expect_list() {
     FIELD="$1" yq -r '.upgrade.expect[strenv(FIELD)][]? // ""' "$SERVICES_FILE"
 }
 
-# effective_version NAME MODE [FALLBACK] -- the chart version this service
-# should be at. MODE=upgraded applies the override; anything else keeps the
-# declared version.
-#
-# FALLBACK matters for the multi-MCS scenarios: service_field only sees the
-# currently selected MCS, so a caller iterating across all of them must pass the
-# version it already has from the row. Without it the lookup silently returns
-# empty and the template name comes out as "traefik-".
+# effective_version NAME MODE [FALLBACK] -- the version this service should be
+# at. FALLBACK is needed when iterating across MCSs: service_field only sees the
+# selected one, and an empty result renders as "traefik-".
 effective_version() {
     local v
     # A chain scenario walks one step at a time, pinning the service to the
@@ -180,9 +166,8 @@ effective_version() {
     echo "${3:-}"
 }
 
-# effective_values NAME MODE -- likewise for the values block. An override
-# replaces the original outright rather than merging: a merge would make it
-# impossible to remove a key, and every override here is a whole block anyway.
+# effective_values NAME MODE -- likewise. An override replaces rather than
+# merges, so a key can be removed.
 effective_values() {
     local v
     if [[ "${2:-}" == "upgraded" ]]; then
@@ -193,10 +178,7 @@ effective_values() {
 }
 
 # ── ServiceTemplateChains and stepwise upgrades ──────────────────────────────
-# A scenario can declare several versions of one application and a chain that
-# says which upgrades are allowed. Versions are written as chart versions; the
-# ServiceTemplate names are derived, so the scenario never has to spell out
-# "cert-manager-1-20-2".
+# Scenarios write chart versions; the ServiceTemplate names are derived.
 
 has_template_chain() {
     [[ "$(yq -r '.templateChain // "" | tag' "$SERVICES_FILE")" == "!!map" ]]
@@ -208,8 +190,7 @@ chain_name() {
     echo "${n:-chain-$SCENARIO_SLUG}"
 }
 
-# chain_service -- the service the chain applies to. Chain scenarios are about
-# one application, so it is simply the first (and only) one.
+# chain_service -- chain scenarios cover one application, so the first one.
 chain_service() {
     services_rows | head -1 | cut -d'|' -f1
 }
@@ -239,9 +220,8 @@ upgrade_step_list() { # upgrade_step_list IDX FIELD
     IDX="$1" FIELD="$2" yq -r '.upgrade.steps[env(IDX)][strenv(FIELD)][]? // ""' "$SERVICES_FILE"
 }
 
-# all_versions_for NAME -- every version a ServiceTemplate is needed for: the
-# declared one, everything the chain names, and every upgrade target. Missing
-# any of them means the upgrade has nothing to point at.
+# all_versions_for NAME -- every version needing a ServiceTemplate: declared,
+# named by the chain, or an upgrade target.
 all_versions_for() {
     { service_field "$1" version
       chain_versions
@@ -283,9 +263,8 @@ EOF
 }
 
 # render_templates FILE MODE -- a HelmRepository and ServiceTemplate per
-# service, at its effective version. In upgraded mode the entries that did not
-# change render identically, so applying the file is a no-op for them and only
-# the new chart version is added.
+# service and version. Unchanged entries render identically, so re-applying is
+# a no-op for them.
 # shellcheck disable=SC2153 # NAMESPACE is from common.sh, not a typo for $_ns
 render_templates() {
     local out="$1" mode="${2:-initial}"
@@ -293,8 +272,7 @@ render_templates() {
     local name chart version repo _ns _dep _wait tmpl
     while IFS="$SERVICE_SEP" read -r name chart version repo _ns _dep _wait; do
         [[ -n "$name" ]] || continue
-        # A chain scenario needs a ServiceTemplate for every version it can
-        # move between, not just the one currently selected.
+        # Every version the scenario can move between, not just the current.
         local versions
         versions="$({ effective_version "$name" "$mode" "$version"; all_versions_for "$name"; } \
                     | awk 'NF && !seen[$0]++')"
@@ -338,8 +316,8 @@ EOF
     done < <(all_services_rows)
 }
 
-# render_mcs FILE MODE -- the MultiClusterService manifest. Shared by the
-# initial deploy and the upgrade so the two cannot drift apart.
+# render_mcs FILE MODE -- shared by the initial deploy and the upgrade, so the
+# two cannot drift apart.
 render_mcs() {
     local out="$1" mode="${2:-initial}" atomic
     atomic="$(scenario_atomic)"
@@ -355,8 +333,7 @@ spec:
       group: $CLD_GROUP_LABEL
 EOF
 
-    # An MCS-level dependsOn holds this whole MCS back until the ones it names
-    # are deployed and healthy -- KCM does not even create its ServiceSet.
+    # Holds the whole MCS back until the named ones are deployed and healthy.
     local dep first=true
     while read -r dep; do
         [[ -n "$dep" ]] || continue
@@ -377,21 +354,17 @@ EOF
             echo "      - template: $(template_name_for "$chart" "$version")"
             echo "        name: $name"
             echo "        namespace: $namespace"
-            # With a chain, KCM only accepts an upgrade that the chain lists as
-            # reachable from the template currently deployed.
+            # KCM then only accepts targets the chain says are reachable.
             if has_template_chain; then
                 echo "        templateChain: $(chain_name)"
             fi
-            # Atomic makes helm undo a failed upgrade instead of leaving the
-            # release broken, which is the whole point of the atomic scenario.
+            # Makes helm undo a failed upgrade instead of leaving it broken.
             if [[ "$atomic" == "true" ]]; then
                 echo "        helmOptions:"
                 echo "          atomic: true"
             fi
             if [[ -n "$dep" ]]; then
-                # KCM waits for the dependency to be deployed before starting
-                # this one: kserve needs cert-manager's webhooks and its own
-                # CRDs first.
+                # KCM waits for the dependency before starting this one.
                 echo "        dependsOn:"
                 echo "          - name: $dep"
                 echo "            namespace: $(service_field "$dep" namespace)"
@@ -408,9 +381,8 @@ EOF
 }
 
 # ── Expected failure ─────────────────────────────────────────────────────────
-# A scenario with an `expect:` block is asserting that the rollout stops rather
-# than that it completes. Without one these all return empty and the callers
-# take the normal path.
+# An `expect:` block asserts the rollout stops rather than completes. Without
+# one these return empty and the callers take the normal path.
 
 # expect_field FIELD -- a scalar from the expect block.
 expect_field() {
