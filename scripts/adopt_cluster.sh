@@ -31,8 +31,7 @@ ADOPTED_SECRET_NAME="${ADOPTED_SECRET_NAME:-adopted-kubeconf-$CLUSTER_NAME_SUFFI
 ADOPTED_CREDENTIAL_NAME="${ADOPTED_CREDENTIAL_NAME:-adopted-cred-$CLUSTER_NAME_SUFFIX}"
 # The internal address, not the host one: KCM talks to the cluster from inside
 # the docker network.
-ADOPTED_KUBECONFIG_B64="$(base64 -w0 < "$INTERNAL_KUBECONFIG" 2>/dev/null \
-    || base64 < "$INTERNAL_KUBECONFIG" | tr -d '\n')"
+ADOPTED_KUBECONFIG_B64="$(openssl base64 -A < "$INTERNAL_KUBECONFIG")"
 export CLD_TEMPLATE ADOPTED_SECRET_NAME ADOPTED_CREDENTIAL_NAME ADOPTED_KUBECONFIG_B64
 
 step "Applying the kubeconfig Secret and Credential"
