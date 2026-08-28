@@ -475,6 +475,36 @@ that the concurrency group then cancels still shows on the PR as a failed
 check — so a branch is expected to have a PR before CI has anything to say
 about it. To run something on a branch without one, use `workflow_dispatch`.
 
+### What a pull request runs
+
+The full matrix is 11 scenarios × 3 variants and costs about 8 hours of runner
+time, which is far too slow to sit in front of a contribution. A pull request
+therefore runs only what the change could plausibly break, and `discover` works
+that out from the diff against the base commit:
+
+| Changed | Runs |
+|---|---|
+| only `test_scenarios/*.yaml` | just those scenarios, against `rel-1-11-0` |
+| anything shared (`scripts/**`, `Makefile`, the workflows) | every scenario, against `rel-1-11-0` |
+| `prepare_kcm.sh`, `push_kcm_artifacts.sh`, `deploy_registry.sh` | `01_basic` against `src: main` |
+| only docs | nothing — E2E does not even trigger |
+
+The sets add up, so a PR touching a scenario *and* the build path runs both.
+
+Pull requests use `rel-1-11-0` because a published chart cannot move underneath
+them: a red leg means the change broke something, not that upstream shifted.
+Which variant that is comes from `prCheck: true` in `kcm-variants.yaml`, so it
+moves with one line when 1.12.0 lands. The source-build path gets a single
+smoke scenario instead — it is shared by every scenario, so if it works for one
+it works for all.
+
+**The full matrix still runs on `main` and nightly**, and it has to. Both races
+found in the upgrade scenarios showed up only on `src: main`, whose different
+timing exposes them; a single variant is always a partial view. Nightly needs
+the repo variable `ENABLE_CRON=1` to be set.
+
+Label a pull request **`ci:full`** to run everything anyway.
+
 ### Running a single combination in CI
 
 `workflow_dispatch` takes `scenarios` and `kcm` filters. Both are space or

@@ -58,9 +58,11 @@ jobs:
     if: github.event_name != 'schedule' || vars.ENABLE_CRON == '1'
     outputs:
       scenarios: ${{ steps.scan.outputs.scenarios }}
-      kcm_variants: ${{ steps.scan.outputs.kcm_variants }}
     steps:
+      # Full history: the pull-request selection diffs against the base commit.
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - name: Install yq
         run: |
@@ -68,61 +70,112 @@ jobs:
             https://github.com/mikefarah/yq/releases/download/v4.53.3/yq_linux_amd64
           sudo chmod +x /usr/local/bin/yq
 
-      - name: Scan scenarios and KCM variants
+      - name: Pick the scenarios and variants to run
         id: scan
         # Via env, not inline interpolation: free-text dispatch input.
         env:
           WANT_SCENARIOS: ${{ github.event.inputs.scenarios }}
           WANT_KCM: ${{ github.event.inputs.kcm }}
+          EVENT: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.sha }}
+          FULL_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'ci:full') }}
         run: |
           set -euo pipefail
 
-          # Empty selection means everything.
-          selected() { # selected <id> <list>
+          ALL="$(yq -o=json -I=0 '.variants' scripts/config/kcm-variants.yaml)"
+          PR_VARIANT="$(jq -r '[.[] | select(.prCheck == true) | .id][0] // empty' <<< "$ALL")"
+          SRC_VARIANT="$(jq -r '[.[] | select(.source == "source") | .id][0] // empty' <<< "$ALL")"
+          SMOKE=01_basic
+
+          all_ids=()
+          for f in test_scenarios/*.yaml; do all_ids+=("$(basename "$f" .yaml)"); done
+
+          # scenario -> the variant ids it should run against
+          declare -A SEL
+          add() {
+            [[ " ${SEL[$1]:-} " == *" $2 "* ]] || SEL["$1"]="${SEL[$1]:-} $2"
+          }
+          add_all_variants() {
+            local v
+            while read -r v; do add "$1" "$v"; done < <(jq -r '.[].id' <<< "$ALL")
+          }
+
+          if [[ "$EVENT" == "pull_request" && "$FULL_LABEL" != "true" ]]; then
+            # Only what the change could plausibly break. The whole matrix still
+            # runs on main and nightly, so nothing is permanently untested.
+            changed="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")"
+            echo "Changed files:"; awk '{print "  " $0}' <<< "$changed"
+
+            touched_scenarios=() source_build=false shared=false
+            while read -r f; do
+              [[ -n "$f" ]] || continue
+              case "$f" in
+                test_scenarios/*.yaml)
+                  touched_scenarios+=("$(basename "$f" .yaml)") ;;
+                # Only ever run in source mode, so a release leg proves nothing.
+                scripts/prepare_kcm.sh|scripts/push_kcm_artifacts.sh|scripts/deploy_registry.sh)
+                  source_build=true ;;
+                scripts/*|.github/workflows/e2e*.yml|Makefile)
+                  shared=true ;;
+              esac
+            done <<< "$changed"
+
+            if [[ "$shared" == true ]]; then
+              for s in "${all_ids[@]}"; do add "$s" "$PR_VARIANT"; done
+            else
+              for s in ${touched_scenarios[@]+"${touched_scenarios[@]}"}; do
+                add "$s" "$PR_VARIANT"
+              done
+            fi
+            # A smoke test is enough here: the build path is shared by every
+            # scenario, so if it works for one it works for all.
+            [[ "$source_build" == true ]] && add "$SMOKE" "$SRC_VARIANT"
+          else
+            for s in "${all_ids[@]}"; do add_all_variants "$s"; done
+          fi
+
+          # Empty selection means everything -- the dispatch filters.
+          selected() {
             local id="$1" want
             [[ -z "${2// /}" ]] && return 0
             for want in ${2//,/ }; do [[ "$want" == "$id" ]] && return 0; done
             return 1
           }
 
-          # Each entry carries the versions it is known to fail on, for the
-          # job name.
           scenarios='[]'
-          all_scenarios=''
           for f in test_scenarios/*.yaml; do
             id="$(basename "$f" .yaml)"
-            all_scenarios+="$id "
             selected "$id" "$WANT_SCENARIOS" || continue
+            ids=""
+            for v in ${SEL[$id]:-}; do selected "$v" "$WANT_KCM" && ids+="$v "; done
+            [[ -n "${ids// /}" ]] || continue
             known="$(yq -r '[.knownFailures[].kcm] | join(" ")' "$f")"
-            scenarios="$(jq -c --arg id "$id" --arg known "$known" \
-              '. + [{id: $id, knownFailingKcm: $known}]' <<< "$scenarios")"
+            # variants is a JSON string: the reusable workflow takes it as one
+            # input and fromJson's it, which lets each scenario have its own set.
+            vjson="$(jq -c --arg ids "$ids" \
+              '[ .[] | select(.id as $i | ($ids | split(" ") | index($i))) ]' <<< "$ALL")"
+            scenarios="$(jq -c --arg id "$id" --arg known "$known" --arg v "$vjson" \
+              '. + [{id: $id, knownFailingKcm: $known, variants: $v}]' <<< "$scenarios")"
           done
 
-          variants='[]'
-          all_variants=''
-          while read -r id; do
-            all_variants+="$id "
-            selected "$id" "$WANT_KCM" || continue
-            variants="$(yq -o=json -I=0 ".variants[] | select(.id == \"$id\")" \
-              scripts/config/kcm-variants.yaml \
-              | jq -c --argjson acc "$variants" '$acc + [.]')"
-          done < <(yq -r '.variants[].id' scripts/config/kcm-variants.yaml)
-
-          # A typo would otherwise mean an empty matrix and a green run that
-          # tested nothing.
-          [[ "$scenarios" == '[]' ]] && {
-            echo "No scenario matches '$WANT_SCENARIOS'. Available: $all_scenarios" >&2; exit 1; }
-          [[ "$variants" == '[]' ]] && {
-            echo "No KCM variant matches '$WANT_KCM'. Available: $all_variants" >&2; exit 1; }
+          # Nothing to run is normal for a docs-only pull request, but for a
+          # manual run it means the filters matched nothing and the run would go
+          # green having tested nothing.
+          if [[ "$scenarios" == '[]' && "$EVENT" == "workflow_dispatch" ]]; then
+            echo "Nothing matches scenarios='$WANT_SCENARIOS' kcm='$WANT_KCM'" >&2
+            echo "Available: ${all_ids[*]} / $(jq -r '[.[].id] | join(" ")' <<< "$ALL")" >&2
+            exit 1
+          fi
 
           echo "scenarios=$scenarios" >> "$GITHUB_OUTPUT"
-          echo "kcm_variants=$variants" >> "$GITHUB_OUTPUT"
-          echo "Scenarios:    $scenarios"
-          echo "KCM variants: $variants"
+          jq -r '.[] | "  \(.id): \(.variants | fromjson | map(.id) | join(", "))"' <<< "$scenarios"
 
   e2e:
     name: ${{ matrix.scenario.id }}
     needs: discover
+    # A docs-only pull request selects nothing.
+    if: needs.discover.outputs.scenarios != '[]'
     strategy:
       fail-fast: false
       matrix:
@@ -130,7 +183,7 @@ jobs:
     uses: ./.github/workflows/e2e-scenario.yml
     with:
       scenario: ${{ matrix.scenario.id }}
-      kcm_variants: ${{ needs.discover.outputs.kcm_variants }}
+      kcm_variants: ${{ matrix.scenario.variants }}
       known_failing_kcm: ${{ matrix.scenario.knownFailingKcm }}
       kcm_ref: ${{ github.event.inputs.kcm_ref || '' }}
       keep_cluster: ${{ github.event.inputs.keep_cluster == 'true' }}
