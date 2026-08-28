@@ -61,10 +61,10 @@ emit_template cluster-api.yaml ProviderTemplate cluster-api-1-1-15
 emit_template cluster-api-provider-docker.yaml ProviderTemplate cluster-api-provider-docker-1-0-24
 emit_template cluster-api-provider-aws.yaml ProviderTemplate cluster-api-provider-aws-1-0-26
 emit_template projectsveltos.yaml ProviderTemplate projectsveltos-1-12-1
-emit_template docker-hosted-cp-1-0-15.yaml ClusterTemplate docker-hosted-cp-1-0-15
+emit_template adopted-cluster-1-0-2.yaml ClusterTemplate adopted-cluster-1-0-2
 
 out=$(KCM_PROVIDERS="cluster-api-provider-docker projectsveltos" \
-      KCM_CLUSTER_TEMPLATES="docker-hosted-cp" \
+      KCM_CLUSTER_TEMPLATES="adopted-cluster" \
       bash "$SCRIPTS_DIR/apply_release.sh" 2>&1)
 assert_eq "succeeds with a valid provider subset" 0 "$?"
 
@@ -82,7 +82,7 @@ assert_eq "records the Release name" "kcm-1-11-0" "$RELEASE_NAME"
 assert_contains "records the provider templates" "$PROVIDER_TEMPLATES" "cluster-api-provider-docker-1-0-24"
 assert_contains "records the core templates" "$PROVIDER_TEMPLATES" "kcm-regional-1-11-0"
 assert_not_contains "does not record aws" "$PROVIDER_TEMPLATES" "aws"
-assert_eq "records the cluster template" "docker-hosted-cp-1-0-15" "$CLUSTER_TEMPLATES"
+assert_eq "records the cluster template" "adopted-cluster-1-0-2" "$CLUSTER_TEMPLATES"
 
 # A provider that is not in the Release is a typo, not a silent no-op.
 out=$(KCM_PROVIDERS="cluster-api-provider-nope" \

@@ -59,8 +59,7 @@ dump helmrepositories.yaml kube get helmrepositories -A -o yaml
 dump helmcharts.txt kube get helmcharts -A
 dump capi-clusters.txt kube get clusters -A -o wide
 dump capi-machines.txt kube get machines -A -o wide
-dump capd-objects.txt kube get devclusters,devmachines -A -o wide
-dump k0smotron.txt kube get k0smotroncontrolplanes -A -o wide
+dump sveltosclusters.txt kube get sveltosclusters -A -o wide
 
 # ── Controller logs ──────────────────────────────────────────────────────────
 for ns in "$NAMESPACE" projectsveltos; do

@@ -34,7 +34,6 @@
 # ── Scope of the run ─────────────────────────────────────────────────────────
 # export TEST_MODE="docker"
 # export CLUSTER_NAME_SUFFIX="e2e"      # ClusterDeployment is <TEST_MODE>-<suffix>
-# export WORKERS_NUMBER="1"
 
 # Providers KCM will actually install. Trimming this list is the main lever on
 # install time -- each extra provider is another Helm chart to reconcile.

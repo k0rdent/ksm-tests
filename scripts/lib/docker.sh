@@ -65,3 +65,9 @@ import_image_into_k0s() {
     log "Importing $image into $container"
     docker save "$image" | docker exec -i "$container" k0s ctr -n k8s.io images import - >/dev/null
 }
+
+# container_ip NAME NETWORK -- address on that network.
+container_ip() {
+    docker inspect "$1" \
+        --format "{{ (index .NetworkSettings.Networks \"$2\").IPAddress }}" 2>/dev/null
+}

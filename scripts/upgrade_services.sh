@@ -40,7 +40,7 @@ if [[ "${SKIP_CHILD_API_CHECK:-false}" == "true" ]]; then
     exit 0
 fi
 [[ -f "$KUBECONFIG_CHILD" ]] \
-    || die "No child kubeconfig at $KUBECONFIG_CHILD. Run ./scripts/check_child_cluster.sh first."
+    || die "No child kubeconfig at $KUBECONFIG_CHILD. Run ./scripts/deploy_adopted_cluster.sh first."
 
 # ── Snapshot ─────────────────────────────────────────────────────────────────
 # Every later claim is relative to this.
