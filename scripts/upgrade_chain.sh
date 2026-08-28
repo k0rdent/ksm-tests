@@ -50,6 +50,8 @@ current_version() {
     chart_version "$(cut -d'|' -f2 <<< "$(release_info "$SVC" "$NS")")"
 }
 
+current_status() { cut -d'|' -f3 <<< "$(release_info "$SVC" "$NS")"; }
+
 # history_versions -- every chart version this release has ever been on.
 history_versions() {
     helm_child history "$SVC" -n "$NS" -o json 2>/dev/null \
@@ -80,9 +82,14 @@ for (( i = 0; i < STEPS; i++ )); do
 
     elapsed=0
     settled=false
+    # Version and status together: helm stamps the new version on the release
+    # as soon as the upgrade starts, so the version alone would report success
+    # while it is still pending-upgrade.
     while (( elapsed < MCS_TIMEOUT )); do
-        now="$(current_version)"
-        if [[ "$want" == "applied" && "$now" == "$target" ]]; then
+        info="$(release_info "$SVC" "$NS")"
+        now="$(chart_version "$(cut -d'|' -f2 <<< "$info")")"
+        status="$(cut -d'|' -f3 <<< "$info")"
+        if [[ "$want" == "applied" && "$now" == "$target" && "$status" == "deployed" ]]; then
             settled=true; break
         fi
         if [[ "$want" == "rejected" ]]; then
@@ -93,7 +100,7 @@ for (( i = 0; i < STEPS; i++ )); do
             }
             (( elapsed >= GRACE )) && { settled=true; break; }
         fi
-        (( elapsed % 30 == 0 )) && log "⏳ '$SVC' is on $now (${elapsed}s)"
+        (( elapsed % 30 == 0 )) && log "⏳ '$SVC' is on $now (${status:-<absent>}) (${elapsed}s)"
         sleep 5
         elapsed=$(( elapsed + 5 ))
     done
@@ -102,7 +109,7 @@ for (( i = 0; i < STEPS; i++ )); do
         { helm_child history "$SVC" -n "$NS" 2>&1 | tail -6
           kube get serviceset -n "$NAMESPACE" -o yaml | head -60
           kcm_errors 10m; } >&2
-        die "'$SVC' never reached $target -- it is on $(current_version)"
+        die "'$SVC' never reached $target -- it is on $(current_version) ($(current_status))"
     fi
 
     if [[ "$want" == "applied" ]]; then
