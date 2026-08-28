@@ -107,26 +107,66 @@ jobs:
             changed="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")"
             echo "Changed files:"; awk '{print "  " $0}' <<< "$changed"
 
-            touched_scenarios=() source_build=false shared=false
+            # Which scenarios use a given feature is already in their files,
+            # so a verification script maps to exactly the scenarios that run it.
+            # if, not &&: a trailing false test would return non-zero and
+            # set -e would kill the run.
+            using() { local f; for f in test_scenarios/*.yaml; do
+              if [[ "$(yq -r "$1" "$f")" == "true" ]]; then basename "$f" .yaml; fi
+            done; }
+            CHAIN='((.templateChain // .upgrade.steps) != null)'
+            UPGRADE='(.upgrade.services != null)'
+            MULTI='(.multiClusterServices != null)'
+            EXPECT='(.expect.failed != null)'
+            PLAIN='((.templateChain // .upgrade // .multiClusterServices // .expect) == null)'
+
+            # One per feature area, preferring a scenario that is not a known
+            # failure -- a leg expected to fail is a poor smoke test.
+            one_of() {
+              local first="" id
+              while read -r id; do
+                [[ -n "$id" ]] || continue
+                [[ -z "$first" ]] && first="$id"
+                if [[ "$(yq -r '[.knownFailures[]?] | length' "test_scenarios/$id.yaml")" == 0 ]]; then
+                  echo "$id"; return
+                fi
+              done < <(using "$1")
+              [[ -n "$first" ]] && echo "$first"
+              return 0
+            }
+
+            targeted="" source_build=false everything=false pipeline=false env_only=false
             while read -r f; do
               [[ -n "$f" ]] || continue
               case "$f" in
-                test_scenarios/*.yaml)
-                  touched_scenarios+=("$(basename "$f" .yaml)") ;;
+                test_scenarios/*.yaml)         targeted+=" $(basename "$f" .yaml)" ;;
                 # Only ever run in source mode, so a release leg proves nothing.
                 scripts/prepare_kcm.sh|scripts/push_kcm_artifacts.sh|scripts/deploy_registry.sh)
-                  source_build=true ;;
-                scripts/*|.github/workflows/e2e*.yml|Makefile)
-                  shared=true ;;
+                                               source_build=true ;;
+                scripts/upgrade_chain.sh)      targeted+=" $(using "$CHAIN" | tr '\n' ' ')" ;;
+                scripts/upgrade_services.sh)   targeted+=" $(using "$UPGRADE" | tr '\n' ' ')" ;;
+                scripts/deploy_mcs_group.sh)   targeted+=" $(using "$MULTI" | tr '\n' ' ')" ;;
+                scripts/verify_mcs_failure.sh) targeted+=" $(using "$EXPECT" | tr '\n' ' ')" ;;
+                # Step wiring: a step that is a no-op for one scenario is real
+                # for another, so this needs one scenario per feature area.
+                .github/workflows/*)           pipeline=true ;;
+                # Values, templates, the cluster definition: these break every
+                # scenario the same way, so one is enough to see it.
+                scripts/config/*)              env_only=true ;;
+                scripts/*|Makefile)            everything=true ;;
               esac
             done <<< "$changed"
 
-            if [[ "$shared" == true ]]; then
+            if [[ "$everything" == true ]]; then
               for s in "${all_ids[@]}"; do add "$s" "$PR_VARIANT"; done
             else
-              for s in ${touched_scenarios[@]+"${touched_scenarios[@]}"}; do
-                add "$s" "$PR_VARIANT"
-              done
+              for s in $targeted; do add "$s" "$PR_VARIANT"; done
+              if [[ "$pipeline" == true ]]; then
+                for p in "$PLAIN" "$EXPECT" "$UPGRADE" "$MULTI" "$CHAIN"; do
+                  s="$(one_of "$p")"; [[ -n "$s" ]] && add "$s" "$PR_VARIANT"
+                done
+              fi
+              [[ "$env_only" == true ]] && add "$SMOKE" "$PR_VARIANT"
             fi
             # A smoke test is enough here: the build path is shared by every
             # scenario, so if it works for one it works for all.
