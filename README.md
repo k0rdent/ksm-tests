@@ -590,3 +590,4 @@ the old etcd — complete with its stale, NotReady nodes.
 
 KCM upgrades (N-1 → N), adopted and remote clusters, backup/restore, service
 dependency graphs and template chains, and the cloud providers.
+
