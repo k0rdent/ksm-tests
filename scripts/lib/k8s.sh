@@ -19,10 +19,12 @@ helm_child() {
 }
 
 # release_info NAME NAMESPACE -- "revision|chart|status", empty if no release.
-# -a matters: without it helm hides pending-install releases, so a chart still
-# running its post-install hooks reads as absent.
+# Helm 3 defaults to showing only deployed releases; -a shows all statuses.
+# Helm 4 shows all statuses by default and removed the -a flag entirely.
+# Passing --deployed --failed --pending --uninstalled --superseded works in both.
 release_info() {
-    helm_child list -a -n "$2" -o json 2>/dev/null \
+    helm_child list --deployed --failed --pending --uninstalled --superseded \
+        -n "$2" -o json 2>/dev/null \
         | jq -r --arg n "$1" '.[] | select(.name == $n) | "\(.revision)|\(.chart)|\(.status)"'
 }
 
