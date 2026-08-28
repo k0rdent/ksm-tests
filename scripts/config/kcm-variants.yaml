@@ -14,10 +14,15 @@ variants:
     ref: main
 
   # Published charts -- tests what users actually install.
+  #
+  # prCheck marks the one variant pull requests run against: a published chart
+  # cannot move under a PR, so a red leg means the change broke something rather
+  # than upstream having shifted. The full matrix runs on main and nightly.
   - id: rel-1-11-0
     name: 'release: 1.11.0'
     source: release
     releaseVersion: '1.11.0'
+    prCheck: true
 
   - id: rel-1-10-0
     name: 'release: 1.10.0'
