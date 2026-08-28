@@ -482,14 +482,29 @@ time, which is far too slow to sit in front of a contribution. A pull request
 therefore runs only what the change could plausibly break, and `discover` works
 that out from the diff against the base commit:
 
-| Changed | Runs |
+| Changed | Runs (against `rel-1-11-0`) |
 |---|---|
-| only `test_scenarios/*.yaml` | just those scenarios, against `rel-1-11-0` |
-| anything shared (`scripts/**`, `Makefile`, the workflows) | every scenario, against `rel-1-11-0` |
-| `prepare_kcm.sh`, `push_kcm_artifacts.sh`, `deploy_registry.sh` | `01_basic` against `src: main` |
+| a `test_scenarios/*.yaml` | just those scenarios |
+| `upgrade_chain.sh` | the scenarios with a chain |
+| `upgrade_services.sh` | the scenarios with an upgrade |
+| `deploy_mcs_group.sh` | the scenarios with several MCSs |
+| `verify_mcs_failure.sh` | the scenarios expecting a failure |
+| `.github/workflows/**` | one scenario per feature area |
+| `scripts/config/**` | `01_basic` |
+| anything else in `scripts/**`, `Makefile` | every scenario |
+| `prepare_kcm.sh`, `push_kcm_artifacts.sh`, `deploy_registry.sh` | `01_basic`, but against `src: main` |
 | only docs | nothing — E2E does not even trigger |
 
+Which scenarios use a chain, an upgrade or several MCSs is not a list anyone
+maintains: it is read from the scenario files themselves, so a new scenario
+joins the right bucket by existing.
+
 The sets add up, so a PR touching a scenario *and* the build path runs both.
+
+A workflow change gets one scenario per feature area rather than a single smoke
+test, because a step that is a no-op for one scenario is real for another —
+`01_basic` would sail past a broken `Upgrade along the chain`. A `scripts/config/**`
+change does get a single scenario: it breaks every scenario the same way.
 
 Pull requests use `rel-1-11-0` because a published chart cannot move underneath
 them: a red leg means the change broke something, not that upstream shifted.
