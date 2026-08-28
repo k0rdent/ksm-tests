@@ -6,7 +6,7 @@ metadata:
   name: ${CLD_NAME}
   namespace: ${NAMESPACE}
   labels:
-    k0rdent-kcm-tests/scenario: docker
+    ksm-tests/scenario: docker
     # What the MultiClusterService selects on.
     group: ${CLD_GROUP_LABEL}
 spec:

@@ -87,6 +87,10 @@ jobs:
           PR_VARIANT="$(jq -r '[.[] | select(.prCheck == true) | .id][0] // empty' <<< "$ALL")"
           SRC_VARIANT="$(jq -r '[.[] | select(.source == "source") | .id][0] // empty' <<< "$ALL")"
           SMOKE=01_basic
+          # Without it every pull request would select nothing and pass having
+          # tested nothing.
+          [[ -n "$PR_VARIANT" ]] \
+            || { echo "No variant in kcm-variants.yaml has prCheck: true" >&2; exit 1; }
 
           all_ids=()
           for f in test_scenarios/*.yaml; do all_ids+=("$(basename "$f" .yaml)"); done
