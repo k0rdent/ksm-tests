@@ -11,7 +11,7 @@ source "$SCRIPTS_DIR/lib/k8s.sh"
 # shellcheck source=scripts/lib/services.sh
 source "$SCRIPTS_DIR/lib/services.sh"
 
-require_cmd kubectl
+require_cmd kubectl helm jq
 require_yq
 
 check_scenario
@@ -65,26 +65,42 @@ if [[ "${SKIP_CHILD_API_CHECK:-false}" == "true" ]]; then
 else
     [[ -f "$KUBECONFIG_CHILD" ]] || die "No child kubeconfig at $KUBECONFIG_CHILD"
 
-    step "Checking the workloads are gone from the child cluster"
-    while read -r ns; do
-        [[ -n "$ns" ]] || continue
+    # The helm release, not just the workloads: a release record can survive a
+    # removal that emptied the namespace, and the next scenario on the same
+    # cluster then fails to install over it. Counting workloads alone reported
+    # success while kserve-resources was still deployed.
+    step "Checking the helm releases are gone from the child cluster"
+    while IFS="$SERVICE_SEP" read -r name _chart _version _repo ns _dep _wait; do
+        [[ -n "$name" ]] || continue
         elapsed=0
         while (( elapsed < MCS_TIMEOUT )); do
-            # The namespace itself may linger; what matters is that no workload does.
-            remaining="$(kube_child get deployments,daemonsets,statefulsets \
-                -n "$ns" -o name 2>/dev/null | wc -l | tr -d ' ')"
-            [[ "$remaining" == "0" ]] && break
+            info="$(release_info "$name" "$ns")"
+            [[ -z "$info" ]] && break
             if (( elapsed % 30 == 0 )); then
-                log "⏳ $remaining workload(s) still in '$ns' (${elapsed}s)"
+                log "⏳ release '$name' still in '$ns': $info (${elapsed}s)"
             fi
             sleep 5
             elapsed=$(( elapsed + 5 ))
         done
+        if [[ -n "${info:-}" ]]; then
+            warn "Helm release '$name' survived the removal: $info"
+            helm_child list --deployed --failed --pending --uninstalled --superseded \
+                -n "$ns" >&2 || true
+            kcm_errors 20m >&2 || true
+            exit 1
+        fi
+        log "✅ '$name' has no release left in '$ns'"
+    done < <(all_services_rows)
 
-        if [[ "${remaining:-0}" != "0" ]]; then
+    step "Checking the workloads are gone from the child cluster"
+    while read -r ns; do
+        [[ -n "$ns" ]] || continue
+        # The namespace itself may linger; what matters is that no workload does.
+        remaining="$(kube_child get deployments,daemonsets,statefulsets \
+            -n "$ns" -o name 2>/dev/null | wc -l | tr -d ' ')"
+        if [[ "$remaining" != "0" ]]; then
             warn "Workloads still present in '$ns' after removal:"
             kube_child get all -n "$ns" >&2 || true
-            kcm_errors 20m >&2 || true
             exit 1
         fi
         log "✅ '$ns' has no workloads left"
