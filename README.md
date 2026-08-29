@@ -49,7 +49,7 @@ scripts/            the pipeline, one script per step
 
 ```bash
 make scenarios                                       # what is available
-make env-up   KCM=rel-1-11-0                         # cluster + KCM, ~9 min
+make env-up   KCM=rel-1-11-0                         # both clusters + KCM, ~7 min
 make scenario SCENARIO=02dep01_valid KCM=rel-1-11-0  # then any number of these
 make env-down KCM=rel-1-11-0
 ```
@@ -57,8 +57,13 @@ make env-down KCM=rel-1-11-0
 Needs `docker`, `git`, `curl`, `tar`, `envsubst`, plus `go` and `make` for
 `KCM=src-main`. The rest lands in `.work/bin` via `make deps`.
 
+A full run — build, scenario, teardown — takes 9 to 11 minutes depending on
+the scenario.
+
 Sharing one environment across scenarios is a debugging convenience, not a
-substitute for CI — scenarios are not isolated from each other that way.
+substitute for CI. Scenarios are genuinely not isolated that way:
+`02dep02_invalid` breaks cert-manager on purpose, so everything after it that
+needs cert-manager fails too.
 
 The adopted cluster publishes its API on the host, so the checks that read it —
 helm releases, pod UIDs, workloads — work on macOS as they do on Linux. KCM
