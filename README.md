@@ -49,9 +49,11 @@ scripts/            the pipeline, one script per step
 
 ```bash
 make scenarios                                       # what is available
-make env-up   KCM=rel-1-11-0                         # both clusters + KCM, ~7 min
-make scenario SCENARIO=02dep01_valid KCM=rel-1-11-0  # then any number of these
-make env-down KCM=rel-1-11-0
+make env-up        KCM=rel-1-11-0                         # both clusters + KCM, ~7 min
+make scenario      SCENARIO=02dep01_valid KCM=rel-1-11-0  # deploy, verify, remove
+make scenario-keep SCENARIO=02dep01_valid KCM=rel-1-11-0  # deploy + verify, leave services running
+make scenario-clean SCENARIO=02dep01_valid KCM=rel-1-11-0 # remove services from a kept scenario
+make env-down      KCM=rel-1-11-0
 ```
 
 Needs `docker`, `git`, `curl`, `tar`, `envsubst`, plus `go` and `make` for
@@ -59,6 +61,9 @@ Needs `docker`, `git`, `curl`, `tar`, `envsubst`, plus `go` and `make` for
 
 A full run — build, scenario, teardown — takes 9 to 11 minutes depending on
 the scenario.
+
+`scenario-keep` / `scenario-clean` let you inspect the deployed services
+between runs — deploy once, poke around, then clean up when you are done.
 
 Sharing one environment across scenarios is a debugging convenience, not a
 substitute for CI. Scenarios are genuinely not isolated that way:

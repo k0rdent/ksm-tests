@@ -63,6 +63,14 @@ env-up: ## Build the cluster and KCM, up to a verified child cluster.
 scenario: ## Run one scenario against an environment that is already up.
 	$(E2E) --scenario-only
 
+.PHONY: scenario-keep
+scenario-keep: ## Run scenario, leave services deployed.
+	$(E2E) --scenario-only --keep-resources
+
+.PHONY: scenario-clean
+scenario-clean: ## Remove services from a kept scenario.
+	$(E2E) --scenario-only --clean-only
+
 .PHONY: env-down
 env-down: ## Tear the environment down.
 	$(E2E) --env-down

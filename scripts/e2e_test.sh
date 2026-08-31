@@ -7,6 +7,8 @@ set -euo pipefail
 #   ./scripts/e2e_test.sh --keep           # everything, leave it running
 #   ./scripts/e2e_test.sh --env-up         # cluster + KCM + child cluster only
 #   ./scripts/e2e_test.sh --scenario-only  # services only, on an existing env
+#   ./scripts/e2e_test.sh --scenario-only --keep-resources  # deploy only, skip remove
+#   ./scripts/e2e_test.sh --scenario-only --clean-only      # remove only
 #   ./scripts/e2e_test.sh --env-down       # tear down
 #
 # Building the environment takes most of the wall clock, so --env-up once
@@ -23,14 +25,18 @@ KEEP=false
 DO_ENV=true
 DO_SCENARIO=true
 DO_DOWN=false
+KEEP_RESOURCES=false
+CLEAN_ONLY=false
 
 for arg in "$@"; do
     case "$arg" in
         --keep)          KEEP=true ;;
         --env-up)        DO_SCENARIO=false; KEEP=true ;;
         --scenario-only) DO_ENV=false; KEEP=true ;;
+        --keep-resources) KEEP_RESOURCES=true ;;
+        --clean-only)    CLEAN_ONLY=true ;;
         --env-down)      DO_ENV=false; DO_SCENARIO=false; DO_DOWN=true ;;
-        *) die "Unknown argument: $arg (--keep, --env-up, --scenario-only, --env-down)" ;;
+        *) die "Unknown argument: $arg (--keep, --env-up, --scenario-only, --keep-resources, --clean-only, --env-down)" ;;
     esac
 done
 
@@ -94,13 +100,17 @@ fi
 if [[ "$DO_SCENARIO" == "true" && "${SKIP_SERVICE_TEST:-false}" != "true" ]]; then
     # Same step names as CI: knownFailures entries reference them.
     step_run() { "$SCRIPTS_DIR/ci_step.sh" "$1" "$2"; }
-    step_run "Install ServiceTemplates" "$SCRIPTS_DIR/install_servicetemplate.sh"
-    step_run "Deploy services via MultiClusterService" "$SCRIPTS_DIR/deploy_mcs.sh"
-    # No-op unless the scenario has an upgrade block.
-    step_run "Upgrade services" "$SCRIPTS_DIR/upgrade_services.sh"
-    # No-op unless the scenario declares upgrade.steps.
-    step_run "Upgrade along the chain" "$SCRIPTS_DIR/upgrade_chain.sh"
-    step_run "Remove MultiClusterService" "$SCRIPTS_DIR/remove_mcs.sh"
+    if [[ "$CLEAN_ONLY" != "true" ]]; then
+        step_run "Install ServiceTemplates" "$SCRIPTS_DIR/install_servicetemplate.sh"
+        step_run "Deploy services via MultiClusterService" "$SCRIPTS_DIR/deploy_mcs.sh"
+        # No-op unless the scenario has an upgrade block.
+        step_run "Upgrade services" "$SCRIPTS_DIR/upgrade_services.sh"
+        # No-op unless the scenario declares upgrade.steps.
+        step_run "Upgrade along the chain" "$SCRIPTS_DIR/upgrade_chain.sh"
+    fi
+    if [[ "$KEEP_RESOURCES" != "true" ]]; then
+        step_run "Remove MultiClusterService" "$SCRIPTS_DIR/remove_mcs.sh"
+    fi
 fi
 
 # Only a full run owns the environment, so only it tears the cluster down.
