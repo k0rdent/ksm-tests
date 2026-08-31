@@ -12,7 +12,7 @@ knownFailures:
   - kcm: rel-1-11-0
     # step and match keep the marker narrow: it excuses this defect in this
     # step only, so the leg still goes red if it breaks for any other reason.
-    step: Remove MultiClusterService
+    step: Remove services
     match: ensure CRDs are installed first
     timeout: 300
     reason: >-

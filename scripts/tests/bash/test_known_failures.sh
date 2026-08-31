@@ -16,7 +16,7 @@ source "$SCRIPTS_DIR/lib/common.sh"
 # shellcheck source=scripts/lib/services.sh
 source "$SCRIPTS_DIR/lib/services.sh"
 
-STEP="Remove MultiClusterService"
+STEP="Remove services"
 MATCH="ensure CRDs are installed first"
 
 # run_step SCENARIO KCM STEP SCRIPT -> "<exit code>|<output>"

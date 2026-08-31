@@ -130,8 +130,8 @@ jobs:
       - name: Upgrade along the chain
         run: ./scripts/ci_step.sh "Upgrade along the chain" ./scripts/upgrade_chain.sh
 
-      - name: Remove MultiClusterService
-        run: ./scripts/ci_step.sh "Remove MultiClusterService" ./scripts/remove_mcs.sh
+      - name: Remove services
+        run: ./scripts/ci_step.sh "Remove services" ./scripts/remove_services.sh
 
       - name: Remove ClusterDeployment
         run: ./scripts/remove_cld.sh
