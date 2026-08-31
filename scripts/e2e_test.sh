@@ -109,7 +109,7 @@ if [[ "$DO_SCENARIO" == "true" && "${SKIP_SERVICE_TEST:-false}" != "true" ]]; th
         step_run "Upgrade along the chain" "$SCRIPTS_DIR/upgrade_chain.sh"
     fi
     if [[ "$KEEP_RESOURCES" != "true" ]]; then
-        step_run "Remove MultiClusterService" "$SCRIPTS_DIR/remove_mcs.sh"
+        step_run "Remove services" "$SCRIPTS_DIR/remove_services.sh"
     fi
 fi
 

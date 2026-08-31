@@ -3,7 +3,7 @@ set -uo pipefail
 
 # Run one pipeline step, turning a recorded failure into a warning.
 #
-#   ./scripts/ci_step.sh "Remove MultiClusterService" ./scripts/remove_mcs.sh
+#   ./scripts/ci_step.sh "Remove services" ./scripts/remove_services.sh
 #
 # When the scenario lists the current $KCM under knownFailures the waits are
 # shortened and a matching failure exits 0 with a warning annotation. The match
