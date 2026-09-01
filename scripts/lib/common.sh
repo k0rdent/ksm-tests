@@ -198,8 +198,9 @@ CLD_TIMEOUT="${CLD_TIMEOUT:-1800}"                 # 30 min
 CLD_REMOVAL_TIMEOUT="${CLD_REMOVAL_TIMEOUT:-900}"  # 15 min
 PODS_TIMEOUT="${PODS_TIMEOUT:-900}"                # 15 min
 MCS_TIMEOUT="${MCS_TIMEOUT:-900}"                  # 15 min
+CRED_TIMEOUT="${CRED_TIMEOUT:-300}"                # 5 min
 export MANAGEMENT_TIMEOUT TEMPLATES_TIMEOUT CLD_TIMEOUT CLD_REMOVAL_TIMEOUT
-export PODS_TIMEOUT MCS_TIMEOUT
+export PODS_TIMEOUT MCS_TIMEOUT CRED_TIMEOUT
 
 # ── Assertions ───────────────────────────────────────────────────────────────
 
