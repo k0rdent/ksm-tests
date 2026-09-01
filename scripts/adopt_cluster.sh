@@ -38,6 +38,13 @@ step "Applying the kubeconfig Secret and Credential"
 envsubst < "$CONFIG_DIR/adopted-credential.yaml" | kube apply -f -
 log "secret: $ADOPTED_SECRET_NAME, credential: $ADOPTED_CREDENTIAL_NAME"
 
+# The ClusterDeployment webhook rejects a Credential that is not yet ready, and
+# it does not requeue -- creating both in one breath races the credential
+# controller's first reconcile and fails the run outright.
+step "Waiting for Credential '$ADOPTED_CREDENTIAL_NAME' to become ready"
+wait_for_ready Credential "$ADOPTED_CREDENTIAL_NAME" "$NAMESPACE" "$CRED_TIMEOUT" 2 \
+    || die "Credential '$ADOPTED_CREDENTIAL_NAME' never became ready"
+
 step "Creating ClusterDeployment '$CLD_NAME' from template '$CLD_TEMPLATE'"
 MANIFEST="$WORKDIR/cld.rendered.yaml"
 envsubst < "$CONFIG_DIR/adopted-cld.yaml" > "$MANIFEST"
@@ -63,15 +70,7 @@ fi
 # The SveltosCluster is what KSM actually deploys through, so a Ready
 # ClusterDeployment with an unhealthy SveltosCluster would be a false positive.
 step "Checking the SveltosCluster is connected"
-elapsed=0
-while (( elapsed < CLD_TIMEOUT )); do
-    ready="$(kube get sveltoscluster -n "$NAMESPACE" -o jsonpath="{.items[?(@.metadata.name==\"$CLD_NAME\")].status.ready}" 2>/dev/null || true)"
-    [[ "$ready" == "true" ]] && break
-    (( elapsed % 30 == 0 )) && log "⏳ SveltosCluster '$CLD_NAME' ready='${ready:-<none>}' (${elapsed}s)"
-    sleep 5
-    elapsed=$(( elapsed + 5 ))
-done
-[[ "$ready" == "true" ]] \
+wait_for_ready SveltosCluster "$CLD_NAME" "$NAMESPACE" "$CLD_TIMEOUT" \
     || { kube get sveltoscluster -A -o yaml >&2 || true
          die "SveltosCluster '$CLD_NAME' never reported ready"; }
 

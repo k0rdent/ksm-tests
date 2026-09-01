@@ -113,6 +113,12 @@ Optional blocks, each switching on extra checks:
 | `helmOptions: {atomic: true}` | passed to the provider from the first deploy on |
 | `multiClusterServices` | replaces `services:` when a scenario needs more than one MCS |
 
+When a script applies an object that another object's status gates, wait for
+that status before applying. KCM's admission webhooks reject on a status not yet
+set and do not requeue, so the apply fails outright rather than retrying:
+`wait_for_valid` for templates, `wait_for_ready` for Credentials and
+SveltosClusters, `wait_for_condition` elsewhere.
+
 Run `make unit` and `make lint` before pushing; neither needs a cluster.
 
 ### Known failures
@@ -163,3 +169,4 @@ variable `ENABLE_CRON=1`.
 Pushes trigger CI only on `main`; elsewhere the pull request does, because a
 branch with an open PR fires both events and the cancelled duplicate shows on
 the PR as a failed check.
+

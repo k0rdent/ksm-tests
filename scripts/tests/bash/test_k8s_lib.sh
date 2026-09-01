@@ -37,7 +37,22 @@ out=$(wait_for_condition Management kcm "" Ready 2 1 2>&1)
 assert_eq "wait_for_condition -> 1 on timeout" 1 "$?"
 assert_contains "reports the timeout" "$out" "Timeout"
 
+echo true > "$STATE"
+out=$(wait_for_ready Credential adopted-cred kcm-system 10 1 2>&1)
+assert_eq "wait_for_ready -> 0 when ready" 0 "$?"
+assert_contains "reports readiness" "$out" "is ready"
+
+# The credential race that broke a CI run: the object exists but has no
+# status.ready yet, and the ClusterDeployment webhook rejects it.
+echo "" > "$STATE"
+out=$(wait_for_ready Credential adopted-cred kcm-system 2 1 2>&1)
+assert_eq "wait_for_ready -> 1 while not ready" 1 "$?"
+assert_contains "reports the timeout" "$out" "Timeout"
+
 echo ABSENT > "$STATE"
+out=$(wait_for_ready Credential adopted-cred kcm-system 2 1 2>&1)
+assert_eq "wait_for_ready -> 1 when absent" 1 "$?"
+
 assert_eq "resource_exists -> false when absent" 1 "$(resource_exists Management kcm; echo $?)"
 out=$(wait_for_absence ClusterDeployment docker-e2e kcm-system 10 1 2>&1)
 assert_eq "wait_for_absence -> 0 when absent" 0 "$?"

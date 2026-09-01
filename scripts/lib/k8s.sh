@@ -142,6 +142,35 @@ wait_for_valid() {
     return 1
 }
 
+# wait_for_ready KIND NAME NAMESPACE TIMEOUT_SECONDS [POLL_SECONDS]
+# For objects exposing readiness as status.ready rather than a condition.
+# Admission webhooks read that bool, so applying a dependent object without
+# waiting here races the controller that sets it.
+wait_for_ready() {
+    local kind="$1" name="$2" ns="$3" timeout="$4" poll="${5:-5}"
+    local elapsed=0 ready=""
+    local args=(get "$kind" "$name")
+    [[ -n "$ns" ]] && args+=(-n "$ns")
+
+    while (( elapsed < timeout )); do
+        ready="$(kube "${args[@]}" -o 'jsonpath={.status.ready}' 2>/dev/null || true)"
+        if [[ "$ready" == "true" ]]; then
+            ok "$kind/$name is ready"
+            return 0
+        fi
+        if (( elapsed % 30 == 0 )); then
+            log "⏳ $kind/$name ready='${ready:-<none>}' (${elapsed}s)"
+        fi
+        sleep "$poll"
+        elapsed=$(( elapsed + poll ))
+    done
+
+    warn "Timeout after ${timeout}s waiting for $kind/$name to become ready"
+    kube "${args[@]}" -o yaml >&2 2>/dev/null || true
+    kcm_errors 10m >&2 || true
+    return 1
+}
+
 # kcm_errors [SINCE] -- warning events and error log lines from the controllers,
 # printed straight into the CI log. A stuck finalizer says nothing by itself;
 # the reason is almost always in here.
