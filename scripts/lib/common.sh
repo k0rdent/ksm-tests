@@ -69,37 +69,45 @@ kcm_variant_field() {
 }
 
 # KCM=<id> is the shorthand CI and the Makefile both speak. Explicitly set
-# KCM_SOURCE/KCM_REF/KCM_RELEASE_VERSION still win, so an ad-hoc version that
-# is not a declared variant stays testable.
+# KCM_MODE/KCM_REF/KCM_VERSION still win, so an ad-hoc version that is not a
+# declared variant stays testable.
 KCM="${KCM:-}"
 if [[ -n "$KCM" ]]; then
     [[ -f "$KCM_VARIANTS_FILE" ]] || die "No KCM variants file at $KCM_VARIANTS_FILE"
     if ! list_kcm_variants | grep -qx "$KCM"; then
         die "Unknown KCM variant '$KCM'. Available: $(list_kcm_variants | tr '\n' ' ')"
     fi
-    KCM_SOURCE="${KCM_SOURCE:-$(kcm_variant_field "$KCM" source)}"
+    KCM_MODE="${KCM_MODE:-$(kcm_variant_field "$KCM" mode)}"
     _variant_ref="$(kcm_variant_field "$KCM" ref)"
-    _variant_version="$(kcm_variant_field "$KCM" releaseVersion)"
+    _variant_version="$(kcm_variant_field "$KCM" version)"
     [[ -n "$_variant_ref" ]] && KCM_REF="${KCM_REF:-$_variant_ref}"
-    [[ -n "$_variant_version" ]] && KCM_RELEASE_VERSION="${KCM_RELEASE_VERSION:-$_variant_version}"
+    [[ -n "$_variant_version" ]] && KCM_VERSION="${KCM_VERSION:-$_variant_version}"
     unset _variant_ref _variant_version
 fi
 export KCM
 
 # ── What is under test ───────────────────────────────────────────────────────
-# source  -- build the images and charts from a KCM checkout (tests a PR/main)
-# release -- install the published chart from ghcr (tests what users get)
-KCM_SOURCE="${KCM_SOURCE:-source}"
-KCM_RELEASE_VERSION="${KCM_RELEASE_VERSION:-1.11.0}"
-KCM_RELEASE_REPO="${KCM_RELEASE_REPO:-oci://ghcr.io/k0rdent/kcm/charts}"
-export KCM_SOURCE KCM_RELEASE_VERSION KCM_RELEASE_REPO
+# release -- install the published chart (tests what users get)
+# source  -- build the images and charts from a git checkout (tests a PR/main)
+KCM_MODE="${KCM_MODE:-release}"
+KCM_VERSION="${KCM_VERSION:-1.11.0}"
+# The chart itself, not the registry holding it: the template charts live
+# alongside it, so the registry is derived by stripping the last segment.
+KCM_RELEASE_URL="${KCM_RELEASE_URL:-oci://ghcr.io/k0rdent/kcm/charts/kcm}"
+KCM_SRC_URL="${KCM_SRC_URL:-https://github.com/K0rdent/kcm.git}"
+# Checked here rather than in a function a script could forget to call.
+case "$KCM_MODE" in
+    source|release) ;;
+    *) die "Invalid KCM_MODE='$KCM_MODE'. Allowed values: release, source" ;;
+esac
+export KCM_MODE KCM_VERSION KCM_RELEASE_URL KCM_SRC_URL
 
 # ── KCM checkout ─────────────────────────────────────────────────────────────
 # Needed in both modes: it supplies the Release and template manifests. In
-# release mode the checkout is pinned to the tag matching KCM_RELEASE_VERSION.
-KCM_REPO="${KCM_REPO:-https://github.com/K0rdent/kcm.git}"
-if [[ "$KCM_SOURCE" == "release" ]]; then
-    KCM_REF="${KCM_REF:-v$KCM_RELEASE_VERSION}"
+# release mode the checkout is pinned to the tag matching KCM_VERSION; in source
+# mode KCM_REF takes any branch, tag or commit from KCM_SRC_URL.
+if [[ "$KCM_MODE" == "release" ]]; then
+    KCM_REF="${KCM_REF:-v$KCM_VERSION}"
 else
     KCM_REF="${KCM_REF:-main}"
 fi
@@ -112,7 +120,7 @@ if [[ -n "$KCM_SRC_DIR" ]]; then
 else
     KCM_DIR="$WORKDIR/kcm"
 fi
-export KCM_REPO KCM_REF KCM_SRC_DIR KCM_DIR
+export KCM_REF KCM_SRC_DIR KCM_DIR
 
 # ── Images (source mode only) ────────────────────────────────────────────────
 # Tagged per run so parallel builds do not overwrite each other.
@@ -143,8 +151,8 @@ REGISTRY_IMAGE="${REGISTRY_IMAGE:-registry:2}"
 # deploy_registry.sh may pick a different free port and record it in
 # $WORKDIR/registry.env, which push_kcm_artifacts.sh then sources.
 REGISTRY_REPO="${REGISTRY_REPO:-oci://127.0.0.1:$REGISTRY_PORT/charts}"
-if [[ "$KCM_SOURCE" == "release" ]]; then
-    TEMPLATES_REPO_URL="${TEMPLATES_REPO_URL:-$KCM_RELEASE_REPO}"
+if [[ "$KCM_MODE" == "release" ]]; then
+    TEMPLATES_REPO_URL="${TEMPLATES_REPO_URL:-${KCM_RELEASE_URL%/*}}"
     INSECURE_REGISTRY="${INSECURE_REGISTRY:-false}"
 else
     TEMPLATES_REPO_URL="${TEMPLATES_REPO_URL:-oci://$REGISTRY_NAME:5000/charts}"
@@ -294,14 +302,6 @@ check_scenario() {
     [[ -f "$SERVICES_FILE" ]] && return 0
     die "Unknown scenario '$SCENARIO' (no $SERVICES_FILE).
 Available: $(list_scenarios | tr '\n' ' ')"
-}
-
-# check_kcm_source -- guard against a typo in KCM_SOURCE.
-check_kcm_source() {
-    case "$KCM_SOURCE" in
-        source|release) ;;
-        *) die "Invalid KCM_SOURCE='$KCM_SOURCE'. Allowed values: source, release" ;;
-    esac
 }
 
 # ── Filesystem helpers ───────────────────────────────────────────────────────

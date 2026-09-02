@@ -85,7 +85,7 @@ jobs:
 
           ALL="$(yq -o=json -I=0 '.variants' scripts/config/kcm-variants.yaml)"
           PR_VARIANT="$(jq -r '[.[] | select(.prCheck == true) | .id][0] // empty' <<< "$ALL")"
-          SRC_VARIANT="$(jq -r '[.[] | select(.source == "source") | .id][0] // empty' <<< "$ALL")"
+          SRC_VARIANT="$(jq -r '[.[] | select(.mode == "source") | .id][0] // empty' <<< "$ALL")"
           SMOKE=01_basic
           # Without it every pull request would select nothing and pass having
           # tested nothing.

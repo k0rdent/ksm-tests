@@ -25,7 +25,10 @@ assert_eq "sveltos is the whole provider list" "projectsveltos" "$KCM_PROVIDERS"
 assert_eq "and the adopted cluster template" "adopted-cluster" "$KCM_CLUSTER_TEMPLATES"
 assert_not_contains "aws provider is off" "$KCM_PROVIDERS" "cluster-api-provider-aws"
 assert_not_contains "azure provider is off" "$KCM_PROVIDERS" "cluster-api-provider-azure"
-assert_eq "registry URL matches the registry name" "oci://$REGISTRY_NAME:5000/charts" "$TEMPLATES_REPO_URL"
+# Only source mode uses the local registry; release mode pulls from the URL.
+assert_eq "registry URL matches the registry name" "oci://$REGISTRY_NAME:5000/charts" \
+    "$(KCM_MODE=source bash -c \
+        "unset TEMPLATES_REPO_URL; source '$SCRIPTS_DIR/lib/common.sh'; echo \$TEMPLATES_REPO_URL")"
 
 # ── chart helpers ────────────────────────────────────────────────────────────
 tmpchart="$(mktemp -d)/mychart"

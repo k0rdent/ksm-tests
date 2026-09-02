@@ -3,9 +3,9 @@ set -euo pipefail
 
 # Install the KCM Helm chart.
 #
-#   KCM_SOURCE=source   from the source tree, so what runs is exactly what
+#   KCM_MODE=source   from the source tree, so what runs is exactly what
 #                       prepare_kcm.sh built
-#   KCM_SOURCE=release  the published chart from ghcr, as a user would install it
+#   KCM_MODE=release  the published chart from ghcr, as a user would install it
 #
 # Both modes end up with a single rendered values file, because
 # apply_management.sh has to copy exactly these values into core.kcm.config.
@@ -15,7 +15,6 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
 # shellcheck source=scripts/lib/k8s.sh
 source "$SCRIPTS_DIR/lib/k8s.sh"
 
-check_kcm_source
 require_cmd helm kubectl envsubst
 require_yq
 
@@ -27,7 +26,7 @@ envsubst < "$CONFIG_DIR/kcm-values.yaml" > "$VALUES_FILE"
 
 helm_args=(--timeout 20m)
 
-if [[ "$KCM_SOURCE" == "source" ]]; then
+if [[ "$KCM_MODE" == "source" ]]; then
     CHART_REF="$KCM_DIR/templates/provider/kcm"
     [[ -d "$CHART_REF" ]] || die "KCM chart not found at $CHART_REF. Run ./scripts/prepare_kcm.sh first."
 
@@ -50,8 +49,8 @@ if [[ "$KCM_SOURCE" == "source" ]]; then
     # flux2 and rbac-manager come from remote repos, kcm-regional from file://.
     MAX_RETRIES=5 SLEEP=5 "$SCRIPTS_DIR/retry.sh" helm dependency update "$CHART_REF"
 else
-    CHART_REF="$KCM_RELEASE_REPO/kcm"
-    helm_args+=(--version "$KCM_RELEASE_VERSION")
+    CHART_REF="$KCM_RELEASE_URL"
+    helm_args+=(--version "$KCM_VERSION")
 fi
 
 step "Rendered values ($VALUES_FILE)"
@@ -67,4 +66,4 @@ helm upgrade --install "$KCM_HELM_RELEASE_NAME" "$CHART_REF" \
 
 NAMESPACE="$NAMESPACE" "$SCRIPTS_DIR/wait_for_deployment.sh"
 
-ok "KCM chart installed ($KCM_SOURCE mode)"
+ok "KCM chart installed ($KCM_MODE mode)"

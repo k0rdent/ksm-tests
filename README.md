@@ -59,6 +59,24 @@ make env-down      KCM=rel-1-11-0
 Needs `docker`, `git`, `curl`, `tar`, `envsubst`, plus `go` and `make` for
 `KCM=src-main`. The rest lands in `.work/bin` via `make deps`.
 
+`KCM=<id>` picks a variant from `scripts/config/kcm-variants.yaml`; an unknown
+id is refused rather than quietly falling back. For anything not declared there
+— a fork, a specific commit, an unpublished chart — set the inputs directly.
+They win over the variant.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `KCM_MODE` | `release` | `release` pulls a published chart, `source` builds a checkout |
+| `KCM_VERSION` | `1.11.0` | chart version, release mode |
+| `KCM_RELEASE_URL` | `oci://ghcr.io/k0rdent/kcm/charts/kcm` | the chart to pull |
+| `KCM_SRC_URL` | `https://github.com/K0rdent/kcm.git` | repository to build, source mode |
+| `KCM_REF` | the matching tag, or `main` | branch, tag or commit |
+
+```bash
+make env-up RUN_ID=fork KCM_MODE=source \
+    KCM_SRC_URL=https://github.com/me/kcm.git KCM_REF=480aad76
+```
+
 A full run — build, scenario, teardown — takes 9 to 11 minutes depending on
 the scenario.
 
@@ -169,4 +187,5 @@ variable `ENABLE_CRON=1`.
 Pushes trigger CI only on `main`; elsewhere the pull request does, because a
 branch with an open PR fires both events and the cancelled duplicate shows on
 the PR as a failed check.
+
 

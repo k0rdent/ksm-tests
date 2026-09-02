@@ -72,7 +72,7 @@ jobs:
       # KCM's Makefile shells out to `go env` while parsing. The binaries are
       # built inside Docker, so a module cache here would not help.
       - uses: actions/setup-go@v7
-        if: matrix.kcm.source == 'source'
+        if: matrix.kcm.mode == 'source'
         with:
           go-version: 'stable'
           cache: false
@@ -85,14 +85,14 @@ jobs:
 
       # The local registry only serves charts we built ourselves.
       - name: Deploy local registry
-        if: matrix.kcm.source == 'source'
+        if: matrix.kcm.mode == 'source'
         run: ./scripts/deploy_registry.sh
 
       - name: Deploy management cluster
         run: ./scripts/deploy_mgmt_cluster.sh
 
       - name: Push images and charts
-        if: matrix.kcm.source == 'source'
+        if: matrix.kcm.mode == 'source'
         run: ./scripts/push_kcm_artifacts.sh
 
       - name: Install KCM

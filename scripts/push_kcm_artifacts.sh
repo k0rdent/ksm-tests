@@ -11,8 +11,8 @@ source "$SCRIPTS_DIR/lib/docker.sh"
 
 require_cmd docker make
 
-[[ "$KCM_SOURCE" == "source" ]] \
-    || die "push_kcm_artifacts.sh only applies to KCM_SOURCE=source (got '$KCM_SOURCE')"
+[[ "$KCM_MODE" == "source" ]] \
+    || die "push_kcm_artifacts.sh only applies to KCM_MODE=source (got '$KCM_MODE')"
 
 [[ -d "$KCM_DIR" ]] || die "KCM source not found at $KCM_DIR. Run ./scripts/prepare_kcm.sh first."
 
