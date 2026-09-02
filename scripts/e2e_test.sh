@@ -40,7 +40,6 @@ for arg in "$@"; do
     esac
 done
 
-check_kcm_source
 check_scenario
 
 if [[ "$DO_DOWN" == "true" ]]; then
@@ -70,7 +69,7 @@ on_exit() {
 }
 trap on_exit EXIT
 
-log "KCM_SOURCE=$KCM_SOURCE${KCM:+ (KCM=$KCM)}, SCENARIO=$SCENARIO${RUN_ID:+, RUN_ID=$RUN_ID}"
+log "KCM_MODE=$KCM_MODE${KCM:+ (KCM=$KCM)}, SCENARIO=$SCENARIO${RUN_ID:+, RUN_ID=$RUN_ID}"
 
 if [[ "$DO_ENV" == "true" ]]; then
     "$SCRIPTS_DIR/check_test_mode.sh"
@@ -78,13 +77,13 @@ if [[ "$DO_ENV" == "true" ]]; then
     "$SCRIPTS_DIR/prepare_kcm.sh"
 
     # The local registry only exists to serve charts we built ourselves.
-    if [[ "$KCM_SOURCE" == "source" ]]; then
+    if [[ "$KCM_MODE" == "source" ]]; then
         "$SCRIPTS_DIR/deploy_registry.sh"
     fi
 
     "$SCRIPTS_DIR/deploy_mgmt_cluster.sh"
 
-    if [[ "$KCM_SOURCE" == "source" ]]; then
+    if [[ "$KCM_MODE" == "source" ]]; then
         "$SCRIPTS_DIR/push_kcm_artifacts.sh"
     fi
 

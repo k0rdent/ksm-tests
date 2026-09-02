@@ -1,10 +1,10 @@
 #!/bin/bash
-# KCM_SOURCE switches between the source build and the published chart.
+# KCM_MODE switches between the source build and the published chart.
 # shellcheck source=scripts/tests/bash/helpers.sh
 source "$(dirname "${BASH_SOURCE[0]}")/helpers.sh"
 
-value_of() { # value_of KCM_SOURCE VAR
-    KCM_SOURCE="$1" bash -c "source '$SCRIPTS_DIR/lib/common.sh'; echo \"\${$2}\""
+value_of() { # value_of KCM_MODE VAR
+    KCM_MODE="$1" bash -c "source '$SCRIPTS_DIR/lib/common.sh'; echo \"\${$2}\""
 }
 
 # Release mode reads charts straight from ghcr over TLS.
@@ -24,19 +24,35 @@ assert_eq "source: checkout follows main" \
     "main" "$(value_of source KCM_REF)"
 
 # An explicit KCM_REF always wins.
-got="$(KCM_SOURCE=release KCM_REF=v1.10.0 bash -c \
+got="$(KCM_MODE=release KCM_REF=v1.10.0 bash -c \
     "source '$SCRIPTS_DIR/lib/common.sh'; echo \$KCM_REF")"
 assert_eq "explicit KCM_REF overrides the default" "v1.10.0" "$got"
 
-# A typo must not silently fall through to one of the modes.
-out=$(KCM_SOURCE=relase bash -c "source '$SCRIPTS_DIR/lib/common.sh'; check_kcm_source" 2>&1)
-assert_eq "invalid KCM_SOURCE is rejected" 1 "$?"
+# A typo must not silently fall through to one of the modes. Sourcing the
+# library is enough -- no script has to remember to call a checker.
+out=$(KCM_MODE=relase bash -c "source '$SCRIPTS_DIR/lib/common.sh'" 2>&1)
+assert_eq "invalid KCM_MODE is rejected" 1 "$?"
 assert_contains "names the bad value" "$out" "relase"
 
 for mode in source release; do
-    KCM_SOURCE="$mode" bash -c "source '$SCRIPTS_DIR/lib/common.sh'; check_kcm_source" >/dev/null 2>&1
+    KCM_MODE="$mode" bash -c "source '$SCRIPTS_DIR/lib/common.sh'" >/dev/null 2>&1
     assert_eq "'$mode' is accepted" 0 "$?"
 done
+
+# The default is the published chart: a plain run tests what users install.
+assert_eq "mode defaults to release" "release" \
+    "$(bash -c "unset KCM KCM_MODE; source '$SCRIPTS_DIR/lib/common.sh'; echo \$KCM_MODE")"
+
+# A fork and an arbitrary commit are both reachable without touching a variant.
+got="$(KCM_MODE=source KCM_SRC_URL=https://github.com/me/kcm.git KCM_REF=480aad76 \
+    bash -c "source '$SCRIPTS_DIR/lib/common.sh'; echo \$KCM_SRC_URL \$KCM_REF")"
+assert_eq "fork url and commit are honoured" "https://github.com/me/kcm.git 480aad76" "$got"
+
+# The template charts sit next to the kcm chart, so the registry is the parent.
+assert_eq "release url drives the template registry" \
+    "oci://reg.example/charts" \
+    "$(KCM_MODE=release KCM_RELEASE_URL=oci://reg.example/charts/kcm bash -c \
+        "source '$SCRIPTS_DIR/lib/common.sh'; echo \$TEMPLATES_REPO_URL")"
 
 # Release mode must run on a host with no Go toolchain: CI skips setup-go for
 # that leg, so an unconditional check here fails the whole job. Real tools are
@@ -53,15 +69,15 @@ if [[ -x "$REPO_ROOT/.work/bin/yq" ]]; then
 fi
 
 if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
-    out=$(PATH="$nogo" KCM_SOURCE=release BIN_DIR="$REPO_ROOT/.work/bin" \
+    out=$(PATH="$nogo" KCM_MODE=release BIN_DIR="$REPO_ROOT/.work/bin" \
           bash "$SCRIPTS_DIR/deps.sh" 2>&1)
     assert_eq "release mode succeeds without go/make" 0 "$?"
     assert_not_contains "does not ask for go" "$out" "'go' is required"
 
-    out=$(PATH="$nogo" KCM_SOURCE=source BIN_DIR="$REPO_ROOT/.work/bin" \
+    out=$(PATH="$nogo" KCM_MODE=source BIN_DIR="$REPO_ROOT/.work/bin" \
           bash "$SCRIPTS_DIR/deps.sh" 2>&1)
     assert_eq "source mode fails without go/make" 1 "$?"
-    assert_contains "says which mode needs it" "$out" "KCM_SOURCE=source"
+    assert_contains "says which mode needs it" "$out" "KCM_MODE=source"
 else
     echo "  ! docker unavailable, skipping the deps.sh prerequisite checks"
 fi

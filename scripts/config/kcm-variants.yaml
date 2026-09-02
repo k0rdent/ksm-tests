@@ -10,7 +10,7 @@ variants:
   # Built from a checkout -- tests the code under review.
   - id: src-main
     name: 'src: main'
-    source: source
+    mode: source
     ref: main
 
   # Published charts -- tests what users actually install.
@@ -20,11 +20,11 @@ variants:
   # than upstream having shifted. The full matrix runs on main and nightly.
   - id: rel-1-11-0
     name: 'release: 1.11.0'
-    source: release
-    releaseVersion: '1.11.0'
+    mode: release
+    version: '1.11.0'
     prCheck: true
 
   - id: rel-1-10-0
     name: 'release: 1.10.0'
-    source: release
-    releaseVersion: '1.10.0'
+    mode: release
+    version: '1.10.0'

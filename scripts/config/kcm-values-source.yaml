@@ -1,4 +1,4 @@
-# Extra values for KCM_SOURCE=source: point the deployments at the images we
+# Extra values for KCM_MODE=source: point the deployments at the images we
 # built and imported into the node's containerd.
 # NOTE: envsubst also expands variables inside comments -- keep them out.
 image:
