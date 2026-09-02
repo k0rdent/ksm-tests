@@ -39,7 +39,10 @@ fi
 KCM_COMMIT="$(git -C "$KCM_DIR" rev-parse --short HEAD)"
 KCM_DESCRIBE="$(git -C "$KCM_DIR" describe --tags --always)"
 KCM_DESCRIBE="${KCM_DESCRIBE#v}"
-log "KCM commit $KCM_COMMIT (describe: $KCM_DESCRIBE)"
+# The date tells apart two builds of the same branch at a glance, which the
+# short sha alone does not.
+KCM_COMMIT_DATE="$(git -C "$KCM_DIR" show -s --format=%cd --date=format:'%a %-d.%-m.%Y' HEAD)"
+log "KCM commit $KCM_COMMIT - $KCM_COMMIT_DATE (describe: $KCM_DESCRIBE)"
 
 if [[ "$KCM_MODE" == "source" ]]; then
     step "Generating template manifests"
@@ -68,6 +71,7 @@ fi
 {
     echo "KCM_COMMIT=$KCM_COMMIT"
     echo "KCM_DESCRIBE=$KCM_DESCRIBE"
+    echo "KCM_COMMIT_DATE=$KCM_COMMIT_DATE"
     echo "KCM_CHART_VERSION=$CHART_VERSION"
 } > "$WORKDIR/kcm-build.env"
 
