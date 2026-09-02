@@ -95,6 +95,17 @@ jobs:
           all_ids=()
           for f in test_scenarios/*.yaml; do all_ids+=("$(basename "$f" .yaml)"); done
 
+          # A typo in a dispatch input used to match nothing and leave a green
+          # run that tested nothing at all.
+          for want in ${WANT_KCM//,/ }; do
+            jq -e --arg w "$want" 'any(.[]; .id == $w)' <<< "$ALL" >/dev/null \
+              || { echo "Unknown KCM variant '$want'. Available: $(jq -r '[.[].id] | join(" ")' <<< "$ALL")" >&2; exit 1; }
+          done
+          for want in ${WANT_SCENARIOS//,/ }; do
+            [[ " ${all_ids[*]} " == *" $want "* ]] \
+              || { echo "Unknown scenario '$want'. Available: ${all_ids[*]}" >&2; exit 1; }
+          done
+
           # scenario -> the variant ids it should run against
           declare -A SEL
           add() {
