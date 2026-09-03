@@ -25,4 +25,16 @@ done < <(grep -B1 -hE '^[a-zA-Z0-9_-]+:.*?## ' "$REPO_ROOT/Makefile" \
 assert_contains "env-down names RUN_ID" "$(mk env-down-help)" "RUN_ID"
 assert_contains "an unknown target says so" "$(mk nope-help)" "No target nope"
 
+# `make <target> help` is a list of two goals to make, so without the guard it
+# builds the cluster and prints the help afterwards. Assert on the dry run:
+# whatever else changes, the help form must never reach a script.
+for order in "env-up help" "help env-up"; do
+    # shellcheck disable=SC2086  # two goals, deliberately split
+    out="$(mk -n $order)"
+    assert_not_contains "'make $order' runs nothing" "$out" "e2e_test.sh"
+    assert_contains "'make $order' explains env-up" "$out" "env-up-help"
+done
+assert_contains "make env-up alone still builds" "$(mk -n env-up)" "e2e_test.sh"
+assert_contains "make help alone still lists targets" "$(mk help)" "Show this help"
+
 finish
