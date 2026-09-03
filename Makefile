@@ -17,6 +17,24 @@ RUN_ID   ?= local$(if $(KCM),-$(KCM))$(if $(KCM_MODE),-$(KCM_MODE))$(if $(KCM_VE
 
 E2E := SCENARIO=$(SCENARIO) KCM=$(KCM) RUN_ID=$(RUN_ID) ./$(SCRIPTS)/e2e_test.sh
 
+# `make env-up help` explains the target instead of running it. make takes its
+# arguments as a list of goals, so without this it would build the cluster and
+# print the help afterwards. The real rules are not defined at all in this mode:
+# defining them and overriding later would turn a missed override into a
+# seven-minute cluster build.
+HELP_FOR := $(if $(filter help,$(MAKECMDGOALS)),$(filter-out help,$(MAKECMDGOALS)))
+ifneq ($(HELP_FOR),)
+
+.PHONY: help $(HELP_FOR)
+# A no-op recipe, not an empty one: an empty one still prints "Nothing to be
+# done for 'help'" after the text the user asked for.
+help:
+	@:
+$(HELP_FOR):
+	@$(MAKE) --no-print-directory $@-help
+
+else
+
 .PHONY: help
 help: ## Show this help.
 	@grep -hE '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -27,7 +45,7 @@ help: ## Show this help.
 	@echo "  make e2e SCENARIO=02dep01_valid KCM_VERSION=1.10.0"
 	@echo "  make e2e SCENARIO=02dep01_valid KCM_MODE=source KCM_REF=<branch|tag|sha>"
 	@echo
-	@echo "Detail and examples for one target:  make <target>-help"
+	@echo "Detail and examples for one target:  make <target> help"
 	@echo "make scenarios lists the scenarios and variants; make status what is built."
 
 # Per-target usage lives in `#:` comments right above each target, so it sits
@@ -192,3 +210,5 @@ logs: ## Dump diagnostics from the current environment into ./logs.
 #:   make clean RUN_ID=local-rel-1-10-0
 clean: ## Tear down containers, network and the working directory.
 	RUN_ID=$(RUN_ID) ./$(SCRIPTS)/cleanup.sh
+
+endif
