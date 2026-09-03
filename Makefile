@@ -5,10 +5,15 @@ SCRIPTS := scripts
 # A scenario is a file in test_scenarios/; a KCM variant is an id from
 # scripts/config/kcm-variants.yaml. `make scenarios` lists both.
 SCENARIO ?= 01_basic
-KCM      ?= src-main
+# Deliberately empty: forcing a variant here would override an explicit
+# KCM_VERSION/KCM_MODE and silently test something else. Empty means the
+# defaults in common.sh apply -- release 1.11.0.
+KCM      ?=
 
-# Shared by env-up / scenario / env-down so they all address the same cluster.
-RUN_ID   ?= local-$(KCM)
+# Shared by env-up / scenario / env-down so they all address the same cluster,
+# and distinct per configuration so two of them can coexist. Dots become dashes:
+# it ends up in CLD_NAME, which is a DNS label.
+RUN_ID   ?= local$(if $(KCM),-$(KCM))$(if $(KCM_MODE),-$(KCM_MODE))$(if $(KCM_VERSION),-$(subst .,-,$(KCM_VERSION)))
 
 E2E := SCENARIO=$(SCENARIO) KCM=$(KCM) RUN_ID=$(RUN_ID) ./$(SCRIPTS)/e2e_test.sh
 
@@ -17,8 +22,12 @@ help: ## Show this help.
 	@grep -hE '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
 		awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-16s\033[0m %s\n", $$1, $$2}'
 	@echo
-	@echo "Pick with SCENARIO=<stem> KCM=<id>, e.g."
-	@echo "  make e2e SCENARIO=02dep01_valid KCM=rel-1-11-0"
+	@echo "Defaults to the published chart $(shell KCM= bash -c 'source scripts/lib/common.sh; echo $$KCM_VERSION'). Pick with:"
+	@echo "  make e2e SCENARIO=02dep01_valid KCM=rel-1-11-0   # a variant CI tests"
+	@echo "  make e2e SCENARIO=02dep01_valid KCM_VERSION=1.10.0"
+	@echo "  make e2e SCENARIO=02dep01_valid KCM_MODE=source KCM_REF=<branch|tag|sha>"
+	@echo
+	@echo "make scenarios lists the scenarios and variants; README has the full input table."
 
 .PHONY: scenarios
 scenarios: ## List the available scenarios and KCM variants.
