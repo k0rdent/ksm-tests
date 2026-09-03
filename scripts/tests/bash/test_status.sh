@@ -33,7 +33,10 @@ assert_contains "reports the mgmt container" "$out" "Up 3 minutes"
 assert_contains "reads the chart version" "$out" "release 1.10.0"
 # The date is why kcm-build.env has to be quoted: unquoted it was not readable.
 assert_contains "reads the commit date" "$out" "Mon 8.6.2026"
-assert_contains "says how to reuse it" "$out" "KCM=rel-1-10-0"
+# RUN_ID is the whole selection -- common.sh reads the rest back from the same
+# file, so the hint must not tell people to repeat it.
+assert_contains "says how to reuse it" "$out" "RUN_ID=demo"
+assert_not_contains "without repeating the selection" "$out" "KCM=rel-1-10-0"
 assert_contains "separates the leftover workdir" "$out" "ghost"
 
 # A value with spaces must be data, never something the shell runs.

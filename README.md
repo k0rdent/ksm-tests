@@ -64,15 +64,15 @@ make scenario-clean SCENARIO=02dep01_valid      # remove them again
 make env-down
 ```
 
-Whatever you pass as `KCM`/`KCM_VERSION`/`KCM_MODE` has to be the same for all
-of them: `RUN_ID` is derived from it, and that is what names the clusters.
-`make status` shows what is actually built and what to pass to reuse it:
+Only `env-up` takes the KCM selection. It records what it built, so the rest
+need `RUN_ID` alone -- and it defaults from the selection, so a plain sequence
+like the one above needs nothing at all. `make status` lists what exists:
 
 ```
 ▶ Environments
   RUN_ID                 MGMT             ADOPTED          KCM
-  credfix                Up 2 days        Up 2 days        release 1.10.0 (b2ae8b31, Mon 8.6.2026)
-                         ↳ make scenario RUN_ID=credfix SCENARIO=<id> KCM=rel-1-10-0
+  stepchain              Up 26 minutes    Up 20 minutes    source 1.11.0 (c84da262, Thu 3.9.2026)
+                         ↳ make scenario RUN_ID=stepchain SCENARIO=<id>
 ```
 
 `make logs` dumps diagnostics, `make clean` tears one environment down.
