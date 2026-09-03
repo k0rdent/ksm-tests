@@ -133,10 +133,22 @@ upgrade_field() {
         '.upgrade.services[]? | select(.name == strenv(NAME)) | .[strenv(FIELD)] // ""' "$SERVICES_FILE"
 }
 
-# scenario_atomic -- set for the whole scenario, not just the upgrade: adding
+# Sveltos keeps two helm revisions per release, which is fewer than a chain
+# scenario needs: the path it took is only provable while the revisions it
+# passed through still exist.
+HELM_MAX_HISTORY="${HELM_MAX_HISTORY:-10}"
+
+# scenario_helm_options [INDENT] -- the helmOptions block every service gets,
+# indented and ready to append. The scenario's own helmOptions are merged over
+# the defaults, so it can override any of them.
+#
+# Rendered from the first install on, not just at upgrade time: adding
 # helmOptions later makes sveltos reinstall instead of upgrade.
-scenario_atomic() {
-    yq -r '.helmOptions.atomic // false' "$SERVICES_FILE"
+scenario_helm_options() {
+    local indent="${1:-10}"
+    HELM_DEFAULTS="{upgradeOptions: {maxHistory: $HELM_MAX_HISTORY}}" \
+        yq -r '(env(HELM_DEFAULTS) * (.helmOptions // {}))' "$SERVICES_FILE" \
+        | sed "s/^/$(printf '%*s' "$indent" '')/"
 }
 
 upgrade_expect_field() {
@@ -319,8 +331,7 @@ EOF
 # render_mcs FILE MODE -- shared by the initial deploy and the upgrade, so the
 # two cannot drift apart.
 render_mcs() {
-    local out="$1" mode="${2:-initial}" atomic
-    atomic="$(scenario_atomic)"
+    local out="$1" mode="${2:-initial}"
 
     cat > "$out" <<EOF
 apiVersion: k0rdent.mirantis.com/v1beta1
@@ -358,11 +369,8 @@ EOF
             if has_template_chain; then
                 echo "        templateChain: $(chain_name)"
             fi
-            # Makes helm undo a failed upgrade instead of leaving it broken.
-            if [[ "$atomic" == "true" ]]; then
-                echo "        helmOptions:"
-                echo "          atomic: true"
-            fi
+            echo "        helmOptions:"
+            scenario_helm_options 10
             if [[ -n "$dep" ]]; then
                 # KCM waits for the dependency before starting this one.
                 echo "        dependsOn:"

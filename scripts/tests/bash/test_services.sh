@@ -168,7 +168,8 @@ SERVICES_FILE="$SCENARIOS_DIR/03upg01_valid.yaml"
 assert_eq "the valid upgrade has one" "0" "$(has_upgrade && echo 0 || echo 1)"
 assert_eq "it upgrades cert-manager" "cert-manager" "$(upgrade_names | tr '\n' ' ' | sed 's/ $//')"
 assert_eq "to a version that exists" "1.21.1" "$(upgrade_field cert-manager version)"
-assert_eq "it is not atomic" "false" "$(scenario_atomic)"
+assert_eq "it is not atomic" "null" \
+    "$(SERVICES_FILE="$SERVICES_FILE" bash -c 'scenario_helm_options 0' 2>/dev/null | yq -r '.atomic')"
 # The override must apply only in upgraded mode, or the first deploy would
 # already install the new version and there would be nothing to upgrade.
 assert_eq "the initial deploy keeps the old version" "1.20.2" \
@@ -189,7 +190,8 @@ assert_eq "untouched services keep their template" "traefik-41-2-0" \
     "$(yq -r '.spec.serviceSpec.services[] | select(.name=="traefik") | .template' "$after")"
 
 SERVICES_FILE="$SCENARIOS_DIR/03upg02_invalid_atomic.yaml"
-assert_eq "the atomic scenario sets atomic" "true" "$(scenario_atomic)"
+assert_eq "the atomic scenario sets atomic" "true" \
+    "$(scenario_helm_options 0 | yq -r '.atomic')"
 assert_eq "it expects a failure" "cert-manager" "$(upgrade_expect_field failed)"
 assert_eq "and a rollback target" "1.20.2" "$(upgrade_expect_field rolledBackTo)"
 # The rollback target must be the version actually deployed first, otherwise
@@ -217,7 +219,21 @@ assert_eq "atomic reaches every service in the MCS" "true" \
 assert_eq "the atomic upgrade pins the new chart version" "cert-manager-1-21-1" \
     "$(yq -r '.spec.serviceSpec.services[] | select(.name=="cert-manager") | .template' "$after")"
 assert_contains "the invalid values are rendered" "$(cat "$after")" "replicaCount: -1"
+# Sveltos keeps two revisions by default, which is fewer than a chain needs to
+# prove the path it took. Every service gets the larger window, and a scenario
+# option is merged on top rather than replacing it.
+assert_eq "atomic keeps the history default too" "10" \
+    "$(yq -r '.spec.serviceSpec.services[] | select(.name=="cert-manager") | .helmOptions.upgradeOptions.maxHistory' "$after")"
 rm -f "$before" "$after"
+
+SERVICES_FILE="$SCENARIOS_DIR/05chain04_stepwise.yaml"
+chain_mcs="$(mktemp)"; render_mcs "$chain_mcs" initial
+assert_eq "a chain scenario gets the history default" "10" \
+    "$(yq -r '.spec.serviceSpec.services[0].helmOptions.upgradeOptions.maxHistory' "$chain_mcs")"
+assert_eq "and it is overridable in one place" "3" \
+    "$(HELM_MAX_HISTORY=3 bash -c "source '$SCRIPTS_DIR/lib/common.sh'; source '$SCRIPTS_DIR/lib/services.sh'; \
+        SERVICES_FILE='$SERVICES_FILE' scenario_helm_options 0" | yq -r '.upgradeOptions.maxHistory')"
+rm -f "$chain_mcs"
 
 # Every name in upgrade.expect must be a real service, same trap as expect:.
 known_services="$(services_rows | cut -d'|' -f1)"
