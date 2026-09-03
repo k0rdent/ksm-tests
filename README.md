@@ -203,6 +203,13 @@ broke something.
 
 Label a PR `ci:full` to run everything anyway.
 
+The **Run workflow** button takes `scenarios`, `kcm`, `kcm_src_url` and
+`kcm_ref`, so a fork or a branch can be run through the whole matrix without
+merging anything. Giving a repository or a ref selects the source variants on
+its own, and refuses a release one -- a published chart would ignore both and
+report green on code it never compiled. Public repositories only; the runner
+clones without credentials.
+
 **The full matrix runs on `main` and nightly**, and needs to: both races found
 in the upgrade scenarios showed up only on `src: main`. Nightly needs the repo
 variable `ENABLE_CRON=1`.

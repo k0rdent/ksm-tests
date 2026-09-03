@@ -17,6 +17,10 @@ on:
         description: 'KCM variants to run, space or comma separated (empty = all)'
         required: false
         default: ''
+      kcm_src_url:
+        description: 'KCM repository to build, e.g. a fork (source mode only)'
+        required: false
+        default: ''
       kcm_ref:
         description: 'KCM branch, tag or SHA to test (source mode only)'
         required: false
@@ -76,6 +80,8 @@ jobs:
         env:
           WANT_SCENARIOS: ${{ github.event.inputs.scenarios }}
           WANT_KCM: ${{ github.event.inputs.kcm }}
+          WANT_SRC_URL: ${{ github.event.inputs.kcm_src_url }}
+          WANT_REF: ${{ github.event.inputs.kcm_ref }}
           EVENT: ${{ github.event_name }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.sha }}
@@ -105,6 +111,24 @@ jobs:
             [[ " ${all_ids[*]} " == *" $want "* ]] \
               || { echo "Unknown scenario '$want'. Available: ${all_ids[*]}" >&2; exit 1; }
           done
+
+          # A repository or ref only means anything to a source build. Left to
+          # run against a release variant it would install the published chart
+          # and report green on code it never compiled.
+          if [[ -n "$WANT_SRC_URL$WANT_REF" ]]; then
+            SRC_IDS="$(jq -r '[.[] | select(.mode == "source") | .id] | join(" ")' <<< "$ALL")"
+            if [[ -z "${WANT_KCM// /}" ]]; then
+              WANT_KCM="$SRC_IDS"
+              echo "kcm_src_url/kcm_ref given, so running the source variants: $WANT_KCM"
+            else
+              for want in ${WANT_KCM//,/ }; do
+                [[ " $SRC_IDS " == *" $want "* ]] || {
+                  echo "kcm_src_url/kcm_ref only apply to a source build, but '$want' is a release variant." >&2
+                  echo "Pick one of: $SRC_IDS, or leave kcm empty." >&2
+                  exit 1; }
+              done
+            fi
+          fi
 
           # scenario -> the variant ids it should run against
           declare -A SEL
@@ -240,5 +264,6 @@ jobs:
       scenario: ${{ matrix.scenario.id }}
       kcm_variants: ${{ matrix.scenario.variants }}
       known_failing_kcm: ${{ matrix.scenario.knownFailingKcm }}
+      kcm_src_url: ${{ github.event.inputs.kcm_src_url || '' }}
       kcm_ref: ${{ github.event.inputs.kcm_ref || '' }}
       keep_cluster: ${{ github.event.inputs.keep_cluster == 'true' }}
