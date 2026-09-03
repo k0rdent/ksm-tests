@@ -140,6 +140,11 @@ services:
         ...
 ```
 
+Every service gets `helmOptions.upgradeOptions.maxHistory: 10`. Sveltos keeps
+two helm revisions by default, which is fewer than a chain scenario needs: the
+path an upgrade took is only provable while the revisions it passed through
+still exist. Change it for a run with `HELM_MAX_HISTORY`.
+
 Charts come from **k0rdent/catalog's registry**. Those are wrappers declaring
 the upstream chart as a dependency of the same name, so values must be nested
 one level under that name — flatten them and helm ignores them silently.
@@ -151,7 +156,7 @@ Optional blocks, each switching on extra checks:
 | `expect: {failed, blocked, deployed, graceSeconds}` | the rollout stops at `failed`, `blocked` never installs, `deployed` survives |
 | `upgrade: {services, expect: {rolledOut, untouched, rolledBackTo}}` | only `rolledOut` moves; `untouched` keeps its chart *and* its pod UIDs |
 | `templateChain` + `upgrade.steps` | each step is `applied` or `rejected` as the chain dictates; `viaVersions` must appear in helm history |
-| `helmOptions: {atomic: true}` | passed to the provider from the first deploy on |
+| `helmOptions` | merged over the suite defaults and passed to the provider from the first deploy on |
 | `multiClusterServices` | replaces `services:` when a scenario needs more than one MCS |
 
 When a script applies an object that another object's status gates, wait for
