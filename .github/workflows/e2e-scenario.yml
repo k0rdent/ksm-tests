@@ -20,6 +20,11 @@ on:
         type: string
         required: false
         default: ''
+      kcm_src_url:
+        description: 'Override the KCM repository to build (source mode only)'
+        type: string
+        required: false
+        default: ''
       kcm_ref:
         description: 'Override the KCM ref (source mode only)'
         type: string
@@ -35,7 +40,9 @@ on:
 
 jobs:
   e2e:
-    name: ${{ matrix.kcm.name }}${{ contains(inputs.known_failing_kcm, matrix.kcm.id) && ' ⚠ known failure' || '' }}
+    # The ref goes in the name when overridden: otherwise a fork build is
+    # indistinguishable from `src: main` in the Actions list.
+    name: ${{ matrix.kcm.name }}${{ inputs.kcm_ref && format(' @ {0}', inputs.kcm_ref) || '' }}${{ contains(inputs.known_failing_kcm, matrix.kcm.id) && ' ⚠ known failure' || '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     strategy:
@@ -46,6 +53,7 @@ jobs:
       # common.sh expands KCM via kcm-variants.yaml, the same file a local run
       # reads, so the mapping is not duplicated here.
       KCM: ${{ matrix.kcm.id }}
+      KCM_SRC_URL: ${{ inputs.kcm_src_url }}
       KCM_REF: ${{ inputs.kcm_ref }}
       SCENARIO: ${{ inputs.scenario }}
       TEST_MODE: adopted
