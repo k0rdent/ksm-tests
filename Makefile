@@ -27,12 +27,12 @@ help: ## Show this help.
 	@echo "  make e2e SCENARIO=02dep01_valid KCM_VERSION=1.10.0"
 	@echo "  make e2e SCENARIO=02dep01_valid KCM_MODE=source KCM_REF=<branch|tag|sha>"
 	@echo
-	@echo "Detail and examples for one target:  make help-<target>"
+	@echo "Detail and examples for one target:  make <target>-help"
 	@echo "make scenarios lists the scenarios and variants; make status what is built."
 
 # Per-target usage lives in `#:` comments right above each target, so it sits
 # next to the recipe it documents and cannot drift from the target list.
-help-%:
+%-help:
 	@awk -v t="$*" ' \
 	    /^#:/  { buf = buf substr($$0, 4) "\n"; next } \
 	    $$0 ~ "^" t ":" { \

@@ -49,7 +49,7 @@ scripts/            the pipeline, one script per step
 
 ```bash
 make help                                       # targets and how to pick a KCM
-make help-env-down                              # what one target does and takes
+make env-down-help                              # what one target does and takes
 make scenarios                                  # what is available
 make e2e SCENARIO=01_basic                      # from scratch and back, ~10 min
 ```
