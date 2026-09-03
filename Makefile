@@ -33,6 +33,11 @@ help: ## Show this help.
 scenarios: ## List the available scenarios and KCM variants.
 	./$(SCRIPTS)/list_scenarios.sh
 
+# No RUN_ID: the point is to show every environment, not the selected one.
+.PHONY: status
+status: ## Show which environments are built, and how to reuse them.
+	./$(SCRIPTS)/status.sh
+
 .PHONY: e2e
 e2e: ## One scenario on one KCM variant, from scratch, then tear down.
 	$(E2E)

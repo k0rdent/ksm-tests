@@ -65,7 +65,16 @@ make env-down
 
 Whatever you pass as `KCM`/`KCM_VERSION`/`KCM_MODE` has to be the same for all
 of them: `RUN_ID` is derived from it, and that is what names the clusters.
-`make logs` dumps diagnostics, `make clean` tears everything down.
+`make status` shows what is actually built and what to pass to reuse it:
+
+```
+▶ Environments
+  RUN_ID                 MGMT             ADOPTED          KCM
+  credfix                Up 2 days        Up 2 days        release 1.10.0 (b2ae8b31, Mon 8.6.2026)
+                         ↳ make scenario RUN_ID=credfix SCENARIO=<id> KCM=rel-1-10-0
+```
+
+`make logs` dumps diagnostics, `make clean` tears one environment down.
 
 Needs `docker`, `git`, `curl`, `tar`, `envsubst`, plus `go` and `make` for
 source mode. The rest lands in `.work/bin` via `make deps`.

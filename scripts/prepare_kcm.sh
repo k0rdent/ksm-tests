@@ -68,11 +68,17 @@ if [[ "$KCM_MODE" == "release" && "$CHART_VERSION" != "$KCM_VERSION" ]]; then
 The manifests would not match the published chart. Set KCM_REF to the matching tag."
 fi
 
+# Quoted: the date contains spaces, and an unquoted value makes the file
+# unsourceable.
 {
-    echo "KCM_COMMIT=$KCM_COMMIT"
-    echo "KCM_DESCRIBE=$KCM_DESCRIBE"
-    echo "KCM_COMMIT_DATE=$KCM_COMMIT_DATE"
-    echo "KCM_CHART_VERSION=$CHART_VERSION"
+    echo "KCM_COMMIT='$KCM_COMMIT'"
+    echo "KCM_DESCRIBE='$KCM_DESCRIBE'"
+    echo "KCM_COMMIT_DATE='$KCM_COMMIT_DATE'"
+    echo "KCM_CHART_VERSION='$CHART_VERSION'"
+    # What selected this build, so status.sh can say how to reuse it.
+    echo "KCM_MODE='$KCM_MODE'"
+    echo "KCM_VARIANT='$KCM'"
+    echo "KCM_REF='$KCM_REF'"
 } > "$WORKDIR/kcm-build.env"
 
 ok "KCM $CHART_VERSION ready from commit $KCM_COMMIT ($KCM_MODE mode)"
