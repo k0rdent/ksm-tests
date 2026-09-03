@@ -39,13 +39,6 @@ done
 
 (( ${#SEEN[@]} )) || { ok "No environment is built. Start one with 'make env-up'."; exit 0; }
 
-# field KEY FILE -- read rather than source. kcm-build.env is data; sourcing it
-# would run whatever a stale or hand-edited file happens to contain. Accepts
-# both the quoted form and the unquoted one older runs wrote.
-field() {
-    sed -n "s/^$1='\(.*\)'$/\1/p; s/^$1=\([^']*\)$/\1/p" "$2" 2>/dev/null | head -1
-}
-
 # state RUN_ID -- one line per environment.
 describe() {
     local id="${1#@}" mgmt="${SEEN[$1]}" suffix="" workdir kcm="" reuse="" adopted="-"
@@ -57,25 +50,17 @@ describe() {
 
     local env_file="$workdir/kcm-build.env"
     if [[ -f "$env_file" ]]; then
-        local version commit date mode variant ref
-        version="$(field KCM_CHART_VERSION "$env_file")"
-        commit="$(field KCM_COMMIT "$env_file")"
-        date="$(field KCM_COMMIT_DATE "$env_file")"
-        mode="$(field KCM_MODE "$env_file")"
-        variant="$(field KCM_VARIANT "$env_file")"
-        ref="$(field KCM_REF "$env_file")"
+        local version commit date mode
+        version="$(built_field KCM_CHART_VERSION "$env_file")"
+        commit="$(built_field KCM_COMMIT "$env_file")"
+        date="$(built_field KCM_COMMIT_DATE "$env_file")"
+        mode="$(built_field KCM_MODE "$env_file")"
 
         kcm="${mode:+$mode }${version:-?}"
         [[ -n "$commit" ]] && kcm="$kcm ($commit${date:+, $date})"
-        # No mode recorded means the environment predates it -- guessing how to
-        # reuse it would be worse than saying nothing.
-        if [[ -n "$variant" ]]; then
-            reuse="KCM=$variant"
-        elif [[ "$mode" == "source" ]]; then
-            reuse="KCM_MODE=source KCM_REF=$ref"
-        elif [[ "$mode" == "release" ]]; then
-            reuse="KCM_VERSION=$version"
-        fi
+        # RUN_ID is the whole selection: common.sh reads the rest back out of
+        # this same file, so there is nothing else to repeat.
+        [[ -n "$mode" ]] && reuse="RUN_ID=${id:-''} SCENARIO=<id>"
     else
         kcm="not installed"
     fi
@@ -83,7 +68,7 @@ describe() {
     printf '  %-22s %-16s %-16s %s\n' \
         "${id:-<none>}" "${mgmt:0:16}" "${adopted:0:16}" "$kcm"
     [[ -n "$reuse" && -n "$mgmt" ]] \
-        && printf '  %-22s %s\n' "" "↳ make scenario RUN_ID=${id:-''} SCENARIO=<id> $reuse"
+        && printf '  %-22s %s\n' "" "↳ make scenario $reuse"
     return 0
 }
 

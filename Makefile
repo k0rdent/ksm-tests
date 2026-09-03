@@ -121,9 +121,9 @@ e2e-parallel: ## Every scenario at once, each with its own cluster.
 #: Builds both k0s clusters, installs KCM and adopts the child cluster.
 #: About 7 minutes. Stops before any scenario runs.
 #:
-#: Vars: KCM / KCM_VERSION / KCM_MODE -- these also derive RUN_ID, so pass the
-#:       same ones to `scenario` and `env-down` or you will address a different
-#:       environment. `make status` shows what you already have.
+#: Vars: KCM / KCM_VERSION / KCM_MODE -- this is the one target that needs
+#:       them; later targets read them back out of the environment. They also
+#:       derive RUN_ID, so set RUN_ID here when the name matters to you.
 #:
 #:   make env-up
 #:   make env-up KCM=rel-1-10-0
@@ -135,11 +135,12 @@ env-up: ## Build the cluster and KCM, up to a verified child cluster.
 #: Deploys the scenario's services through a MultiClusterService, verifies
 #: them and removes them again. Needs `make env-up` first.
 #:
-#: Vars: SCENARIO, plus the same KCM selection you built the environment with,
-#:       or RUN_ID directly as `make status` prints it.
+#: Vars: SCENARIO, and RUN_ID to say which environment -- as `make status`
+#:       prints it. Nothing else: the environment records which KCM built it,
+#:       so the selection is not repeated here.
 #:
-#:   make scenario SCENARIO=02dep01_valid KCM=rel-1-10-0
-#:   make scenario SCENARIO=02dep01_valid RUN_ID=local-rel-1-10-0
+#:   make scenario SCENARIO=02dep01_valid                    # the default one
+#:   make scenario SCENARIO=02dep01_valid RUN_ID=stepchain
 #:
 #: Scenarios are not isolated from each other on a shared environment:
 #: 02dep02_invalid breaks cert-manager on purpose.
@@ -170,12 +171,11 @@ scenario-clean: ## Remove services from a kept scenario.
 #: Removes the containers, network and kubeconfigs of ONE environment. The
 #: working directory stays; `make clean` removes that too.
 #:
-#: Vars: RUN_ID, or the same KCM / KCM_VERSION / KCM_MODE you built with --
-#:       RUN_ID is derived from them, and that is what names the clusters.
+#: Vars: RUN_ID -- which environment, as `make status` prints it. Passing the
+#:       KCM selection instead works too, because RUN_ID is derived from it.
 #:
 #:   make env-down                        # the default environment
-#:   make env-down KCM=rel-1-10-0
-#:   make env-down RUN_ID=credfix         # exactly what `make status` printed
+#:   make env-down RUN_ID=stepchain       # exactly what `make status` printed
 env-down: ## Tear the environment down.
 	$(E2E) --env-down
 

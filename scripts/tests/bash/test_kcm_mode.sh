@@ -56,6 +56,32 @@ assert_eq "KCM_VERSION alone picks that release" "v1.10.0" \
 assert_contains "RUN_ID follows the version" "$(mk KCM_VERSION=1.10.0)" "RUN_ID=local-1-10-0"
 assert_contains "RUN_ID follows the variant" "$(mk KCM=src-main)" "RUN_ID=local-src-main"
 
+# Reusing an environment must need RUN_ID and nothing else: it records what
+# built it, and repeating the selection is a second chance to get it wrong.
+built="$REPO_ROOT/.work-inherit-test"
+mkdir -p "$built"
+cat > "$built/kcm-build.env" <<'EOF'
+KCM_MODE='source'
+KCM_VARIANT=''
+KCM_CHART_VERSION='1.12.0'
+KCM_REF='stepchain'
+EOF
+inherited() { RUN_ID=inherit-test KCM='' bash -c \
+    "source '$SCRIPTS_DIR/lib/common.sh'; echo \"\${$1}\""; }
+assert_eq "RUN_ID alone recovers the mode" "source" "$(inherited KCM_MODE)"
+assert_eq "RUN_ID alone recovers the ref" "stepchain" "$(inherited KCM_REF)"
+# The mode is what decides where the scenario reads its charts from, which is
+# the part that silently went wrong when it had to be repeated by hand.
+assert_contains "and with it the template registry" "$(inherited TEMPLATES_REPO_URL)" \
+    "kcm-test-registry-inherit-test"
+assert_eq "an explicit value still wins" "1.9.9" \
+    "$(RUN_ID=inherit-test KCM='' KCM_VERSION=1.9.9 bash -c \
+        "source '$SCRIPTS_DIR/lib/common.sh'; echo \$KCM_VERSION")"
+rm -rf "$built"
+assert_eq "an unbuilt RUN_ID falls back to the defaults" "release" \
+    "$(RUN_ID=inherit-test KCM='' bash -c \
+        "source '$SCRIPTS_DIR/lib/common.sh'; echo \$KCM_MODE")"
+
 # A fork and an arbitrary commit are both reachable without touching a variant.
 got="$(KCM_MODE=source KCM_SRC_URL=https://github.com/me/kcm.git KCM_REF=480aad76 \
     bash -c "source '$SCRIPTS_DIR/lib/common.sh'; echo \$KCM_SRC_URL \$KCM_REF")"

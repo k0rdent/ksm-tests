@@ -68,6 +68,26 @@ kcm_variant_field() {
     ' "$KCM_VARIANTS_FILE"
 }
 
+# built_field KEY [FILE] -- one value out of a kcm-build.env, empty if absent.
+# Read, never sourced: it is data, and a value with spaces would otherwise
+# become a command.
+built_field() {
+    local file="${2:-$WORKDIR/kcm-build.env}"
+    [[ -f "$file" ]] || return 0
+    sed -n "s/^$1='\(.*\)'\$/\1/p; s/^$1=\([^']*\)\$/\1/p" "$file" 2>/dev/null | head -1
+}
+
+# An environment records what built it, so reusing one -- scenario, env-down,
+# logs -- needs RUN_ID and nothing else. Repeating the selection would be a
+# second chance to get it wrong, and getting it wrong points at a different
+# environment or reads templates from the wrong registry.
+if [[ -f "$WORKDIR/kcm-build.env" ]]; then
+    KCM="${KCM:-$(built_field KCM_VARIANT)}"
+    KCM_MODE="${KCM_MODE:-$(built_field KCM_MODE)}"
+    KCM_VERSION="${KCM_VERSION:-$(built_field KCM_CHART_VERSION)}"
+    KCM_REF="${KCM_REF:-$(built_field KCM_REF)}"
+fi
+
 # KCM=<id> is the shorthand CI and the Makefile both speak. Explicitly set
 # KCM_MODE/KCM_REF/KCM_VERSION still win, so an ad-hoc version that is not a
 # declared variant stays testable.
