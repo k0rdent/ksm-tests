@@ -48,21 +48,33 @@ scripts/            the pipeline, one script per step
 ## Running locally
 
 ```bash
-make scenarios                                       # what is available
-make env-up        KCM=rel-1-11-0                         # both clusters + KCM, ~7 min
-make scenario      SCENARIO=02dep01_valid KCM=rel-1-11-0  # deploy, verify, remove
-make scenario-keep SCENARIO=02dep01_valid KCM=rel-1-11-0  # deploy + verify, leave services running
-make scenario-clean SCENARIO=02dep01_valid KCM=rel-1-11-0 # remove services from a kept scenario
-make env-down      KCM=rel-1-11-0
+make help                                       # targets and how to pick a KCM
+make scenarios                                  # what is available
+make e2e SCENARIO=01_basic                      # from scratch and back, ~10 min
 ```
 
-Needs `docker`, `git`, `curl`, `tar`, `envsubst`, plus `go` and `make` for
-`KCM=src-main`. The rest lands in `.work/bin` via `make deps`.
+Building the environment is most of that, so for a second run build it once:
 
-`KCM=<id>` picks a variant from `scripts/config/kcm-variants.yaml`; an unknown
-id is refused rather than quietly falling back. For anything not declared there
-— a fork, a specific commit, an unpublished chart — set the inputs directly.
-They win over the variant.
+```bash
+make env-up                                     # both clusters + KCM, ~7 min
+make scenario       SCENARIO=02dep01_valid      # deploy, verify, remove
+make scenario-keep  SCENARIO=02dep01_valid      # same, but leave the services up
+make scenario-clean SCENARIO=02dep01_valid      # remove them again
+make env-down
+```
+
+Whatever you pass as `KCM`/`KCM_VERSION`/`KCM_MODE` has to be the same for all
+of them: `RUN_ID` is derived from it, and that is what names the clusters.
+`make logs` dumps diagnostics, `make clean` tears everything down.
+
+Needs `docker`, `git`, `curl`, `tar`, `envsubst`, plus `go` and `make` for
+source mode. The rest lands in `.work/bin` via `make deps`.
+
+With nothing set you get the published **1.11.0** chart — the same leg pull
+requests run. `KCM=<id>` picks a variant from `scripts/config/kcm-variants.yaml`
+(the combinations CI tests, and the ids `knownFailures` refer to); an unknown id
+is refused rather than quietly falling back. For anything not declared there —
+another release, a fork, a specific commit — set the inputs directly.
 
 | Variable | Default | Meaning |
 |---|---|---|
@@ -73,7 +85,8 @@ They win over the variant.
 | `KCM_REF` | the matching tag, or `main` | branch, tag or commit |
 
 ```bash
-make env-up RUN_ID=fork KCM_MODE=source \
+make e2e SCENARIO=01_basic KCM_VERSION=1.10.0        # another published release
+make e2e SCENARIO=01_basic KCM_MODE=source \
     KCM_SRC_URL=https://github.com/me/kcm.git KCM_REF=480aad76
 ```
 

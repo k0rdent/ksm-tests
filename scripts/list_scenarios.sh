@@ -48,7 +48,7 @@ while read -r id; do
 done < <(list_scenarios)
 
 echo
-echo "KCM variants (pick with KCM=<id>):"
+echo "KCM variants (pick with KCM=<id>; these are what CI runs):"
 while read -r id; do
     [[ -n "$id" ]] || continue
     printf '  %-24s %s\n' "$id" "$(kcm_variant_field "$id" name)"
@@ -56,3 +56,4 @@ done < <(list_kcm_variants)
 
 echo
 echo "Example: make e2e SCENARIO=02dep01_valid KCM=rel-1-11-0"
+echo "Anything else: KCM_VERSION=<v>, or KCM_MODE=source with KCM_SRC_URL/KCM_REF."

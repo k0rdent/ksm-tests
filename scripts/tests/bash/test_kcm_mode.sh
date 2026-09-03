@@ -43,6 +43,19 @@ done
 assert_eq "mode defaults to release" "release" \
     "$(bash -c "unset KCM KCM_MODE; source '$SCRIPTS_DIR/lib/common.sh'; echo \$KCM_MODE")"
 
+# The Makefile must not force a variant: KCM=src-main would win over an
+# explicit KCM_VERSION and quietly build main from source instead.
+mk() { make -n --no-print-directory -C "$REPO_ROOT" env-up "$@" 2>/dev/null | head -1; }
+assert_not_contains "make does not force a variant" "$(mk)" "KCM=src-main"
+assert_contains "a bare run is release 1.11.0" \
+    "$(KCM='' bash -c "source '$SCRIPTS_DIR/lib/common.sh'; echo \$KCM_MODE \$KCM_VERSION")" \
+    "release 1.11.0"
+assert_eq "KCM_VERSION alone picks that release" "v1.10.0" \
+    "$(KCM='' KCM_VERSION=1.10.0 bash -c "source '$SCRIPTS_DIR/lib/common.sh'; echo \$KCM_REF")"
+# Two configurations must not land in the same workdir and cluster names.
+assert_contains "RUN_ID follows the version" "$(mk KCM_VERSION=1.10.0)" "RUN_ID=local-1-10-0"
+assert_contains "RUN_ID follows the variant" "$(mk KCM=src-main)" "RUN_ID=local-src-main"
+
 # A fork and an arbitrary commit are both reachable without touching a variant.
 got="$(KCM_MODE=source KCM_SRC_URL=https://github.com/me/kcm.git KCM_REF=480aad76 \
     bash -c "source '$SCRIPTS_DIR/lib/common.sh'; echo \$KCM_SRC_URL \$KCM_REF")"
