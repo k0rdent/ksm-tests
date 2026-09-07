@@ -22,11 +22,6 @@ knownFailures:
     match: the chain says it must step through it
     timeout: 300
     reason: Same as rel-1-10-0; reproduced.
-  - kcm: src-main
-    step: Upgrade along the chain
-    match: the chain says it must step through it
-    timeout: 300
-    reason: Same as rel-1-10-0; inferred, not yet run.
 
 templateChain:
   supportedTemplates:
