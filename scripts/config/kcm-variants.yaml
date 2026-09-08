@@ -23,8 +23,3 @@ variants:
     mode: release
     version: '1.11.0'
     prCheck: true
-
-  - id: rel-1-10-0
-    name: 'release: 1.10.0'
-    mode: release
-    version: '1.10.0'

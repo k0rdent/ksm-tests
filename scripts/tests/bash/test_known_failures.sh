@@ -54,7 +54,7 @@ r="$(run_step 02dep01_valid rel-1-11-0 "Deploy services via MultiClusterService"
 assert_eq "a failure in another step still fails" "1" "${r%%|*}"
 
 # ── Variants with no marker ──────────────────────────────────────────────────
-r="$(run_step 02dep01_valid rel-1-10-0 "$STEP" "$s")"
+r="$(run_step 02dep01_valid src-main "$STEP" "$s")"
 assert_eq "an unmarked variant still fails" "1" "${r%%|*}"
 r="$(run_step 01_basic src-main "$STEP" "$s")"
 assert_eq "a scenario with no knownFailures still fails" "1" "${r%%|*}"

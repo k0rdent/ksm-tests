@@ -25,7 +25,6 @@ assert_eq "rel-1-11-0 pins the version" "1.11.0" "$(var_of rel-1-11-0 KCM_VERSIO
 # common.sh derives the tag from the version, so the checkout matches the chart.
 assert_eq "rel-1-11-0 checks out the matching tag" "v1.11.0" "$(var_of rel-1-11-0 KCM_REF)"
 
-assert_eq "rel-1-10-0 pins its own version" "1.10.0" "$(var_of rel-1-10-0 KCM_VERSION)"
 
 # An ad-hoc version that is not a declared variant must stay testable.
 got="$(KCM=rel-1-11-0 KCM_VERSION=1.9.0 bash -c \

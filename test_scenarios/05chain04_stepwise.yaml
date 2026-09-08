@@ -9,7 +9,7 @@ description: >-
 # chain is valid and all three templates exist, and 05chain02/03 show it *is*
 # consulted -- so it constrains which versions may be reached, not the route.
 knownFailures:
-  - kcm: rel-1-10-0
+  - kcm: rel-1-11-0
     step: Upgrade along the chain
     match: the chain says it must step through it
     timeout: 300
@@ -17,11 +17,6 @@ knownFailures:
       The upgrade jumps straight to the latest version instead of passing
       through the intermediate one the chain defines, contrary to issue #5
       scenario 4.
-  - kcm: rel-1-11-0
-    step: Upgrade along the chain
-    match: the chain says it must step through it
-    timeout: 300
-    reason: Same as rel-1-10-0; reproduced.
 
 templateChain:
   supportedTemplates:
