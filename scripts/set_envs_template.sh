@@ -12,7 +12,7 @@
 # ── Which KCM to test ────────────────────────────────────────────────────────
 # KCM=<id> is the shorthand CI uses too; ids come from
 # scripts/config/kcm-variants.yaml and `make scenarios` lists them.
-# export KCM="src-main"                 # or rel-1-11-0, rel-1-10-0
+# export KCM="src-main"                 # or rel-1-11-0
 #
 # Setting these directly still wins over the variant, for an ad-hoc version:
 # export KCM_MODE="release"             # or source

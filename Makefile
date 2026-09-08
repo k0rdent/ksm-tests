@@ -42,7 +42,7 @@ help: ## Show this help.
 	@echo
 	@echo "Defaults to the published chart $(shell KCM= bash -c 'source scripts/lib/common.sh; echo $$KCM_VERSION'). Pick with:"
 	@echo "  make e2e SCENARIO=02dep01_valid KCM=rel-1-11-0   # a variant CI tests"
-	@echo "  make e2e SCENARIO=02dep01_valid KCM_VERSION=1.10.0"
+	@echo "  make e2e SCENARIO=02dep01_valid KCM_VERSION=1.11.0"
 	@echo "  make e2e SCENARIO=02dep01_valid KCM_MODE=source KCM_REF=<branch|tag|sha>"
 	@echo
 	@echo "Detail and examples for one target:  make <target> help"
@@ -83,7 +83,7 @@ status: ## Show which environments are built, and how to reuse them.
 #:       to choose the KCM under test. Defaults to the published 1.11.0.
 #:
 #:   make e2e SCENARIO=02dep01_valid
-#:   make e2e SCENARIO=02dep01_valid KCM=rel-1-10-0
+#:   make e2e SCENARIO=02dep01_valid KCM=rel-1-11-0
 #:   make e2e SCENARIO=01_basic KCM_MODE=source KCM_REF=my-branch
 #:
 #: See also: e2e-keep (leave it running), env-up + scenario (reuse it).
@@ -126,7 +126,7 @@ e2e-parallel: ## Every scenario at once, each with its own cluster.
 #:       derive RUN_ID, so set RUN_ID here when the name matters to you.
 #:
 #:   make env-up
-#:   make env-up KCM=rel-1-10-0
+#:   make env-up KCM=rel-1-11-0
 #:   make env-up KCM_MODE=source KCM_SRC_URL=https://github.com/me/kcm.git KCM_REF=480aad76
 env-up: ## Build the cluster and KCM, up to a verified child cluster.
 	$(E2E) --env-up
@@ -207,7 +207,7 @@ logs: ## Dump diagnostics from the current environment into ./logs.
 #:
 #: Vars: RUN_ID.
 #:
-#:   make clean RUN_ID=local-rel-1-10-0
+#:   make clean RUN_ID=local-rel-1-11-0
 clean: ## Tear down containers, network and the working directory.
 	RUN_ID=$(RUN_ID) ./$(SCRIPTS)/cleanup.sh
 

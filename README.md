@@ -28,8 +28,7 @@ credentials, no cost.
 | `05chain03_direct_to_latest` | only what the chain lists is accepted |
 | `05chain04_stepwise` | a multi-hop chain is walked, not skipped |
 
-Each runs against three KCM builds: `src: main`, `release: 1.11.0` and
-`release: 1.10.0`.
+Each runs against two KCM builds: `src: main` and `release: 1.11.0`.
 
 Install, `Management` reconcile, `ClusterDeployment` and teardown are asserted
 too, because KSM sits on them. Cloud provisioning is out of scope.
@@ -95,7 +94,7 @@ another release, a fork, a specific commit — set the inputs directly.
 | `KCM_REF` | the matching tag, or `main` | branch, tag or commit |
 
 ```bash
-make e2e SCENARIO=01_basic KCM_VERSION=1.10.0        # another published release
+make e2e SCENARIO=01_basic KCM_VERSION=1.10.0        # a release no variant declares
 make e2e SCENARIO=01_basic KCM_MODE=source \
     KCM_SRC_URL=https://github.com/me/kcm.git KCM_REF=480aad76
 ```
@@ -174,9 +173,9 @@ and reports, but as a warning rather than a red job:
 
 ```yaml
 knownFailures:
-  - kcm: rel-1-10-0
-    step: Upgrade services                      # which step must fail
-    match: did not roll back to a healthy state # and with what in its output
+  - kcm: rel-1-11-0
+    step: Upgrade along the chain               # which step must fail
+    match: the chain says it must step through it  # and with what in its output
     timeout: 300                                # shorten the waits on this leg
     reason: ...
 ```
@@ -185,10 +184,10 @@ The marker is deliberately narrow — the failure has to happen in that step
 *and* print that string — so it cannot hide an unrelated regression. Delete the
 entry once the defect is fixed upstream.
 
-Two are recorded today, both upstream defects rather than test bugs:
-`03upg02_invalid_atomic.yaml` (1.10.0 removes the release instead of rolling
-back) and `05chain04_stepwise.yaml` (a chain constrains which versions may be
-reached, but not the route taken).
+Two are recorded today, both against `rel-1-11-0`: `02dep01_valid.yaml`
+(teardown removes kserve-crd before the release that still needs it) and
+`05chain04_stepwise.yaml` (a chain constrains which versions may be reached,
+but not the route taken).
 
 ## CI
 

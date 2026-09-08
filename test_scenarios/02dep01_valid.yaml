@@ -19,7 +19,7 @@ knownFailures:
       Teardown removes kserve-crd before uninstalling kserve-resources, whose
       release still holds a ClusterStorageContainer, so the uninstall fails with
       "ensure CRDs are installed first" and the MCS finalizer never clears.
-      1.10.0 and main are unaffected; catalog does not test this path at all.
+      main is unaffected; catalog does not test this path at all.
 
 # Charts come from k0rdent/catalog's registry. Those are thin wrappers that
 # declare the upstream chart as a dependency of the same name, so values are
