@@ -16,17 +16,21 @@ helmOptions:
 knownFailures:
   - kcm: rel-1-10-0
     step: Upgrade services
-    match: did not roll back to a healthy state
+    match: was removed instead of rolled back
     timeout: 300
     reason: >-
-      The rollback is attempted but does not succeed, so the service never
-      returns to the previous healthy state that issue #3 scenario 2 asks for.
-      Helm upgrades to 1.21.1, that fails on the rejected replicaCount, and the
-      rollback to 1.20.2 then fails itself with 'original object Role with the
-      name "cert-manager-tokenrequest" not found' -- the failed upgrade already
-      removed a resource the rollback needs to restore. The release is left on
-      1.20.2 in state failed and KCM retries in a loop, climbing revisions
-      without ever recovering. Fixed in 1.11.0.
+      The release is deleted rather than returned to the previous healthy
+      version that issue #3 scenario 2 asks for. Helm upgrades to 1.21.1, that
+      fails on the rejected replicaCount, and 1.10.0 then tears the release down
+      instead of rolling it back -- which is what atomic does on a failed
+      install, where there is no earlier revision, not on a failed upgrade,
+      where there is one. 1.11.0 and main roll back correctly, so the assertion
+      itself still holds them to it. 1.10.0 ships sveltos v1.9.0 against v1.12.0
+      in 1.11.0.
+      Until the maxHistory default was added this leg failed one step earlier
+      instead: the rollback ran, put the release back on 1.20.2 but left it
+      'failed', and KCM retried in a loop up to revision 13. Which of the
+      upgradeOptions moved it to a delete was not established.
 
 upgrade:
   services:
