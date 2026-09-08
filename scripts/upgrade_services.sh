@@ -116,11 +116,15 @@ if [[ -n "$ROLLED_BACK_TO" ]]; then
 
     # Two terminal bad endings: the release disappears, or it returns on the
     # old chart but failed. Waiting out the timeout only delays the verdict.
+    # Every command tolerated: `helm history` exits non-zero when the release
+    # is gone, which is one of the two endings this dump exists to explain.
+    # Under `set -e` that killed the script before it could say so.
     rollback_diag() {
         { echo "── helm history $watch_svc -n $ns"
-          helm_child history "$watch_svc" -n "$ns" 2>&1 | tail -6
-          dump_states "$(sset_json)"
-          kcm_errors 10m; } >&2
+          helm_child history "$watch_svc" -n "$ns" 2>&1 | tail -6 || true
+          dump_states "$(sset_json)" || true
+          kcm_errors 10m || true; } >&2
+        return 0
     }
 
     while (( elapsed < MCS_TIMEOUT )); do
