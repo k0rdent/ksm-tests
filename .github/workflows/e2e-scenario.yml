@@ -40,9 +40,9 @@ on:
 
 jobs:
   e2e:
-    # The ref goes in the name when overridden: otherwise a fork build is
-    # indistinguishable from `src: main` in the Actions list.
-    name: ${{ matrix.kcm.name }}${{ inputs.kcm_ref && format(' @ {0}', inputs.kcm_ref) || '' }}${{ contains(inputs.known_failing_kcm, matrix.kcm.id) && ' ⚠ known failure' || '' }}
+    # The name already says which ref and commit a source build uses: discover
+    # resolves it, because a job name is fixed before the job can clone.
+    name: ${{ matrix.kcm.name }}${{ contains(inputs.known_failing_kcm, matrix.kcm.id) && ' ⚠ known failure' || '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     strategy:

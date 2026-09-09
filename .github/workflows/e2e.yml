@@ -90,6 +90,39 @@ jobs:
           set -euo pipefail
 
           ALL="$(yq -o=json -I=0 '.variants' scripts/config/kcm-variants.yaml)"
+
+          # A source variant is named after what it will actually check out, not
+          # after the ref the variants file happens to declare: with kcm_ref set,
+          # 'src: main' named the wrong thing entirely. The commit has to be
+          # resolved here -- job names are fixed before any job clones anything.
+          #   a branch or tag -> 'src: <ref> (<sha>)'
+          #   a commit        -> 'src: <sha>'
+          src_name() {
+            local ref="$1" url="$2" sha
+            sha="$(git ls-remote "$url" "$ref" 2>/dev/null | head -1 | cut -f1)"
+            if [[ -n "$sha" ]]; then
+              echo "src: $ref (${sha:0:8})"
+            elif [[ "$ref" =~ ^[0-9a-f]{7,40}$ ]]; then
+              echo "src: ${ref:0:8}"          # the commit itself
+            else
+              # A ref this remote does not have. Shown whole rather than cut to
+              # a fake sha, and the job fails on it instead of quietly testing
+              # something else.
+              echo "src: $ref"
+            fi
+          }
+          SRC_URL="${WANT_SRC_URL:-$(KCM='' KCM_MODE=source bash -c \
+            'source scripts/lib/common.sh; echo "$KCM_SRC_URL"')}"
+          ALL="$(jq -c --arg url "$SRC_URL" --arg want "$WANT_REF" '
+            [ .[] | if .mode == "source"
+                    then . + {ref: (if $want != "" then $want else .ref end)}
+                    else . end ]' <<< "$ALL")"
+          while read -r vid vref; do
+            [[ -n "$vid" ]] || continue
+            ALL="$(jq -c --arg id "$vid" --arg n "$(src_name "$vref" "$SRC_URL")" \
+              '[ .[] | if .id == $id then . + {name: $n} else . end ]' <<< "$ALL")"
+          done < <(jq -r '.[] | select(.mode == "source") | "\(.id) \(.ref)"' <<< "$ALL")
+
           PR_VARIANT="$(jq -r '[.[] | select(.prCheck == true) | .id][0] // empty' <<< "$ALL")"
           SRC_VARIANT="$(jq -r '[.[] | select(.mode == "source") | .id][0] // empty' <<< "$ALL")"
           SMOKE=01_basic
