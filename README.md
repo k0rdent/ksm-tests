@@ -143,6 +143,12 @@ two helm revisions by default, which is fewer than a chain scenario needs: the
 path an upgrade took is only provable while the revisions it passed through
 still exist. Change it for a run with `HELM_MAX_HISTORY`.
 
+KCM runs its own cert-manager in this cluster, and its helm release owns the
+cert-manager CRDs. A scenario that deploys cert-manager therefore has to set
+`crds.enabled: false` and a `fullnameOverride`, or helm refuses to import
+resources another release already owns. That is the price of self-management:
+the services land in a cluster that is not empty.
+
 Charts come from **k0rdent/catalog's registry**. Those are wrappers declaring
 the upstream chart as a dependency of the same name, so values must be nested
 one level under that name — flatten them and helm ignores them silently.

@@ -20,8 +20,10 @@ upgrade:
       version: 1.21.1
       values: |
         cert-manager:
+          # KCM owns the cert-manager CRDs in this cluster; see the note above.
           crds:
-            enabled: true
+            enabled: false
+          fullnameOverride: scenario-cert-manager
           replicaCount: -1
   expect:
     failed: cert-manager
@@ -49,8 +51,13 @@ services:
     waitForPods: cert-manager-
     values: |
       cert-manager:
+        # KCM runs its own cert-manager in this management cluster and its helm
+        # release owns the CRDs, so this copy must not install them and needs
+        # names of its own. Under self-management there is nowhere else to put
+        # it.
         crds:
-          enabled: true
+          enabled: false
+        fullnameOverride: scenario-cert-manager
 
   - name: kserve-crd
     chart: kserve-crd
