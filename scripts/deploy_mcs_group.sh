@@ -127,19 +127,17 @@ if [[ -z "${NEVER// /}" ]]; then
             || die "'$key' never reported all services deployed within ${LIMIT}s"
     done
 
-    if [[ "${SKIP_CHILD_API_CHECK:-false}" != "true" ]]; then
-        [[ -f "$KUBECONFIG_CHILD" ]] || die "No child kubeconfig at $KUBECONFIG_CHILD"
-        step "Checking the workloads in the child cluster"
-        while IFS="$SERVICE_SEP" read -r name _chart _version _repo namespace _dep waitfor; do
-            [[ -n "$name" ]] || continue
-            wait_release "$name" "$namespace" "$MCS_TIMEOUT" \
-                || die "Service '$name' has no deployed helm release in the child cluster"
-            [[ -n "$waitfor" ]] || continue
-            KUBECONFIG="$KUBECONFIG_CHILD" NAMESPACE="$namespace" \
-                WAIT_FOR_PODS="$waitfor" "$SCRIPTS_DIR/wait_for_deployment.sh"
-        done < <(all_services_rows)
+    [[ -f "$KUBECONFIG_CHILD" ]] || die "No child kubeconfig at $KUBECONFIG_CHILD"
+    step "Checking the workloads in the child cluster"
+    while IFS="$SERVICE_SEP" read -r name _chart _version _repo namespace _dep waitfor; do
+        [[ -n "$name" ]] || continue
+        wait_release "$name" "$namespace" "$MCS_TIMEOUT" \
+            || die "Service '$name' has no deployed helm release in the child cluster"
+        [[ -n "$waitfor" ]] || continue
+        KUBECONFIG="$KUBECONFIG_CHILD" NAMESPACE="$namespace" \
+            WAIT_FOR_PODS="$waitfor" "$SCRIPTS_DIR/wait_for_deployment.sh"
+    done < <(all_services_rows)
     fi
-fi
 
 kube get multiclusterservice
 ok "MultiClusterService dependencies behaved as the scenario expects"

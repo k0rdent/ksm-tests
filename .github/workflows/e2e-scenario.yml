@@ -56,7 +56,7 @@ jobs:
       KCM_SRC_URL: ${{ inputs.kcm_src_url }}
       KCM_REF: ${{ inputs.kcm_ref }}
       SCENARIO: ${{ inputs.scenario }}
-      TEST_MODE: adopted
+      TEST_MODE: self
       # No scenario here: each combination has its own runner, and MCS_NAME
       # already carries the scenario slug.
       RUN_ID: ci${{ github.run_id }}-${{ matrix.kcm.id }}
@@ -124,12 +124,6 @@ jobs:
       - name: Wait for Management
         run: ./scripts/wait_for_management.sh
 
-      - name: Deploy the cluster to adopt
-        run: ./scripts/deploy_adopted_cluster.sh
-
-      - name: Adopt the cluster
-        run: ./scripts/adopt_cluster.sh
-
       - name: Install ServiceTemplates
         run: ./scripts/ci_step.sh "Install ServiceTemplates" ./scripts/install_servicetemplate.sh
 
@@ -146,9 +140,6 @@ jobs:
 
       - name: Remove services
         run: ./scripts/ci_step.sh "Remove services" ./scripts/remove_services.sh
-
-      - name: Remove ClusterDeployment
-        run: ./scripts/remove_cld.sh
 
       - name: Uninstall KCM
         run: ./scripts/remove_kcm.sh

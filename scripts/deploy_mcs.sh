@@ -28,7 +28,7 @@ ensure_workdir
 MANIFEST="$WORKDIR/service-mcs.rendered.yaml"
 render_mcs "$MANIFEST" initial
 
-step "Scenario $SCENARIO: creating MultiClusterService '$MCS_NAME' (group=$CLD_GROUP_LABEL)"
+step "Scenario $SCENARIO: creating MultiClusterService '$MCS_NAME'"
 cat "$MANIFEST"
 kube apply -f "$MANIFEST"
 
@@ -55,18 +55,10 @@ while (( elapsed < MCS_TIMEOUT )); do
     elapsed=$(( elapsed + 5 ))
 done
 if [[ -z "${sset:-}" ]]; then
-    warn "No ServiceSet was created for '$MCS_NAME' -- check the MCS selector"
+    warn "No ServiceSet was created for '$MCS_NAME'"
     kube get multiclusterservice "$MCS_NAME" -o yaml >&2 || true
-    kube get clusterdeployment "$CLD_NAME" -n "$NAMESPACE" --show-labels >&2 || true
     kcm_errors 20m >&2 || true
     exit 1
-fi
-
-if [[ "${SKIP_CHILD_API_CHECK:-false}" == "true" ]]; then
-    warn "SKIP_CHILD_API_CHECK=true -- not verifying the workloads in the child cluster"
-    kube get multiclusterservice "$MCS_NAME"
-    ok "MultiClusterService '$MCS_NAME' created"
-    exit 0
 fi
 
 # Scenarios that assert the rollout stops have their own checks: waiting for

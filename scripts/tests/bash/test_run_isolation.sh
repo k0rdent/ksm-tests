@@ -7,7 +7,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/helpers.sh"
 names_for() {
     RUN_ID="$1" bash -c "
         source '$SCRIPTS_DIR/lib/common.sh'
-        echo \"\$MGMT_CLUSTER_NAME|\$REGISTRY_NAME|\$WORKDIR|\$KUBECONFIG_MGMT|\$KUBECONFIG_CHILD|\$IMG|\$IMG_TELEMETRY|\$CLD_NAME|\$CLD_GROUP_LABEL|\$LOG_DIR\"
+        echo \"\$MGMT_CLUSTER_NAME|\$REGISTRY_NAME|\$WORKDIR|\$KUBECONFIG_MGMT|\$KUBECONFIG_CHILD|\$IMG|\$IMG_TELEMETRY|\$MCS_NAME|\$LOG_DIR\"
     "
 }
 
@@ -16,8 +16,10 @@ b="$(names_for b)"
 
 IFS='|' read -ra fa <<< "$a"
 IFS='|' read -ra fb <<< "$b"
+# KUBECONFIG_CHILD is the management one under self-management, so it is
+# isolated for the same reason and by the same suffix.
 labels=(MGMT_CLUSTER_NAME REGISTRY_NAME WORKDIR KUBECONFIG_MGMT KUBECONFIG_CHILD \
-        IMG IMG_TELEMETRY CLD_NAME CLD_GROUP_LABEL LOG_DIR)
+        IMG IMG_TELEMETRY MCS_NAME LOG_DIR)
 
 for i in "${!labels[@]}"; do
     TESTS_RUN=$((TESTS_RUN + 1))
@@ -39,6 +41,6 @@ plain="$(names_for '')"
 assert_contains "no RUN_ID keeps the plain cluster name" "$plain" "kcm-mgmt|"
 assert_contains "no RUN_ID keeps the plain registry name" "$plain" "kcm-test-registry|"
 assert_contains "no RUN_ID keeps the plain kubeconfig" "$plain" "/kcfg_k0rdent|"
-assert_contains "no RUN_ID keeps the default cluster name" "$plain" "adopted-e2e|"
+assert_contains "no RUN_ID keeps the plain MCS name" "$plain" "mcs-e2e-01-basic|"
 
 finish

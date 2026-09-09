@@ -8,11 +8,11 @@ Everything is a shell script, so CI runs exactly what you run locally.
 
 ## What it tests
 
-Each scenario builds a throwaway environment — two k0s clusters in Docker, one
-running KCM and one it adopts — exercises one KSM behaviour and tears it all
-down. Nothing is provisioned through CAPI: KCM is handed the second cluster's
-kubeconfig, which is what the `adopted-cluster` template is for. No cloud
-credentials, no cost.
+Each scenario builds a throwaway environment — one k0s cluster in Docker
+running KCM — exercises one KSM behaviour and tears it down. Nothing is
+provisioned: the `MultiClusterService` asks for `selfManagement`, so KCM
+deploys the services into the cluster it runs in. No second cluster, no
+`ClusterDeployment`, no cloud credentials, no cost.
 
 | Scenario | Asserts |
 |---|---|
@@ -110,10 +110,9 @@ substitute for CI. Scenarios are genuinely not isolated that way:
 `02dep02_invalid` breaks cert-manager on purpose, so everything after it that
 needs cert-manager fails too.
 
-The adopted cluster publishes its API on the host, so the checks that read it —
-helm releases, pod UIDs, workloads — work on macOS as they do on Linux. KCM
-reaches the same cluster by its address on the docker network, which is why
-there are two kubeconfigs: `kcfg_adopted*` for you, and one in a Secret for KCM.
+There is one kubeconfig, `kcfg_k0rdent*`, and its API is published on the host,
+so the checks that read the deployed services — helm releases, pod UIDs,
+workloads — work on macOS as they do on Linux.
 
 ## Adding a scenario
 
@@ -221,5 +220,6 @@ variable `ENABLE_CRON=1`.
 Pushes trigger CI only on `main`; elsewhere the pull request does, because a
 branch with an open PR fires both events and the cancelled duplicate shows on
 the PR as a failed check.
+
 
 

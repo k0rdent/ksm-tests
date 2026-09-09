@@ -112,13 +112,11 @@ while read -r name; do
     [[ -n "$name" ]] || continue
     ns="$(service_field "$name" namespace)"
     log "── blocked: $name is '$(state_of "$name" "$json")' (namespace '$ns')"
-    if [[ "${SKIP_CHILD_API_CHECK:-false}" != "true" ]]; then
-        count="$(kube_child get deployments,daemonsets,statefulsets -n "$ns" \
-            -o name 2>/dev/null | wc -l | tr -d ' ')"
-        [[ "$count" == "0" ]] \
-            || { kube_child get all -n "$ns" >&2 || true
-                 die "'$name' is blocked but left $count workload(s) in '$ns'"; }
-    fi
+    count="$(kube_child get deployments,daemonsets,statefulsets -n "$ns" \
+        -o name 2>/dev/null | wc -l | tr -d ' ')"
+    [[ "$count" == "0" ]] \
+        || { kube_child get all -n "$ns" >&2 || true
+             die "'$name' is blocked but left $count workload(s) in '$ns'"; }
 done < <(expect_list blocked)
 ok "Blocked services were never installed"
 
@@ -146,16 +144,12 @@ while read -r name; do
              die "'$name' never came back to Deployed (last state '${st:-<unlisted>}') -- it was rolled back after '$FAILED_SVC' failed"; }
 
     ns="$(service_field "$name" namespace)"
-    if [[ "${SKIP_CHILD_API_CHECK:-false}" != "true" ]]; then
-        count="$(kube_child get deployments,daemonsets,statefulsets -n "$ns" \
-            -o name 2>/dev/null | wc -l | tr -d ' ')"
-        [[ "$count" != "0" ]] \
-            || die "'$name' is Deployed but its workloads are gone from '$ns'"
-        log "── kept: $name -- $count workload(s) in '$ns'"
-        kube_child get pods -n "$ns" 2>/dev/null || true
-    else
-        log "── kept: $name is Deployed"
-    fi
+    count="$(kube_child get deployments,daemonsets,statefulsets -n "$ns" \
+        -o name 2>/dev/null | wc -l | tr -d ' ')"
+    [[ "$count" != "0" ]] \
+        || die "'$name' is Deployed but its workloads are gone from '$ns'"
+    log "── kept: $name -- $count workload(s) in '$ns'"
+    kube_child get pods -n "$ns" 2>/dev/null || true
 done < <(expect_list deployed)
 
 step "Final ServiceSet state"

@@ -29,7 +29,7 @@ if [[ -f "$SERVICES_FILE" ]] && command -v yq >/dev/null 2>&1 \
 
     if [[ -z "$KF_STEP" || "$KF_STEP" == "$STEP_NAME" ]]; then
         # Only the failing step: the ones before it need their normal budget.
-        export MCS_TIMEOUT="$KF_TIMEOUT" CLD_REMOVAL_TIMEOUT="$KF_TIMEOUT"
+        export MCS_TIMEOUT="$KF_TIMEOUT"
         export DIAG_INTERVAL="${DIAG_INTERVAL_KNOWN:-60}"
         warn "'$STEP_NAME' is a known failure on $KCM -- waits shortened to ${KF_TIMEOUT}s"
     fi

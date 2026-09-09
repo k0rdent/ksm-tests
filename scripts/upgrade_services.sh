@@ -35,12 +35,8 @@ export KUBECONFIG="$KUBECONFIG_MGMT"
 require_cluster
 ensure_workdir
 
-if [[ "${SKIP_CHILD_API_CHECK:-false}" == "true" ]]; then
-    warn "SKIP_CHILD_API_CHECK=true -- the upgrade checks read the child cluster, skipping"
-    exit 0
-fi
 [[ -f "$KUBECONFIG_CHILD" ]] \
-    || die "No child kubeconfig at $KUBECONFIG_CHILD. Run ./scripts/deploy_adopted_cluster.sh first."
+    || die "No kubeconfig at $KUBECONFIG_CHILD. Run ./scripts/deploy_mgmt_cluster.sh first."
 
 # ── Snapshot ─────────────────────────────────────────────────────────────────
 # Every later claim is relative to this.
