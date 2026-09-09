@@ -30,5 +30,10 @@ services:
     waitForPods: cert-manager-
     values: |
       cert-manager:
+        # KCM runs its own cert-manager in this management cluster and its helm
+        # release owns the CRDs, so this copy must not install them and needs
+        # names of its own. Under self-management there is nowhere else to put
+        # it.
         crds:
-          enabled: true
+          enabled: false
+        fullnameOverride: scenario-cert-manager

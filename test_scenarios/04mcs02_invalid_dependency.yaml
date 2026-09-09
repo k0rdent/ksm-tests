@@ -16,8 +16,10 @@ multiClusterServices:
         # A negative replica count is refused, so the release never installs.
         values: |
           cert-manager:
+            # KCM owns the cert-manager CRDs in this cluster; see the note above.
             crds:
-              enabled: true
+              enabled: false
+            fullnameOverride: scenario-cert-manager
             replicaCount: -1
 
   - name: dependent

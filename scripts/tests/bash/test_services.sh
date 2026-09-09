@@ -297,8 +297,13 @@ assert_eq "the dependency carries its namespace" "cert-manager" \
 assert_eq "cert-manager has no dependsOn in the MCS" "null" \
     "$(yq -r '.spec.serviceSpec.services[] | select(.name=="cert-manager") | .dependsOn' "$WORKDIR/mcs.yaml" 2>/dev/null)"
 # The values must survive as a nested block, since the chart is a wrapper.
-assert_eq "cert-manager values reach the subchart" "true" \
-    "$(yq -r '.spec.serviceSpec.services[] | select(.name=="cert-manager") | .values' "$WORKDIR/mcs.yaml" 2>/dev/null | yq -r '.["cert-manager"].crds.enabled')"
+# crds is off on purpose: KCM's own release owns the cert-manager CRDs in the
+# cluster the services now deploy into, and a second owner cannot import them.
+vals="$(yq -r '.spec.serviceSpec.services[] | select(.name=="cert-manager") | .values' "$WORKDIR/mcs.yaml" 2>/dev/null)"
+assert_eq "cert-manager values reach the subchart" "false" \
+    "$(yq -r '.["cert-manager"].crds.enabled' <<< "$vals")"
+assert_eq "and rename it away from KCM's own" "scenario-cert-manager" \
+    "$(yq -r '.["cert-manager"].fullnameOverride' <<< "$vals")"
 
 rm -rf "$WORKDIR" "$MOCK_BIN"
 finish

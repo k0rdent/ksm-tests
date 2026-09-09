@@ -18,8 +18,10 @@ multiClusterServices:
         waitForPods: cert-manager-
         values: |
           cert-manager:
+            # KCM owns the cert-manager CRDs in this cluster; see the note above.
             crds:
-              enabled: true
+              enabled: false
+            fullnameOverride: scenario-cert-manager
 
   - name: dependent
     dependsOn:

@@ -35,6 +35,11 @@ services:
     # A negative replica count is rejected, so the release fails.
     values: |
       cert-manager:
+        # crds/fullnameOverride as everywhere else, so this still fails on the
+        # rejected replicaCount and not on KCM's ownership of the CRDs.
+        crds:
+          enabled: false
+        fullnameOverride: scenario-cert-manager
         replicaCount: -1
 
   - name: kserve-crd
