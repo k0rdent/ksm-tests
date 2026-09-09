@@ -71,13 +71,6 @@ for ns in "$NAMESPACE" projectsveltos; do
     done < <(kube get pods -n "$ns" -o name 2>/dev/null)
 done
 
-# ── Child cluster ────────────────────────────────────────────────────────────
-if [[ -f "$KUBECONFIG_CHILD" ]] && kube_child version --request-timeout=10s >/dev/null 2>&1; then
-    dump child-nodes.txt kube_child get nodes -o wide
-    dump child-pods.txt kube_child get pods -A -o wide
-    dump child-events.txt kube_child get events -A --sort-by=.lastTimestamp
-else
-    log "Child cluster not reachable -- skipping its dump"
-fi
-
+# The services land in this same cluster under self-management, so the
+# cluster-wide dumps above already cover them. There is nothing else to reach.
 ok "Diagnostics written to $LOG_DIR"

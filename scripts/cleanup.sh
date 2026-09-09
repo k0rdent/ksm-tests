@@ -9,7 +9,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
 step "Cleaning up"
 
 if command -v docker >/dev/null 2>&1; then
-    for container in "$ADOPTED_CLUSTER_NAME" "$MGMT_CLUSTER_NAME" "$REGISTRY_NAME"; do
+    for container in "$MGMT_CLUSTER_NAME" "$REGISTRY_NAME"; do
         if docker ps -a --format '{{.Names}}' | grep -qx "$container"; then
             log "Removing container '$container'"
             docker rm -vf "$container" >/dev/null 2>&1

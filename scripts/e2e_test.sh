@@ -92,8 +92,6 @@ if [[ "$DO_ENV" == "true" ]]; then
     "$SCRIPTS_DIR/wait_for_templates.sh"
     "$SCRIPTS_DIR/apply_management.sh"
     "$SCRIPTS_DIR/wait_for_management.sh"
-    "$SCRIPTS_DIR/deploy_adopted_cluster.sh"
-    "$SCRIPTS_DIR/adopt_cluster.sh"
 fi
 
 if [[ "$DO_SCENARIO" == "true" && "${SKIP_SERVICE_TEST:-false}" != "true" ]]; then
@@ -115,6 +113,5 @@ fi
 # Only a full run owns the environment, so only it tears the cluster down.
 # --env-up leaves it for the --scenario-only runs that follow.
 if [[ "$DO_ENV" == "true" && "$DO_SCENARIO" == "true" ]]; then
-    "$SCRIPTS_DIR/remove_cld.sh"
     "$SCRIPTS_DIR/remove_kcm.sh"
 fi

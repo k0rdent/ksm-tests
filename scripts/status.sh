@@ -41,12 +41,9 @@ done
 
 # state RUN_ID -- one line per environment.
 describe() {
-    local id="${1#@}" mgmt="${SEEN[$1]}" suffix="" workdir kcm="" reuse="" adopted="-"
+    local id="${1#@}" mgmt="${SEEN[$1]}" suffix="" workdir kcm="" reuse=""
     [[ -n "$id" ]] && suffix="-$id"
     workdir="$PROJECT_ROOT/.work$suffix"
-
-    adopted="$(docker ps -a --filter "name=^adopted$suffix\$" --format '{{.Status}}' 2>/dev/null | head -1)"
-    adopted="${adopted:--}"
 
     local env_file="$workdir/kcm-build.env"
     if [[ -f "$env_file" ]]; then
@@ -65,15 +62,14 @@ describe() {
         kcm="not installed"
     fi
 
-    printf '  %-22s %-16s %-16s %s\n' \
-        "${id:-<none>}" "${mgmt:0:16}" "${adopted:0:16}" "$kcm"
+    printf '  %-22s %-16s %s\n' "${id:-<none>}" "${mgmt:0:16}" "$kcm"
     [[ -n "$reuse" && -n "$mgmt" ]] \
         && printf '  %-22s %s\n' "" "↳ make scenario $reuse"
     return 0
 }
 
 step "Environments"
-printf '  %-22s %-16s %-16s %s\n' "RUN_ID" "MGMT" "ADOPTED" "KCM"
+printf '  %-22s %-16s %s\n' "RUN_ID" "CLUSTER" "KCM"
 for key in $(printf '%s\n' "${!SEEN[@]}" | sort); do
     [[ -n "${SEEN[$key]}" ]] || continue
     describe "$key"

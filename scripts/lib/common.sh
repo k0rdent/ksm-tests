@@ -152,17 +152,10 @@ export IMG IMG_TELEMETRY
 MGMT_CLUSTER_NAME="${MGMT_CLUSTER_NAME:-kcm-mgmt$RUN_SUFFIX}"
 MGMT_API_PORT="${MGMT_API_PORT:-6443}"
 K0S_IMAGE="${K0S_IMAGE:-docker.io/k0sproject/k0s:v1.36.3-k0s.0}"
-# Both clusters share a network so KCM can reach the adopted one by container
-# name. Parallel runs share it too: the names are unique.
+# Shared with the local registry so KCM can reach it by container name.
+# Parallel runs share it too: the names are unique.
 DOCKER_NETWORK="${DOCKER_NETWORK:-kind}"
 export MGMT_CLUSTER_NAME MGMT_API_PORT K0S_IMAGE DOCKER_NETWORK
-
-# The cluster KCM adopts. Its API is published on the host as well, which is the
-# whole point: the checks run from the host, and a NodePort inside the docker
-# network is not routable from macOS.
-ADOPTED_CLUSTER_NAME="${ADOPTED_CLUSTER_NAME:-adopted$RUN_SUFFIX}"
-ADOPTED_API_PORT="${ADOPTED_API_PORT:-6444}"
-export ADOPTED_CLUSTER_NAME ADOPTED_API_PORT
 
 # ── Local OCI registry for the template charts (source mode only) ────────────
 REGISTRY_NAME="${REGISTRY_NAME:-kcm-test-registry$RUN_SUFFIX}"
@@ -184,27 +177,31 @@ export TEMPLATES_REPO_URL INSECURE_REGISTRY
 # ── Kubernetes ───────────────────────────────────────────────────────────────
 NAMESPACE="${NAMESPACE:-kcm-system}"
 KCM_HELM_RELEASE_NAME="${KCM_HELM_RELEASE_NAME:-kcm}"
-TEST_MODE="${TEST_MODE:-adopted}"
+# self -- KCM deploys the services into the cluster it runs in, so there is one
+# cluster, no ClusterDeployment and nothing to adopt.
+TEST_MODE="${TEST_MODE:-self}"
 KUBECONFIG_MGMT="${KUBECONFIG_MGMT:-$PROJECT_ROOT/kcfg_k0rdent$RUN_SUFFIX}"
-KUBECONFIG_CHILD="${KUBECONFIG_CHILD:-$PROJECT_ROOT/kcfg_$TEST_MODE$RUN_SUFFIX}"
+# Kept as its own name so the scripts still read "child" where they check what
+# was deployed; under self-management it is the same cluster.
+KUBECONFIG_CHILD="${KUBECONFIG_CHILD:-$KUBECONFIG_MGMT}"
 export NAMESPACE KCM_HELM_RELEASE_NAME TEST_MODE KUBECONFIG_MGMT KUBECONFIG_CHILD
 
 # ── What KCM actually installs ───────────────────────────────────────────────
 # Only these stay in the Release and Management; every provider dropped is a
-# Helm chart KCM need not reconcile, which is most of the install time. The
-# adopted-cluster template requires no provider of its own -- it only creates a
-# SveltosCluster -- so sveltos is the whole list.
+# Helm chart KCM need not reconcile, which is most of the install time. Under
+# self-management nothing is provisioned at all, so sveltos is the whole list
+# and no cluster template is needed.
 KCM_PROVIDERS="${KCM_PROVIDERS:-projectsveltos}"
-KCM_CLUSTER_TEMPLATES="${KCM_CLUSTER_TEMPLATES:-adopted-cluster}"
+KCM_CLUSTER_TEMPLATES="${KCM_CLUSTER_TEMPLATES:-}"
 export KCM_PROVIDERS KCM_CLUSTER_TEMPLATES
 
-# ── ClusterDeployment under test ─────────────────────────────────────────────
+# ── What deploys the services ────────────────────────────────────────────────
+# One environment per run, so the names only have to separate runs from each
+# other. No ClusterDeployment exists: the MCS asks for self-management instead
+# of selecting a cluster.
 CLUSTER_NAME_SUFFIX="${CLUSTER_NAME_SUFFIX:-${RUN_ID:-e2e}}"
-CLD_NAME="${CLD_NAME:-$TEST_MODE-$CLUSTER_NAME_SUFFIX}"
-# MCS selects the cluster by this label, set on the ClusterDeployment. It is
-# per-run so a MultiClusterService never reaches another run's cluster.
-CLD_GROUP_LABEL="${CLD_GROUP_LABEL:-e2e-${RUN_ID:-default}}"
-export CLUSTER_NAME_SUFFIX CLD_NAME CLD_GROUP_LABEL
+KSM_PROVIDER="${KSM_PROVIDER:-ksm-projectsveltos}"
+export CLUSTER_NAME_SUFFIX KSM_PROVIDER
 
 # ── Scenario under test ──────────────────────────────────────────────────────
 # A scenario is a file in test_scenarios/ describing the services and their
@@ -222,13 +219,9 @@ export SCENARIOS_DIR SCENARIO SCENARIO_SLUG SERVICES_FILE MCS_NAME
 # ── Timeouts (seconds) ───────────────────────────────────────────────────────
 MANAGEMENT_TIMEOUT="${MANAGEMENT_TIMEOUT:-1500}"   # 25 min
 TEMPLATES_TIMEOUT="${TEMPLATES_TIMEOUT:-900}"      # 15 min
-CLD_TIMEOUT="${CLD_TIMEOUT:-1800}"                 # 30 min
-CLD_REMOVAL_TIMEOUT="${CLD_REMOVAL_TIMEOUT:-900}"  # 15 min
 PODS_TIMEOUT="${PODS_TIMEOUT:-900}"                # 15 min
 MCS_TIMEOUT="${MCS_TIMEOUT:-900}"                  # 15 min
-CRED_TIMEOUT="${CRED_TIMEOUT:-300}"                # 5 min
-export MANAGEMENT_TIMEOUT TEMPLATES_TIMEOUT CLD_TIMEOUT CLD_REMOVAL_TIMEOUT
-export PODS_TIMEOUT MCS_TIMEOUT CRED_TIMEOUT
+export MANAGEMENT_TIMEOUT TEMPLATES_TIMEOUT PODS_TIMEOUT MCS_TIMEOUT
 
 # ── Assertions ───────────────────────────────────────────────────────────────
 

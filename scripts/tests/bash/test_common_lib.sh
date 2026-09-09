@@ -16,13 +16,15 @@ assert_eq "PROJECT_ROOT points at the repo" "$REPO_ROOT" "$PROJECT_ROOT"
 assert_eq "CONFIG_DIR is derived from it" "$REPO_ROOT/scripts/config" "$CONFIG_DIR"
 
 # ── defaults ─────────────────────────────────────────────────────────────────
-assert_eq "TEST_MODE defaults to adopted" "adopted" "$TEST_MODE"
-assert_eq "CLD_NAME is <mode>-<suffix>" "adopted-e2e" "$CLD_NAME"
+assert_eq "TEST_MODE defaults to self" "self" "$TEST_MODE"
+# One cluster, so the checks read back through the same kubeconfig they wrote
+# through. A second path here would mean a second cluster came back.
+assert_eq "the child kubeconfig is the management one" "$KUBECONFIG_MGMT" "$KUBECONFIG_CHILD"
 assert_contains "sveltos is enabled" "$KCM_PROVIDERS" "projectsveltos"
-# The adopted template needs no provider of its own, so anything else here
-# would just be a chart KCM reconciles for nothing.
+# Nothing is provisioned under self-management, so anything else here would
+# just be a chart KCM reconciles for nothing.
 assert_eq "sveltos is the whole provider list" "projectsveltos" "$KCM_PROVIDERS"
-assert_eq "and the adopted cluster template" "adopted-cluster" "$KCM_CLUSTER_TEMPLATES"
+assert_eq "and no cluster template is needed" "" "$KCM_CLUSTER_TEMPLATES"
 assert_not_contains "aws provider is off" "$KCM_PROVIDERS" "cluster-api-provider-aws"
 assert_not_contains "azure provider is off" "$KCM_PROVIDERS" "cluster-api-provider-azure"
 # Only source mode uses the local registry; release mode pulls from the URL.
@@ -61,25 +63,3 @@ assert_eq "require_cmd fails on a missing binary" 1 "$?"
 assert_contains "suggests deps.sh" "$out" "deps.sh"
 
 finish
-
-# ── Adopted cluster ──────────────────────────────────────────────────────────
-# The two kubeconfigs are the reason for the adopted mode: one for the harness
-# on the host, one for KCM inside the docker network. If they ever collapse
-# into one, macOS goes blind again.
-# unset first: this process already sourced common.sh, which exports it, and
-# the child would inherit rather than derive.
-assert_contains "the adopted container is named per run" \
-    "$(RUN_ID=x bash -c "unset ADOPTED_CLUSTER_NAME; source '$SCRIPTS_DIR/lib/common.sh'; echo \$ADOPTED_CLUSTER_NAME")" \
-    "adopted-x"
-assert_eq "its API port differs from the management one" "1" \
-    "$([[ "$ADOPTED_API_PORT" != "$MGMT_API_PORT" ]] && echo 1 || echo 0)"
-
-# deploy_adopted_cluster.sh writes the host-facing kubeconfig at 127.0.0.1 and
-# the internal one at the container name; grep the script rather than run it.
-adopted_script="$SCRIPTS_DIR/deploy_adopted_cluster.sh"
-assert_contains "the harness kubeconfig points at 127.0.0.1" \
-    "$(grep -A2 'for the harness' "$adopted_script" || true)" "127.0.0.1"
-# By IP, not hostname: the k0s API certificate has no SAN for the container
-# name, so sveltos would fail the TLS check.
-assert_contains "the KCM kubeconfig points at the container IP" \
-    "$(grep 'ADOPTED_IP:6443' "$adopted_script" || true)" "ADOPTED_IP"

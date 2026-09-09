@@ -339,9 +339,6 @@ kind: MultiClusterService
 metadata:
   name: $(mcs_object_name "${MCS_IDX:-0}")
 spec:
-  clusterSelector:
-    matchLabels:
-      group: $CLD_GROUP_LABEL
 EOF
 
     # Holds the whole MCS back until the named ones are deployed and healthy.
@@ -352,8 +349,15 @@ EOF
         echo "    - $(mcs_object_name "$(mcs_index_of "$dep")")" >> "$out"
     done < <(mcs_depends_on "${MCS_IDX:-0}")
 
+    # provider before services, and both after dependsOn: dependsOn sits on the
+    # MCS itself, one level above serviceSpec.
     cat >> "$out" <<EOF
   serviceSpec:
+    provider:
+      name: $KSM_PROVIDER
+      # KCM deploys into the cluster it runs in, so there is no
+      # ClusterDeployment to select and no second cluster to reach.
+      selfManagement: true
     services:
 EOF
 

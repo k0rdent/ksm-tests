@@ -33,8 +33,8 @@
 # export RUN_ID="mine"
 
 # ── Scope of the run ─────────────────────────────────────────────────────────
-# export TEST_MODE="docker"
-# export CLUSTER_NAME_SUFFIX="e2e"      # ClusterDeployment is <TEST_MODE>-<suffix>
+# export TEST_MODE="self"               # the only mode: KCM deploys into itself
+# export CLUSTER_NAME_SUFFIX="e2e"
 
 # Providers KCM will actually install. Trimming this list is the main lever on
 # install time -- each extra provider is another Helm chart to reconcile.
@@ -56,7 +56,6 @@
 
 # ── Timeouts, in seconds ─────────────────────────────────────────────────────
 # export MANAGEMENT_TIMEOUT="1500"
-# export CLD_TIMEOUT="1800"
 
 # ── Debugging ────────────────────────────────────────────────────────────────
 # export DEBUG="true"                   # verbose helm output and pod describes
