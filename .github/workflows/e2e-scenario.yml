@@ -78,13 +78,64 @@ jobs:
           go-version: 'stable'
           cache: false
 
-      - name: Build the k0rdent cluster
-        run: ./scripts/deploy_k0rdent.sh
+      # One step per script, so the step list says where a run failed without
+      # anyone opening a log. deploy_k0rdent.sh runs the same sequence for a
+      # local run; nothing enforces that the two stay in step, so a script
+      # added there has to be added here too.
+      - name: Install dependencies
+        run: ./scripts/deps.sh
 
-      - name: Run the scenario
-        run: ./scripts/scenario_run.sh
+      - name: Prepare KCM
+        run: ./scripts/prepare_kcm.sh
 
-      # Both entry points collect diagnostics themselves when they fail.
+      # The local registry only serves charts we built ourselves.
+      - name: Deploy local registry
+        if: matrix.kcm.mode == 'source'
+        run: ./scripts/deploy_registry.sh
+
+      - name: Deploy k0rdent cluster
+        run: ./scripts/deploy_mgmt_cluster.sh
+
+      - name: Push images and charts
+        if: matrix.kcm.mode == 'source'
+        run: ./scripts/push_kcm_artifacts.sh
+
+      - name: Install KCM
+        run: ./scripts/deploy_kcm.sh
+
+      - name: Apply Release and templates
+        run: ./scripts/apply_release.sh
+
+      - name: Wait for templates
+        run: ./scripts/wait_for_templates.sh
+
+      - name: Apply Management
+        run: ./scripts/apply_management.sh
+
+      - name: Wait for Management
+        run: ./scripts/wait_for_management.sh
+
+      - name: Install ServiceTemplates
+        run: ./scripts/install_servicetemplate.sh
+
+      - name: Deploy services via MultiClusterService
+        run: ./scripts/deploy_mcs.sh
+
+      # No-op unless the scenario has an upgrade block.
+      - name: Upgrade services
+        run: ./scripts/upgrade_services.sh
+
+      # No-op unless the scenario declares upgrade.steps.
+      - name: Upgrade along the chain
+        run: ./scripts/upgrade_chain.sh
+
+      - name: Remove services
+        run: ./scripts/remove_services.sh
+
+      - name: Collect diagnostics
+        if: failure()
+        run: ./scripts/collect_logs.sh
+
       - name: Upload diagnostics
         if: failure()
         uses: actions/upload-artifact@v7
