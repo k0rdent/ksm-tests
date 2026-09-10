@@ -180,7 +180,10 @@ MANAGEMENT_TIMEOUT="${MANAGEMENT_TIMEOUT:-1500}"   # 25 min
 TEMPLATES_TIMEOUT="${TEMPLATES_TIMEOUT:-900}"      # 15 min
 PODS_TIMEOUT="${PODS_TIMEOUT:-900}"                # 15 min
 MCS_TIMEOUT="${MCS_TIMEOUT:-900}"                  # 15 min
-export MANAGEMENT_TIMEOUT TEMPLATES_TIMEOUT PODS_TIMEOUT MCS_TIMEOUT
+# Teardown separately, and much shorter: a removal that has not finished in a
+# minute is wedged, and waiting the deploy budget out only delays the report.
+REMOVE_TIMEOUT="${REMOVE_TIMEOUT:-60}"             # 1 min
+export MANAGEMENT_TIMEOUT TEMPLATES_TIMEOUT PODS_TIMEOUT MCS_TIMEOUT REMOVE_TIMEOUT
 
 # ── Assertions ───────────────────────────────────────────────────────────────
 
