@@ -192,20 +192,8 @@ jobs:
             EXPECT='(.expect.failed != null)'
             PLAIN='((.templateChain // .upgrade // .multiClusterServices // .expect) == null)'
 
-            # One per feature area, preferring a scenario that is not a known
-            # failure -- a leg expected to fail is a poor smoke test.
-            one_of() {
-              local first="" id
-              while read -r id; do
-                [[ -n "$id" ]] || continue
-                [[ -z "$first" ]] && first="$id"
-                if [[ "$(yq -r '[.knownFailures[]?] | length' "test_scenarios/$id.yaml")" == 0 ]]; then
-                  echo "$id"; return
-                fi
-              done < <(using "$1")
-              [[ -n "$first" ]] && echo "$first"
-              return 0
-            }
+            # One per feature area.
+            one_of() { using "$1" | head -1; }
 
             targeted="" source_build=false everything=false pipeline=false env_only=false
             while read -r f; do
@@ -262,13 +250,12 @@ jobs:
             ids=""
             for v in ${SEL[$id]:-}; do selected "$v" "$WANT_KCM" && ids+="$v "; done
             [[ -n "${ids// /}" ]] || continue
-            known="$(yq -r '[.knownFailures[].kcm] | join(" ")' "$f")"
             # variants is a JSON string: the reusable workflow takes it as one
             # input and fromJson's it, which lets each scenario have its own set.
             vjson="$(jq -c --arg ids "$ids" \
               '[ .[] | select(.id as $i | ($ids | split(" ") | index($i))) ]' <<< "$ALL")"
-            scenarios="$(jq -c --arg id "$id" --arg known "$known" --arg v "$vjson" \
-              '. + [{id: $id, knownFailingKcm: $known, variants: $v}]' <<< "$scenarios")"
+            scenarios="$(jq -c --arg id "$id" --arg v "$vjson" \
+              '. + [{id: $id, variants: $v}]' <<< "$scenarios")"
           done
 
           # Nothing to run is normal for a docs-only pull request, but for a
@@ -296,7 +283,6 @@ jobs:
     with:
       scenario: ${{ matrix.scenario.id }}
       kcm_variants: ${{ matrix.scenario.variants }}
-      known_failing_kcm: ${{ matrix.scenario.knownFailingKcm }}
       kcm_src_url: ${{ github.event.inputs.kcm_src_url || '' }}
       kcm_ref: ${{ github.event.inputs.kcm_ref || '' }}
       keep_cluster: ${{ github.event.inputs.keep_cluster == 'true' }}

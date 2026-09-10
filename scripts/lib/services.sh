@@ -98,22 +98,6 @@ template_name_for() {
     echo "$1-$(fqdn_version "$2")"
 }
 
-# ── Known failures ───────────────────────────────────────────────────────────
-# The entry names a step and a fragment of the expected error, so a leg that
-# breaks for another reason still goes red rather than being swallowed.
-
-# known_failure_field FIELD -- from the entry matching $KCM, empty otherwise.
-known_failure_field() {
-    KCMID="${KCM:-}" FIELD="$1" yq -r \
-        '.knownFailures[]? | select(.kcm == strenv(KCMID)) | .[strenv(FIELD)] // ""' "$SERVICES_FILE"
-}
-
-# is_known_failure -- true when this scenario is expected to fail on this KCM.
-is_known_failure() {
-    [[ -n "${KCM:-}" ]] || return 1
-    [[ -n "$(known_failure_field kcm)" ]]
-}
-
 # ── Upgrades ─────────────────────────────────────────────────────────────────
 # An `upgrade:` block deploys once, changes some services, then asserts what
 # moved and what did not.

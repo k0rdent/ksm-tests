@@ -5,21 +5,11 @@ description: >-
   CRDs must exist before the controller. Same chain as catalog's apps/kserve.
   Issue #2, scenario 1: every service is valid, so all of them must land.
 
-# KCM versions where this scenario is known to fail. CI still runs the leg and
-# still reports it, but it does not block the workflow. Drop an entry once the
-# defect is fixed upstream.
-knownFailures:
-  - kcm: rel-1-11-0
-    # step and match keep the marker narrow: it excuses this defect in this
-    # step only, so the leg still goes red if it breaks for any other reason.
-    step: Remove services
-    match: ensure CRDs are installed first
-    timeout: 300
-    reason: >-
-      Teardown removes kserve-crd before uninstalling kserve-resources, whose
-      release still holds a ClusterStorageContainer, so the uninstall fails with
-      "ensure CRDs are installed first" and the MCS finalizer never clears.
-      main is unaffected; catalog does not test this path at all.
+# KNOWN FAILURE on KCM 1.11.0, in "Remove services": teardown removes
+# kserve-crd before uninstalling kserve-resources, whose release still holds a
+# ClusterStorageContainer, so the uninstall fails with "ensure CRDs are
+# installed first" and the MCS finalizer never clears. Fixed between v1.11.0
+# and v1.12.0-rc1; main is unaffected.
 
 # Charts come from k0rdent/catalog's registry. Those are thin wrappers that
 # declare the upstream chart as a dependency of the same name, so values are

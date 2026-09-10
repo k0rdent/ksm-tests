@@ -95,18 +95,16 @@ if [[ "$DO_ENV" == "true" ]]; then
 fi
 
 if [[ "$DO_SCENARIO" == "true" && "${SKIP_SERVICE_TEST:-false}" != "true" ]]; then
-    # Same step names as CI: knownFailures entries reference them.
-    step_run() { "$SCRIPTS_DIR/ci_step.sh" "$1" "$2"; }
     if [[ "$CLEAN_ONLY" != "true" ]]; then
-        step_run "Install ServiceTemplates" "$SCRIPTS_DIR/install_servicetemplate.sh"
-        step_run "Deploy services via MultiClusterService" "$SCRIPTS_DIR/deploy_mcs.sh"
+        "$SCRIPTS_DIR/install_servicetemplate.sh"
+        "$SCRIPTS_DIR/deploy_mcs.sh"
         # No-op unless the scenario has an upgrade block.
-        step_run "Upgrade services" "$SCRIPTS_DIR/upgrade_services.sh"
+        "$SCRIPTS_DIR/upgrade_services.sh"
         # No-op unless the scenario declares upgrade.steps.
-        step_run "Upgrade along the chain" "$SCRIPTS_DIR/upgrade_chain.sh"
+        "$SCRIPTS_DIR/upgrade_chain.sh"
     fi
     if [[ "$KEEP_RESOURCES" != "true" ]]; then
-        step_run "Remove services" "$SCRIPTS_DIR/remove_services.sh"
+        "$SCRIPTS_DIR/remove_services.sh"
     fi
 fi
 
