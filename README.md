@@ -63,15 +63,16 @@ make scenario-clean SCENARIO=02dep01_valid      # remove them again
 make env-down
 ```
 
-Only `env-up` takes the KCM selection. It records what it built, so the rest
-need `RUN_ID` alone -- and it defaults from the selection, so a plain sequence
-like the one above needs nothing at all. `make status` lists what exists:
+`KCM` is the only knob: a variant id from `scripts/config/kcm-variants.yaml`,
+a chart version, or a git ref with `KCM_MODE=source`. It names the environment
+as well as the build, so the same `KCM=` reaches the same cluster from every
+target and nothing else has to be repeated. `make status` lists what exists:
 
 ```
 ▶ Environments
-  RUN_ID                 MGMT             ADOPTED          KCM
-  stepchain              Up 26 minutes    Up 20 minutes    source 1.11.0 (c84da262, Thu 3.9.2026)
-                         ↳ make scenario RUN_ID=stepchain SCENARIO=<id>
+  RUN_ID                 CLUSTER          KCM
+  local-1-12-0-rc1       Up 26 minutes    release 1.12.0-rc1
+                         ↳ make scenario RUN_ID=local-1-12-0-rc1 SCENARIO=<id>
 ```
 
 `make logs` dumps diagnostics, `make clean` tears one environment down.

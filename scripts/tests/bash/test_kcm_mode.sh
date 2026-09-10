@@ -62,8 +62,10 @@ out="$(KCM=rel-1-12-0 bash -c "source '$SCRIPTS_DIR/lib/common.sh'" 2>&1)"
 assert_eq "a typo is refused" 1 "$?"
 assert_contains "and lists the variants" "$out" "src-main"
 # Two configurations must not land in the same workdir and cluster names.
-assert_contains "RUN_ID follows the version" "$(mk KCM_VERSION=1.10.0)" "RUN_ID=local-1-10-0"
-assert_contains "RUN_ID follows the variant" "$(mk KCM=src-main)" "RUN_ID=local-src-main"
+# One knob: KCM names both what is installed and the environment holding it,
+# so nothing else has to be passed to address the same cluster again.
+assert_contains "RUN_ID follows KCM, a variant" "$(mk KCM=src-main)" "RUN_ID=local-src-main"
+assert_contains "or a version, with dots made safe" "$(mk KCM=1.12.0-rc1)" "RUN_ID=local-1-12-0-rc1"
 
 # Reusing an environment must need RUN_ID and nothing else: it records what
 # built it, and repeating the selection is a second chance to get it wrong.

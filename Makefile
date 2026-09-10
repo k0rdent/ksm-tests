@@ -10,10 +10,11 @@ SCENARIO ?= 01_basic
 # defaults in common.sh apply -- release 1.11.0.
 KCM      ?=
 
-# Shared by env-up / scenario / env-down so they all address the same cluster,
-# and distinct per configuration so two of them can coexist. Dots become dashes:
-# it ends up in CLD_NAME, which is a DNS label.
-RUN_ID   ?= local$(if $(KCM),-$(KCM))$(if $(KCM_MODE),-$(KCM_MODE))$(if $(KCM_VERSION),-$(subst .,-,$(KCM_VERSION)))
+# The environment's name, derived from KCM so the same KCM= addresses the same
+# cluster across env-up / scenario / env-down and nothing else has to be typed.
+# Dots become dashes: it ends up in MCS_NAME, which is a DNS label.
+# Override it only to hold two environments for one KCM at once.
+RUN_ID   ?= local$(if $(KCM),-$(subst .,-,$(KCM)))
 
 E2E := SCENARIO=$(SCENARIO) KCM=$(KCM) RUN_ID=$(RUN_ID) ./$(SCRIPTS)/e2e_test.sh
 
@@ -121,9 +122,9 @@ e2e-parallel: ## Every scenario at once, each with its own cluster.
 #: Builds both k0s clusters, installs KCM and adopts the child cluster.
 #: About 7 minutes. Stops before any scenario runs.
 #:
-#: Vars: KCM / KCM_VERSION / KCM_MODE -- this is the one target that needs
-#:       them; later targets read them back out of the environment. They also
-#:       derive RUN_ID, so set RUN_ID here when the name matters to you.
+#: Vars: KCM -- a variant id, or a chart version, or a git ref with
+#:       KCM_MODE=source. It also names the environment, so the same KCM
+#:       reaches it again from `scenario` and `env-down`.
 #:
 #:   make env-up
 #:   make env-up KCM=rel-1-11-0
@@ -135,12 +136,10 @@ env-up: ## Build the cluster and KCM, up to a verified child cluster.
 #: Deploys the scenario's services through a MultiClusterService, verifies
 #: them and removes them again. Needs `make env-up` first.
 #:
-#: Vars: SCENARIO, and RUN_ID to say which environment -- as `make status`
-#:       prints it. Nothing else: the environment records which KCM built it,
-#:       so the selection is not repeated here.
+#: Vars: SCENARIO, and the same KCM you built the environment with.
 #:
-#:   make scenario SCENARIO=02dep01_valid                    # the default one
-#:   make scenario SCENARIO=02dep01_valid RUN_ID=stepchain
+#:   make scenario SCENARIO=02dep01_valid                 # the default one
+#:   make scenario SCENARIO=02dep01_valid KCM=1.12.0-rc1
 #:
 #: Scenarios are not isolated from each other on a shared environment:
 #: 02dep02_invalid breaks cert-manager on purpose.
@@ -171,11 +170,11 @@ scenario-clean: ## Remove services from a kept scenario.
 #: Removes the containers, network and kubeconfigs of ONE environment. The
 #: working directory stays; `make clean` removes that too.
 #:
-#: Vars: RUN_ID -- which environment, as `make status` prints it. Passing the
-#:       KCM selection instead works too, because RUN_ID is derived from it.
+#: Vars: the same KCM you built it with. RUN_ID still works for an
+#:       environment whose name `make status` prints.
 #:
 #:   make env-down                        # the default environment
-#:   make env-down RUN_ID=stepchain       # exactly what `make status` printed
+#:   make env-down KCM=1.12.0-rc1
 env-down: ## Tear the environment down.
 	$(E2E) --env-down
 
