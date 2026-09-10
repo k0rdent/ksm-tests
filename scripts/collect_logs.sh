@@ -24,6 +24,12 @@ dump docker-ps.txt docker ps -a
 dump docker-networks.txt docker network ls
 dump disk-usage.txt df -h
 
+# A scenario run has no KCM -- it only knows ./kcfg_k0rdent -- so read the
+# cluster back off the link rather than dropping the container logs.
+if [[ -z "$KCM" && -L "$KUBECONFIG_MGMT" ]]; then
+    MGMT_CLUSTER_NAME="k0rdent-$(basename "$(readlink "$KUBECONFIG_MGMT")" | sed 's/^kcfg_k0rdent_//')"
+fi
+
 if command -v docker >/dev/null 2>&1 && docker ps --format '{{.Names}}' | grep -qx "$MGMT_CLUSTER_NAME"; then
     dump k0s-status.txt docker exec "$MGMT_CLUSTER_NAME" k0s status
     dump mgmt-container.log docker logs --tail 500 "$MGMT_CLUSTER_NAME"
