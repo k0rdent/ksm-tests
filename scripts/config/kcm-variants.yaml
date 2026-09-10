@@ -15,8 +15,8 @@ variants:
   # prCheck marks the one variant pull requests run against: a published chart
   # cannot move under a PR, so a red leg means the change broke something rather
   # than upstream having shifted. The full matrix runs on main and nightly.
-  - id: rel-1-11-0
-    name: 'release: 1.11.0'
-    kcm: '1.11.0'
+  - id: rel-1-12-0-rc-3
+    name: 'release: 1.12.0-rc.3'
+    kcm: '1.12.0-rc.3'
     mode: release
     prCheck: true

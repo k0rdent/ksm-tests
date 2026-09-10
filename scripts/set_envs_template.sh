@@ -12,7 +12,7 @@
 # ── Which KCM to test ────────────────────────────────────────────────────────
 # Required by deploy_k0rdent.sh and remove_k0rdent.sh. It names the cluster
 # (k0rdent-$KCM) as well as the build, so several can exist side by side.
-# export KCM="1.11.0"                   # a published chart version
+# export KCM="1.12.0-rc.3"              # a published chart version
 # export KCM_MODE="release"             # or source, to build from git
 # export OCI_URL="oci://ghcr.io/k0rdent/kcm/charts"   # or .../staging
 

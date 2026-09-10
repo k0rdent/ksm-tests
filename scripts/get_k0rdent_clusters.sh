@@ -37,7 +37,7 @@ for dir in "$WORKDIR/$PREFIX"*; do
 done
 
 (( ${#SEEN[@]} )) || {
-    ok "No k0rdent cluster exists. Build one with KCM=1.11.0 ./scripts/deploy_k0rdent.sh"
+    ok "No k0rdent cluster exists. Build one with KCM=1.12.0-rc.3 ./scripts/deploy_k0rdent.sh"
     exit 0
 }
 

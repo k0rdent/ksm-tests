@@ -2,7 +2,7 @@
 # Remove one k0rdent test cluster: the containers, its kubeconfig and its
 # build state. Best-effort, so it is safe to run twice or from a trap.
 #
-#   export KCM=1.11.0                   # required: which cluster
+#   export KCM=1.12.0-rc.3            # required: which cluster
 #   ./scripts/remove_k0rdent.sh
 set -uo pipefail
 
