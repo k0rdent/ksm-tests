@@ -88,49 +88,65 @@ if [[ -f "$WORKDIR/kcm-build.env" ]]; then
     KCM_REF="${KCM_REF:-$(built_field KCM_REF)}"
 fi
 
-# KCM=<id> is the shorthand CI and the Makefile both speak. Explicitly set
-# KCM_MODE/KCM_REF/KCM_VERSION still win, so an ad-hoc version that is not a
-# declared variant stays testable.
+# ── What is under test ───────────────────────────────────────────────────────
+# release -- install a published chart (tests what users get). Needs no git:
+#            the Release and template manifests come from the kcm-templates
+#            chart in the same registry.
+# source  -- build the images and charts from a git checkout (tests a PR/main)
+#
+# The registry, not one chart in it: kcm, kcm-templates and every provider
+# chart sit side by side, so a staging build is just a different OCI_URL.
+OCI_URL="${OCI_URL:-oci://ghcr.io/k0rdent/kcm/charts}"
+SRC_URL="${SRC_URL:-https://github.com/K0rdent/kcm.git}"
+export OCI_URL SRC_URL
+
+# KCM is the one knob: a variant id from kcm-variants.yaml, or -- when it is
+# not one -- the chart version in release mode and the git ref in source mode.
+# KCM_VERSION and KCM_REF are what the scripts read; KCM only sets them.
+# The variant is resolved before KCM_MODE defaults, so a variant can set it.
 KCM="${KCM:-}"
+_kcm_is_variant=false
 if [[ -n "$KCM" ]]; then
     [[ -f "$KCM_VARIANTS_FILE" ]] || die "No KCM variants file at $KCM_VARIANTS_FILE"
-    if ! list_kcm_variants | grep -qx "$KCM"; then
-        die "Unknown KCM variant '$KCM'. Available: $(list_kcm_variants | tr '\n' ' ')"
+    if list_kcm_variants | grep -qx "$KCM"; then
+        _kcm_is_variant=true
+        KCM_MODE="${KCM_MODE:-$(kcm_variant_field "$KCM" mode)}"
+        _variant_ref="$(kcm_variant_field "$KCM" ref)"
+        _variant_version="$(kcm_variant_field "$KCM" version)"
+        _variant_url="$(kcm_variant_field "$KCM" url)"
+        [[ -n "$_variant_ref" ]] && KCM_REF="${KCM_REF:-$_variant_ref}"
+        [[ -n "$_variant_version" ]] && KCM_VERSION="${KCM_VERSION:-$_variant_version}"
+        [[ -n "$_variant_url" ]] && OCI_URL="$_variant_url"
+        unset _variant_ref _variant_version _variant_url
     fi
-    KCM_MODE="${KCM_MODE:-$(kcm_variant_field "$KCM" mode)}"
-    _variant_ref="$(kcm_variant_field "$KCM" ref)"
-    _variant_version="$(kcm_variant_field "$KCM" version)"
-    [[ -n "$_variant_ref" ]] && KCM_REF="${KCM_REF:-$_variant_ref}"
-    [[ -n "$_variant_version" ]] && KCM_VERSION="${KCM_VERSION:-$_variant_version}"
-    unset _variant_ref _variant_version
 fi
-export KCM
 
-# ── What is under test ───────────────────────────────────────────────────────
-# release -- install the published chart (tests what users get)
-# source  -- build the images and charts from a git checkout (tests a PR/main)
 KCM_MODE="${KCM_MODE:-release}"
-KCM_VERSION="${KCM_VERSION:-1.11.0}"
-# The chart itself, not the registry holding it: the template charts live
-# alongside it, so the registry is derived by stripping the last segment.
-KCM_RELEASE_URL="${KCM_RELEASE_URL:-oci://ghcr.io/k0rdent/kcm/charts/kcm}"
-KCM_SRC_URL="${KCM_SRC_URL:-https://github.com/K0rdent/kcm.git}"
-# Checked here rather than in a function a script could forget to call.
 case "$KCM_MODE" in
     source|release) ;;
     *) die "Invalid KCM_MODE='$KCM_MODE'. Allowed values: release, source" ;;
 esac
-export KCM_MODE KCM_VERSION KCM_RELEASE_URL KCM_SRC_URL
 
-# ── KCM checkout ─────────────────────────────────────────────────────────────
-# Needed in both modes: it supplies the Release and template manifests. In
-# release mode the checkout is pinned to the tag matching KCM_VERSION; in source
-# mode KCM_REF takes any branch, tag or commit from KCM_SRC_URL.
-if [[ "$KCM_MODE" == "release" ]]; then
-    KCM_REF="${KCM_REF:-v$KCM_VERSION}"
-else
-    KCM_REF="${KCM_REF:-main}"
+if [[ -n "$KCM" && "$_kcm_is_variant" == "false" ]]; then
+    if [[ "$KCM_MODE" == "source" ]]; then
+        # Any branch, tag or commit. No shape to check -- a branch is a name.
+        KCM_REF="${KCM_REF:-$KCM}"
+    elif [[ "$KCM" == [0-9]* ]]; then
+        KCM_VERSION="${KCM_VERSION:-$KCM}"
+    else
+        # Neither a variant nor version-shaped: almost certainly a typo, and
+        # left alone it would fail much later on a chart that does not exist.
+        die "Unknown KCM variant '$KCM'. Available: $(list_kcm_variants | tr '\n' ' ')
+A chart version must start with a digit; a git ref needs KCM_MODE=source."
+    fi
 fi
+unset _kcm_is_variant
+
+KCM_VERSION="${KCM_VERSION:-1.11.0}"
+export KCM KCM_MODE KCM_VERSION
+
+# ── KCM checkout (source mode only) ──────────────────────────────────────────
+KCM_REF="${KCM_REF:-main}"
 # Point KCM_SRC_DIR at an existing checkout to test local changes without
 # cloning. Not safe to share between parallel source-mode runs -- the build
 # writes into it.
@@ -165,7 +181,7 @@ REGISTRY_IMAGE="${REGISTRY_IMAGE:-registry:2}"
 # $WORKDIR/registry.env, which push_kcm_artifacts.sh then sources.
 REGISTRY_REPO="${REGISTRY_REPO:-oci://127.0.0.1:$REGISTRY_PORT/charts}"
 if [[ "$KCM_MODE" == "release" ]]; then
-    TEMPLATES_REPO_URL="${TEMPLATES_REPO_URL:-${KCM_RELEASE_URL%/*}}"
+    TEMPLATES_REPO_URL="${TEMPLATES_REPO_URL:-$OCI_URL}"
     INSECURE_REGISTRY="${INSECURE_REGISTRY:-false}"
 else
     TEMPLATES_REPO_URL="${TEMPLATES_REPO_URL:-oci://$REGISTRY_NAME:5000/charts}"
@@ -324,10 +340,20 @@ ensure_workdir() {
 }
 
 # The generated Release / Template manifests produced by `make templates-generate`.
+# In release mode these come from the kcm-templates chart pulled into the
+# workdir; in source mode from the checkout, where the build regenerates them.
+kcm_chart_root() {
+    if [[ "$KCM_MODE" == "release" ]]; then
+        echo "$WORKDIR/kcm-templates"
+    else
+        echo "$KCM_DIR/templates/provider/kcm-templates"
+    fi
+}
+
 kcm_templates_dir() {
-    echo "$KCM_DIR/templates/provider/kcm-templates/files/templates"
+    echo "$(kcm_chart_root)/files/templates"
 }
 
 kcm_release_file() {
-    echo "$KCM_DIR/templates/provider/kcm-templates/files/release.yaml"
+    echo "$(kcm_chart_root)/files/release.yaml"
 }

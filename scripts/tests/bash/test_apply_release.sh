@@ -21,7 +21,10 @@ WORKDIR="$(mktemp -d)"
 KCM_SRC_DIR="$WORKDIR/kcm"
 TPL="$KCM_SRC_DIR/templates/provider/kcm-templates/files/templates"
 mkdir -p "$TPL"
-export WORKDIR KCM_SRC_DIR
+# A checkout layout, so this is source mode: in release mode the manifests
+# come from the kcm-templates chart pulled into the workdir instead.
+KCM_MODE=source
+export WORKDIR KCM_SRC_DIR KCM_MODE
 
 cat > "$KCM_SRC_DIR/templates/provider/kcm-templates/files/release.yaml" <<'EOF'
 apiVersion: k0rdent.mirantis.com/v1beta1

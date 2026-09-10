@@ -53,7 +53,7 @@ jobs:
       # common.sh expands KCM via kcm-variants.yaml, the same file a local run
       # reads, so the mapping is not duplicated here.
       KCM: ${{ matrix.kcm.id }}
-      KCM_SRC_URL: ${{ inputs.kcm_src_url }}
+      SRC_URL: ${{ inputs.kcm_src_url }}
       KCM_REF: ${{ inputs.kcm_ref }}
       SCENARIO: ${{ inputs.scenario }}
       TEST_MODE: self

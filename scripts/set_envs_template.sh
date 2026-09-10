@@ -17,10 +17,10 @@
 # Setting these directly still wins over the variant, for an ad-hoc version:
 # export KCM_MODE="release"             # or source
 # export KCM_VERSION="1.11.0"           # chart version, release mode
-# export KCM_RELEASE_URL="oci://ghcr.io/k0rdent/kcm/charts/kcm"
+# export OCI_URL="oci://ghcr.io/k0rdent/kcm/charts"   # or .../staging
 
 # Source mode: any repository (a fork works) at any branch, tag or commit.
-# export KCM_SRC_URL="https://github.com/K0rdent/kcm.git"
+# export SRC_URL="https://github.com/K0rdent/kcm.git"
 # export KCM_REF="main"
 
 # ...or point at a checkout you are already working in (skips the clone).
