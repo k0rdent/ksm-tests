@@ -141,9 +141,6 @@ jobs:
       - name: Remove services
         run: ./scripts/ci_step.sh "Remove services" ./scripts/remove_services.sh
 
-      - name: Uninstall KCM
-        run: ./scripts/remove_kcm.sh
-
       - name: Collect diagnostics
         if: failure()
         run: ./scripts/collect_logs.sh
