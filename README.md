@@ -30,8 +30,8 @@ deploys the services into the cluster it runs in. No second cluster, no
 
 Each runs against two KCM builds: `src: main` and `release: 1.11.0`.
 
-Install, `Management` reconcile, `ClusterDeployment` and teardown are asserted
-too, because KSM sits on them. Cloud provisioning is out of scope.
+Install, `Management` reconcile and teardown are asserted too, because KSM
+sits on them. Cloud provisioning is out of scope.
 
 ## Structure
 
@@ -39,7 +39,7 @@ too, because KSM sits on them. Cloud provisioning is out of scope.
 test_scenarios/     one YAML per scenario -- the whole test definition
 scripts/            the pipeline, one script per step
   lib/              shared helpers; services.sh reads the scenario files
-  config/           cluster template, KCM values, KCM variants
+  config/           KCM values, the Management object, the CI matrix
   tests/bash/       unit tests for the scripts, no cluster needed
 .github/workflows/  e2e.yml picks what to run, e2e-scenario.yml runs it
 ```
@@ -76,7 +76,11 @@ export SCENARIO=01_basic # (required) scenario id, fail for invalid, list availa
 
 ### List testing k0rdent clusters
 ~~~bash
+# Every k0rdent-<KCM> cluster, and which one kcfg_k0rdent points at
 ./scripts/get_k0rdent_clusters.sh
+
+# Switch the scenarios to another one
+ln -sfn kcfg_k0rdent_1.12.0-rc1 kcfg_k0rdent
 ~~~
 
 ### Delete testing k0rdent cluster

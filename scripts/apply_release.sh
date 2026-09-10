@@ -39,7 +39,7 @@ for provider in "${providers[@]}"; do
     select_expr+=".name == \"$provider\""
 done
 
-TRIMMED_RELEASE="$WORKDIR/release.trimmed.yaml"
+TRIMMED_RELEASE="$ENVDIR/release.trimmed.yaml"
 yq ".spec.providers |= map(select($select_expr))" "$RELEASE_FILE" > "$TRIMMED_RELEASE"
 
 RELEASE_NAME="$(yq -r '.metadata.name' "$TRIMMED_RELEASE")"
@@ -86,6 +86,6 @@ kube apply -f "$TRIMMED_RELEASE"
     echo "RELEASE_NAME=$RELEASE_NAME"
     echo "PROVIDER_TEMPLATES=\"${applied_provider_templates[*]}\""
     echo "CLUSTER_TEMPLATES=\"${applied_cluster_templates[*]}\""
-} > "$WORKDIR/release.env"
+} > "$ENVDIR/release.env"
 
 ok "Release '$RELEASE_NAME' and its templates applied"

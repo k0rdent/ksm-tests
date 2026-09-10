@@ -54,6 +54,6 @@ MAX_RETRIES=30 SLEEP=2 "$SCRIPTS_DIR/retry.sh" \
 {
     echo "REGISTRY_PORT=$REGISTRY_PORT"
     echo "REGISTRY_REPO=$REGISTRY_REPO"
-} > "$WORKDIR/registry.env"
+} > "$ENVDIR/registry.env"
 
 ok "Registry ready: push to $REGISTRY_REPO, cluster reads $TEMPLATES_REPO_URL"

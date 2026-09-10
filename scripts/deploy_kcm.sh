@@ -21,7 +21,7 @@ require_yq
 export KUBECONFIG="$KUBECONFIG_MGMT"
 ensure_workdir
 
-VALUES_FILE="$WORKDIR/kcm-values.rendered.yaml"
+VALUES_FILE="$ENVDIR/kcm-values.rendered.yaml"
 envsubst < "$CONFIG_DIR/kcm-values.yaml" > "$VALUES_FILE"
 
 helm_args=(--timeout 20m)
@@ -38,7 +38,7 @@ if [[ "$KCM_MODE" == "source" ]]; then
     IMG_TELEMETRY_TAG="${IMG_TELEMETRY##*:}"
     export IMG_REPO IMG_TAG IMG_TELEMETRY_REPO IMG_TELEMETRY_TAG
 
-    overlay="$WORKDIR/kcm-values-source.rendered.yaml"
+    overlay="$ENVDIR/kcm-values-source.rendered.yaml"
     envsubst < "$CONFIG_DIR/kcm-values-source.yaml" > "$overlay"
     # shellcheck disable=SC2016 # $item is a yq variable, not a shell one
     yq eval-all '. as $item ireduce ({}; . * $item)' "$VALUES_FILE" "$overlay" \

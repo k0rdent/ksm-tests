@@ -1,10 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
-# Management cluster: a single k0s node in Docker. Writes $KUBECONFIG_MGMT.
-#
-# CAPD needs two extras: the host docker socket (it creates the node containers
-# as siblings) and membership of $DOCKER_NETWORK, where it attaches them.
+# The k0rdent cluster itself: a single k0s node in Docker. Writes
+# $KUBECONFIG_NAMED and points $KUBECONFIG_MGMT (./kcfg_k0rdent) at it.
 
 # shellcheck source=scripts/lib/common.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
@@ -62,13 +60,17 @@ fi
 # for its nodes; the plain k0s image does not.
 docker exec "$MGMT_CLUSTER_NAME" mount --make-rshared /
 
-step "Writing kubeconfig to $KUBECONFIG_MGMT"
-docker exec "$MGMT_CLUSTER_NAME" k0s kubeconfig admin > "$KUBECONFIG_MGMT"
+step "Writing kubeconfig to $KUBECONFIG_NAMED"
+docker exec "$MGMT_CLUSTER_NAME" k0s kubeconfig admin > "$KUBECONFIG_NAMED"
 # k0s points the kubeconfig at the container's internal address; we reach the
 # API through the published port instead.
-sed -i.bak "s#server:.*#server: https://127.0.0.1:$MGMT_API_PORT#" "$KUBECONFIG_MGMT"
-rm -f "$KUBECONFIG_MGMT.bak"
-chmod 0600 "$KUBECONFIG_MGMT"
+sed -i.bak "s#server:.*#server: https://127.0.0.1:$MGMT_API_PORT#" "$KUBECONFIG_NAMED"
+rm -f "$KUBECONFIG_NAMED.bak"
+chmod 0600 "$KUBECONFIG_NAMED"
+
+# kcfg_k0rdent is whichever cluster the scenario scripts will talk to. A link,
+# so switching environments is one ln and `ls -l` says which one is current.
+ln -sfn "$(basename "$KUBECONFIG_NAMED")" "$KUBECONFIG_MGMT"
 
 step "Waiting for the node to come up"
 log "Waiting for kube-system pods to appear..."

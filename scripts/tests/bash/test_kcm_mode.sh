@@ -1,12 +1,15 @@
 #!/bin/bash
-# KCM_MODE switches between the source build and the published chart.
+# KCM selects the build and names the environment; KCM_MODE switches between
+# the published chart and a source build.
 # shellcheck source=scripts/tests/bash/helpers.sh
 source "$(dirname "${BASH_SOURCE[0]}")/helpers.sh"
 
+# This process has not sourced common.sh, so each child starts clean.
 value_of() { # value_of KCM_MODE VAR
     KCM_MODE="$1" bash -c "source '$SCRIPTS_DIR/lib/common.sh'; echo \"\${$2}\""
 }
 
+# ── Modes ────────────────────────────────────────────────────────────────────
 # Release mode reads charts straight from ghcr over TLS.
 assert_eq "release: templatesRepoURL is ghcr" \
     "oci://ghcr.io/k0rdent/kcm/charts" "$(value_of release TEMPLATES_REPO_URL)"
@@ -20,7 +23,7 @@ assert_eq "release: the registry is the source of everything" \
 
 # Source mode reads them from the local registry over plain HTTP.
 assert_contains "source: templatesRepoURL is the local registry" \
-    "$(value_of source TEMPLATES_REPO_URL)" "kcm-test-registry"
+    "$(value_of source TEMPLATES_REPO_URL)" "kcm-registry"
 assert_eq "source: registry is insecure" \
     "true" "$(value_of source INSECURE_REGISTRY)"
 assert_eq "source: checkout follows main" \
@@ -46,57 +49,54 @@ done
 assert_eq "mode defaults to release" "release" \
     "$(bash -c "unset KCM KCM_MODE; source '$SCRIPTS_DIR/lib/common.sh'; echo \$KCM_MODE")"
 
-# The Makefile must not force a variant: KCM=src-main would win over an
-# explicit KCM_VERSION and quietly build main from source instead.
-mk() { make -n --no-print-directory -C "$REPO_ROOT" env-up "$@" 2>/dev/null | head -1; }
-assert_not_contains "make does not force a variant" "$(mk)" "KCM=src-main"
-assert_contains "a bare run is release 1.11.0" \
-    "$(KCM='' bash -c "source '$SCRIPTS_DIR/lib/common.sh'; echo \$KCM_MODE \$KCM_VERSION")" \
-    "release 1.11.0"
-assert_eq "KCM alone is the version in release mode" "1.12.0-rc1" \
+# TEST_MODE is validated the same way, and for the same reason: a value left
+# over from another project used to reach the cluster build.
+out=$(TEST_MODE=adopted bash -c "source '$SCRIPTS_DIR/lib/common.sh'" 2>&1)
+assert_eq "invalid TEST_MODE is rejected" 1 "$?"
+assert_contains "names the bad value" "$out" "adopted"
+
+# ── KCM is the version, the ref, and the name ────────────────────────────────
+assert_eq "KCM is the chart version in release mode" "1.12.0-rc1" \
     "$(KCM=1.12.0-rc1 bash -c "source '$SCRIPTS_DIR/lib/common.sh'; echo \$KCM_VERSION")"
-assert_eq "and the ref in source mode" "480aad76" \
+assert_eq "and the git ref in source mode" "480aad76" \
     "$(KCM=480aad76 KCM_MODE=source bash -c "source '$SCRIPTS_DIR/lib/common.sh'; echo \$KCM_REF")"
-# A typo is neither, and must not be taken for a chart version.
-out="$(KCM=rel-1-12-0 bash -c "source '$SCRIPTS_DIR/lib/common.sh'" 2>&1)"
-assert_eq "a typo is refused" 1 "$?"
-assert_contains "and lists the variants" "$out" "src-main"
-# Two configurations must not land in the same workdir and cluster names.
-# One environment under plain names unless RUN_ID says otherwise, so the
-# cluster is always kcm-mgmt and its kubeconfig always ./kcfg_k0rdent.
-assert_contains "no RUN_ID is imposed" "$(mk KCM=1.12.0-rc1)" "RUN_ID= "
-assert_eq "so the kubeconfig has the plain name" "$REPO_ROOT/kcfg_k0rdent" \
-    "$(RUN_ID='' bash -c "source '$SCRIPTS_DIR/lib/common.sh'; echo \$KUBECONFIG_MGMT")"
-assert_eq "and RUN_ID still isolates when given" "$REPO_ROOT/kcfg_k0rdent-two" \
-    "$(RUN_ID=two bash -c "source '$SCRIPTS_DIR/lib/common.sh'; echo \$KUBECONFIG_MGMT")"
+# A branch name in release mode is a typo, not a chart nobody published.
+out="$(KCM=my-branch bash -c "source '$SCRIPTS_DIR/lib/common.sh'" 2>&1)"
+assert_eq "a non-version is refused in release mode" 1 "$?"
+assert_contains "and says how to build a ref" "$out" "KCM_MODE=source"
 
-# Reusing an environment must need RUN_ID and nothing else: it records what
-# built it, and repeating the selection is a second chance to get it wrong.
-built="$REPO_ROOT/.work-inherit-test"
-mkdir -p "$built"
-cat > "$built/kcm-build.env" <<'EOF'
-KCM_MODE='source'
-KCM_VARIANT=''
-KCM_CHART_VERSION='1.12.0'
-KCM_REF='stepchain'
-EOF
-inherited() { RUN_ID=inherit-test KCM='' bash -c \
-    "source '$SCRIPTS_DIR/lib/common.sh'; echo \"\${$1}\""; }
-assert_eq "RUN_ID alone recovers the mode" "source" "$(inherited KCM_MODE)"
-assert_eq "RUN_ID alone recovers the ref" "stepchain" "$(inherited KCM_REF)"
-# The mode is what decides where the scenario reads its charts from, which is
-# the part that silently went wrong when it had to be repeated by hand.
-assert_contains "and with it the template registry" "$(inherited TEMPLATES_REPO_URL)" \
-    "kcm-test-registry-inherit-test"
-assert_eq "an explicit value still wins" "1.9.9" \
-    "$(RUN_ID=inherit-test KCM='' KCM_VERSION=1.9.9 bash -c \
-        "source '$SCRIPTS_DIR/lib/common.sh'; echo \$KCM_VERSION")"
-rm -rf "$built"
-assert_eq "an unbuilt RUN_ID falls back to the defaults" "release" \
-    "$(RUN_ID=inherit-test KCM='' bash -c \
-        "source '$SCRIPTS_DIR/lib/common.sh'; echo \$KCM_MODE")"
+# The environment scripts cannot guess which cluster is meant.
+out="$(KCM='' bash -c "source '$SCRIPTS_DIR/lib/common.sh'; require_kcm" 2>&1)"
+assert_eq "require_kcm fails without KCM" 1 "$?"
+assert_contains "and says what KCM is for" "$out" "k0rdent-<KCM>"
 
-# A fork and an arbitrary commit are both reachable without touching a variant.
+# Everything two environments could collide on is keyed by KCM.
+names_for() { # names_for KCM
+    KCM="$1" bash -c "
+        source '$SCRIPTS_DIR/lib/common.sh'
+        echo \"\$MGMT_CLUSTER_NAME|\$REGISTRY_NAME|\$ENVDIR|\$KUBECONFIG_NAMED|\$IMG|\$IMG_TELEMETRY\""
+}
+IFS='|' read -ra fa <<< "$(names_for 1.11.0)"
+IFS='|' read -ra fb <<< "$(names_for 1.12.0-rc1)"
+labels=(MGMT_CLUSTER_NAME REGISTRY_NAME ENVDIR KUBECONFIG_NAMED IMG IMG_TELEMETRY)
+for i in "${!labels[@]}"; do
+    assert_not_eq "${labels[$i]} differs between environments" "${fa[$i]}" "${fb[$i]}"
+done
+
+assert_eq "the cluster is named after KCM" "k0rdent-1.11.0" \
+    "$(KCM=1.11.0 bash -c "source '$SCRIPTS_DIR/lib/common.sh'; echo \$MGMT_CLUSTER_NAME")"
+assert_eq "and so is its kubeconfig" "$REPO_ROOT/kcfg_k0rdent_1.11.0" \
+    "$(KCM=1.11.0 bash -c "source '$SCRIPTS_DIR/lib/common.sh'; echo \$KUBECONFIG_NAMED")"
+# The scenario scripts read this one and never KCM, so a cluster you built
+# yourself works as well as one deploy_k0rdent.sh built.
+assert_eq "scenarios always read the plain name" "$REPO_ROOT/kcfg_k0rdent" \
+    "$(KCM=1.11.0 bash -c "source '$SCRIPTS_DIR/lib/common.sh'; echo \$KUBECONFIG_MGMT")"
+# Tools are deliberately shared -- re-downloading them per environment is waste.
+assert_eq "BIN_DIR is shared" \
+    "$(KCM=1.11.0 bash -c "source '$SCRIPTS_DIR/lib/common.sh'; echo \$BIN_DIR")" \
+    "$(KCM=1.12.0 bash -c "source '$SCRIPTS_DIR/lib/common.sh'; echo \$BIN_DIR")"
+
+# A fork and an arbitrary commit are both reachable.
 got="$(KCM_MODE=source SRC_URL=https://github.com/me/kcm.git KCM_REF=480aad76 \
     bash -c "source '$SCRIPTS_DIR/lib/common.sh'; echo \$SRC_URL \$KCM_REF")"
 assert_eq "fork url and commit are honoured" "https://github.com/me/kcm.git 480aad76" "$got"
@@ -105,6 +105,7 @@ assert_eq "OCI_URL is what KCM pulls its templates from" "oci://reg.example/char
     "$(KCM_MODE=release OCI_URL=oci://reg.example/charts bash -c \
         "unset TEMPLATES_REPO_URL; source '$SCRIPTS_DIR/lib/common.sh'; echo \$TEMPLATES_REPO_URL")"
 
+# ── Prerequisites ────────────────────────────────────────────────────────────
 # Release mode must run on a host with no Go toolchain: CI skips setup-go for
 # that leg, so an unconditional check here fails the whole job. Real tools are
 # used deliberately -- mocking curl or yq would only test the mocks.

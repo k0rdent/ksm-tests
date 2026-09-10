@@ -17,9 +17,9 @@ require_cmd docker make
 [[ -d "$KCM_DIR" ]] || die "KCM source not found at $KCM_DIR. Run ./scripts/prepare_kcm.sh first."
 
 # deploy_registry.sh may have had to pick a different port.
-if [[ -f "$WORKDIR/registry.env" ]]; then
+if [[ -f "$ENVDIR/registry.env" ]]; then
     # shellcheck source=/dev/null
-    source "$WORKDIR/registry.env"
+    source "$ENVDIR/registry.env"
 fi
 container_running "$MGMT_CLUSTER_NAME" \
     || die "Management cluster '$MGMT_CLUSTER_NAME' is not running. Run ./scripts/deploy_mgmt_cluster.sh first."
