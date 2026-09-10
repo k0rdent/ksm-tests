@@ -28,13 +28,13 @@ remove_one() {
     else
         step "Scenario $SCENARIO: deleting MultiClusterService '$mcs'"
         kube delete multiclusterservice "$mcs" --wait=false
-        wait_for_absence MultiClusterService "$mcs" "" "$MCS_TIMEOUT" 5
+        wait_for_absence MultiClusterService "$mcs" "" "$REMOVE_TIMEOUT" 5
     fi
 
     step "Checking the ServiceSet of '$mcs' is gone"
     # Only the MCS-owned one: the ClusterDeployment keeps a ServiceSet of its
     # own for as long as the cluster exists.
-    while (( elapsed < MCS_TIMEOUT )); do
+    while (( elapsed < REMOVE_TIMEOUT )); do
         sset="$(kube get serviceset -n "$NAMESPACE" \
             -o jsonpath="{.items[?(@.spec.multiClusterService==\"$mcs\")].metadata.name}" 2>/dev/null || true)"
         [[ -z "$sset" ]] && break
@@ -70,7 +70,7 @@ step "Checking the helm releases are gone from the child cluster"
 while IFS="$SERVICE_SEP" read -r name _chart _version _repo ns _dep _wait; do
     [[ -n "$name" ]] || continue
     elapsed=0
-    while (( elapsed < MCS_TIMEOUT )); do
+    while (( elapsed < REMOVE_TIMEOUT )); do
         info="$(release_info "$name" "$ns")"
         [[ -z "$info" ]] && break
         if (( elapsed % 30 == 0 )); then

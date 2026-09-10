@@ -46,6 +46,8 @@
 
 # ── Timeouts, in seconds ─────────────────────────────────────────────────────
 # export MANAGEMENT_TIMEOUT="1500"
+# export MCS_TIMEOUT="900"              # deploying the services
+# export REMOVE_TIMEOUT="60"            # removing them again
 
 # ── Debugging ────────────────────────────────────────────────────────────────
 # export DEBUG="true"                   # verbose helm output and pod describes
