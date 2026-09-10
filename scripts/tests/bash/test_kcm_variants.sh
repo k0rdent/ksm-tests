@@ -1,5 +1,5 @@
 #!/bin/bash
-# KCM=<id> resolution, and the link between variants and scenario knownFailures.
+# KCM=<id> resolution.
 # shellcheck source=scripts/tests/bash/helpers.sh
 source "$(dirname "${BASH_SOURCE[0]}")/helpers.sh"
 
@@ -38,26 +38,5 @@ out=$(KCM=nope bash -c "source '$SCRIPTS_DIR/lib/common.sh'" 2>&1)
 assert_eq "an unknown variant is rejected" 1 "$?"
 assert_contains "names the bad value" "$out" "nope"
 assert_contains "lists what is available" "$out" "rel-1-11-0"
-
-# ── Variants and scenarios must agree ────────────────────────────────────────
-# A typo in knownFailures would not fail anything -- the marker would simply
-# never match, and CI would go red without explanation. Catch it here instead.
-ids="$(list_kcm_variants)"
-while read -r scenario; do
-    [[ -n "$scenario" ]] || continue
-    file="$SCENARIOS_DIR/$scenario.yaml"
-    command -v yq >/dev/null 2>&1 || break
-    yq --version 2>&1 | grep -qi mikefarah || break
-    while read -r kcm; do
-        [[ -n "$kcm" ]] || continue
-        TESTS_RUN=$((TESTS_RUN + 1))
-        if grep -qx "$kcm" <<< "$ids"; then
-            echo "  ✓ $scenario knownFailures references a real variant: $kcm"
-        else
-            echo "  ✗ $scenario knownFailures references unknown variant '$kcm'"
-            TESTS_FAILED=$((TESTS_FAILED + 1))
-        fi
-    done < <(yq -r '.knownFailures[].kcm' "$file" 2>/dev/null)
-done < <(list_scenarios)
 
 finish

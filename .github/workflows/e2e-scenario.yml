@@ -1,8 +1,7 @@
 name: E2E scenario
 
 # Reusable: one scenario across every KCM variant, called once per scenario by
-# e2e.yml. Known failures are handled by scripts/ci_step.sh, not
-# continue-on-error; the marker reaches this file only to label the job name.
+# e2e.yml.
 
 on:
   workflow_call:
@@ -15,11 +14,6 @@ on:
         description: 'JSON array of KCM variants, from the discover job'
         type: string
         required: true
-      known_failing_kcm:
-        description: 'Space-separated variant ids this scenario is known to fail on'
-        type: string
-        required: false
-        default: ''
       kcm_src_url:
         description: 'Override the KCM repository to build (source mode only)'
         type: string
@@ -42,7 +36,7 @@ jobs:
   e2e:
     # The name already says which ref and commit a source build uses: discover
     # resolves it, because a job name is fixed before the job can clone.
-    name: ${{ matrix.kcm.name }}${{ contains(inputs.known_failing_kcm, matrix.kcm.id) && ' ⚠ known failure' || '' }}
+    name: ${{ matrix.kcm.name }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     strategy:
@@ -125,21 +119,21 @@ jobs:
         run: ./scripts/wait_for_management.sh
 
       - name: Install ServiceTemplates
-        run: ./scripts/ci_step.sh "Install ServiceTemplates" ./scripts/install_servicetemplate.sh
+        run: ./scripts/install_servicetemplate.sh
 
       - name: Deploy services via MultiClusterService
-        run: ./scripts/ci_step.sh "Deploy services via MultiClusterService" ./scripts/deploy_mcs.sh
+        run: ./scripts/deploy_mcs.sh
 
       # No-op unless the scenario has an upgrade block.
       - name: Upgrade services
-        run: ./scripts/ci_step.sh "Upgrade services" ./scripts/upgrade_services.sh
+        run: ./scripts/upgrade_services.sh
 
       # No-op unless the scenario declares upgrade.steps.
       - name: Upgrade along the chain
-        run: ./scripts/ci_step.sh "Upgrade along the chain" ./scripts/upgrade_chain.sh
+        run: ./scripts/upgrade_chain.sh
 
       - name: Remove services
-        run: ./scripts/ci_step.sh "Remove services" ./scripts/remove_services.sh
+        run: ./scripts/remove_services.sh
 
       - name: Collect diagnostics
         if: failure()

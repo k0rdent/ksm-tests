@@ -56,11 +56,6 @@ assert_eq "the dependency cases share one group" "Service dependencies" \
 assert_eq "both dependency cases are in it" "Service dependencies" \
     "$(yq -r '.group' "$SCENARIOS_DIR/02dep02_invalid.yaml")"
 
-assert_eq "01 has no known failures" "0" \
-    "$(yq -r '[.knownFailures[]] | length' "$SCENARIOS_DIR/01_basic.yaml")"
-assert_eq "02 records the 1.11.0 defect" "rel-1-11-0" \
-    "$(yq -r '.knownFailures[0].kcm' "$SCENARIOS_DIR/02dep01_valid.yaml")"
-
 # Every chart must come from catalog's registry, which is what the values
 # nesting below assumes.
 all_repos="$(yq -r '.services[].repo' "$SCENARIOS_DIR"/*.yaml | grep -v '^---$' | sort -u)"
