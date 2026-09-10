@@ -28,7 +28,7 @@ deploys the services into the cluster it runs in. No second cluster, no
 | `05chain03_direct_to_latest` | only what the chain lists is accepted |
 | `05chain04_stepwise` | a multi-hop chain is walked, not skipped |
 
-Each runs against two KCM builds: `src: main` and `release: 1.11.0`.
+Each runs against two KCM builds: `src: main` and `release: 1.12.0-rc.3`.
 
 Install, `Management` reconcile and teardown are asserted too, because KSM
 sits on them. Cloud provisioning is out of scope.
@@ -49,7 +49,7 @@ scripts/            the pipeline, one script per step
 ### Create testing k0rdent cluster
 ~~~bash
 # Create local k0s-in-docker cluster "k0rdent-<KCM>", deploy KCM
-export KCM=1.11.0 # (required), can be any release tag of OCI_URL chart
+export KCM=1.12.0-rc.3 # (required), can be any release tag of OCI_URL chart
 # ... export k0rdent cluster kubeconfig to kcfg_k0rdent and kcfg_k0rdent_<KCM>
 # export TEST_MODE=self (default); TODO later: "adopted, aws, gcp"
 # export KCM_MODE=release (default); "source" - build and deploy kcm from SRC_URL git, KCM ref (tag, branch, sha)
@@ -85,6 +85,6 @@ ln -sfn kcfg_k0rdent_1.12.0-rc1 kcfg_k0rdent
 
 ### Delete testing k0rdent cluster
 ~~~bash
-export KCM=1.11.0 # (required)
+export KCM=1.12.0-rc.3 # (required)
 ./scripts/remove_k0rdent.sh # remove k0rdent-<KCM> in-docker cluster, remove kcfg_k0rdent and kcfg_k0rdent_<KCM>
 ~~~

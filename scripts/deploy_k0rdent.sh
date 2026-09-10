@@ -5,10 +5,10 @@ set -euo pipefail
 # Around 5 minutes. Nothing is provisioned -- the scenarios use KCM's
 # selfManagement, so the services land in this same cluster.
 #
-#   export KCM=1.11.0                   # required: a published chart version
+#   export KCM=1.12.0-rc.3            # required: a published chart version
 #   ./scripts/deploy_k0rdent.sh
 #
-#   export KCM=main KCM_MODE=source     # or build a branch, tag or commit
+#   export KCM=main KCM_MODE=source   # or build a branch, tag or commit
 #   ./scripts/deploy_k0rdent.sh
 #
 # Writes the kubeconfig to ./kcfg_k0rdent_$KCM and points ./kcfg_k0rdent at it,
