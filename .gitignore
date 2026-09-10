@@ -1,7 +1,11 @@
-# Working directory: kcm checkout, downloaded tools, packaged charts
+# Working directory: kcm checkout, pulled charts, rendered manifests
 # (.work-<RUN_ID> for parallel runs)
 .work/
 .work-*/
+
+# Downloaded CLI tools. Outside the workdir on purpose: `make clean` throws
+# the environment away, and re-downloading kubectl and helm with it is waste.
+.bin/
 
 # Kubeconfigs written by the scripts
 kcfg_*

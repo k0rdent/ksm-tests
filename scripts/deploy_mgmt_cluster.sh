@@ -86,4 +86,7 @@ done
 kube taint nodes "$MGMT_CLUSTER_NAME" node-role.kubernetes.io/control-plane:NoSchedule- 2>/dev/null || true
 
 kube get nodes
-ok "Management cluster is ready (KUBECONFIG=$KUBECONFIG_MGMT)"
+ok "Management cluster is ready"
+# Copy-pasteable from the repo root, where you ran make. Absolute only if the
+# kubeconfig was pointed somewhere else.
+log "export KUBECONFIG=${KUBECONFIG_MGMT#"$PROJECT_ROOT"/}"

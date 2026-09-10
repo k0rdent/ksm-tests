@@ -4,7 +4,7 @@ set -euo pipefail
 # Make sure every CLI the test scripts need is available.
 #
 # Tools that are already on PATH are left alone; anything missing is downloaded
-# into .work/bin, which scripts/lib/common.sh prepends to PATH. Set
+# into .bin, which scripts/lib/common.sh prepends to PATH. Set
 # FORCE_INSTALL_DEPS=1 to install the pinned versions regardless.
 
 # shellcheck source=scripts/lib/common.sh

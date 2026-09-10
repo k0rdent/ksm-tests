@@ -21,7 +21,7 @@ export RUN_ID RUN_SUFFIX
 # ── Working directory ────────────────────────────────────────────────────────
 WORKDIR="${WORKDIR:-$PROJECT_ROOT/.work$RUN_SUFFIX}"
 # Tools are shared between runs; only generated state is per-run.
-BIN_DIR="${BIN_DIR:-$PROJECT_ROOT/.work/bin}"
+BIN_DIR="${BIN_DIR:-$PROJECT_ROOT/.bin}"
 LOG_DIR="${LOG_DIR:-$PROJECT_ROOT/logs$RUN_SUFFIX}"
 export WORKDIR BIN_DIR LOG_DIR
 
