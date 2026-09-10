@@ -11,7 +11,7 @@ EOF
 
 WORKDIR="$(mktemp -d)"
 # BIN_DIR normally lives under WORKDIR; keep pointing at the real tools.
-BIN_DIR="$REPO_ROOT/.work/bin"
+BIN_DIR="$REPO_ROOT/.bin"
 export WORKDIR BIN_DIR
 echo 'RELEASE_NAME=kcm-1-11-0' > "$WORKDIR/release.env"
 cat > "$WORKDIR/kcm-values.rendered.yaml" <<'EOF'

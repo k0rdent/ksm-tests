@@ -56,29 +56,32 @@ make e2e SCENARIO=01_basic                      # from scratch and back, ~10 min
 Building the environment is most of that, so for a second run build it once:
 
 ```bash
-make env-up                                     # both clusters + KCM, ~7 min
+make env-up KCM=1.12.0-rc1                      # cluster + KCM, ~5 min
 make scenario       SCENARIO=02dep01_valid      # deploy, verify, remove
 make scenario-keep  SCENARIO=02dep01_valid      # same, but leave the services up
 make scenario-clean SCENARIO=02dep01_valid      # remove them again
 make env-down
 ```
 
-`KCM` is the only knob: a variant id from `scripts/config/kcm-variants.yaml`,
-a chart version, or a git ref with `KCM_MODE=source`. It names the environment
-as well as the build, so the same `KCM=` reaches the same cluster from every
-target and nothing else has to be repeated. `make status` lists what exists:
+One environment, under plain names: the cluster is `kcm-mgmt` and its
+kubeconfig is `./kcfg_k0rdent`, so
 
+```bash
+export KUBECONFIG=kcfg_k0rdent
+kubectl get multiclusterservice -A
 ```
-▶ Environments
-  RUN_ID                 CLUSTER          KCM
-  local-1-12-0-rc1       Up 26 minutes    release 1.12.0-rc1
-                         ↳ make scenario RUN_ID=local-1-12-0-rc1 SCENARIO=<id>
-```
+
+is all it takes to look at it by hand. `KCM` says only *what* to install --
+a variant id from `scripts/config/kcm-variants.yaml`, a chart version, or a
+git ref with `KCM_MODE=source`. `env-up` records it in `.work/kcm-build.env`,
+so `scenario` and `env-down` need nothing repeated.
+
+Set `RUN_ID` to hold several environments at once; `make status` lists them.
 
 `make logs` dumps diagnostics, `make clean` tears one environment down.
 
 Needs `docker`, `git`, `curl`, `tar`, `envsubst`, plus `go` and `make` for
-source mode. The rest lands in `.work/bin` via `make deps`.
+source mode. The rest lands in `.bin` via `make deps`.
 
 With nothing set you get the published **1.11.0** chart — the same leg pull
 requests run. `KCM=<id>` picks a variant from `scripts/config/kcm-variants.yaml`

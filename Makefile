@@ -10,11 +10,15 @@ SCENARIO ?= 01_basic
 # defaults in common.sh apply -- release 1.11.0.
 KCM      ?=
 
-# The environment's name, derived from KCM so the same KCM= addresses the same
-# cluster across env-up / scenario / env-down and nothing else has to be typed.
-# Dots become dashes: it ends up in MCS_NAME, which is a DNS label.
-# Override it only to hold two environments for one KCM at once.
-RUN_ID   ?= local$(if $(KCM),-$(subst .,-,$(KCM)))
+# Empty by default: one environment, under plain names, the way catalog does
+# it -- the cluster is kcm-mgmt and its kubeconfig is ./kcfg_k0rdent, so
+# `export KUBECONFIG=kcfg_k0rdent` is all it takes to poke at it by hand.
+# Which KCM is in it is recorded in .work/kcm-build.env, so `scenario` and
+# `env-down` need nothing repeated.
+#
+# Set RUN_ID to hold several environments at once; e2e-parallel does that,
+# and CI gives each job its own.
+RUN_ID   ?=
 
 E2E := SCENARIO=$(SCENARIO) KCM=$(KCM) RUN_ID=$(RUN_ID) ./$(SCRIPTS)/e2e_test.sh
 
@@ -189,7 +193,7 @@ lint: ## Run shellcheck over every shell script, and actionlint if installed.
 		|| echo "actionlint not installed, skipping workflow lint"
 
 .PHONY: deps
-deps: ## Verify/install the required CLI tools into .work/bin.
+deps: ## Verify/install the required CLI tools into .bin.
 	./$(SCRIPTS)/deps.sh
 
 .PHONY: logs

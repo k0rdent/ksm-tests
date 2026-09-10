@@ -3,7 +3,7 @@
 # shellcheck source=scripts/tests/bash/helpers.sh
 source "$(dirname "${BASH_SOURCE[0]}")/helpers.sh"
 
-BIN_DIR="$REPO_ROOT/.work/bin"
+BIN_DIR="$REPO_ROOT/.bin"
 export BIN_DIR
 PATH="$BIN_DIR:$PATH"
 if ! yq --version 2>&1 | grep -qi mikefarah; then

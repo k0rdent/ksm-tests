@@ -62,10 +62,13 @@ out="$(KCM=rel-1-12-0 bash -c "source '$SCRIPTS_DIR/lib/common.sh'" 2>&1)"
 assert_eq "a typo is refused" 1 "$?"
 assert_contains "and lists the variants" "$out" "src-main"
 # Two configurations must not land in the same workdir and cluster names.
-# One knob: KCM names both what is installed and the environment holding it,
-# so nothing else has to be passed to address the same cluster again.
-assert_contains "RUN_ID follows KCM, a variant" "$(mk KCM=src-main)" "RUN_ID=local-src-main"
-assert_contains "or a version, with dots made safe" "$(mk KCM=1.12.0-rc1)" "RUN_ID=local-1-12-0-rc1"
+# One environment under plain names unless RUN_ID says otherwise, so the
+# cluster is always kcm-mgmt and its kubeconfig always ./kcfg_k0rdent.
+assert_contains "no RUN_ID is imposed" "$(mk KCM=1.12.0-rc1)" "RUN_ID= "
+assert_eq "so the kubeconfig has the plain name" "$REPO_ROOT/kcfg_k0rdent" \
+    "$(RUN_ID='' bash -c "source '$SCRIPTS_DIR/lib/common.sh'; echo \$KUBECONFIG_MGMT")"
+assert_eq "and RUN_ID still isolates when given" "$REPO_ROOT/kcfg_k0rdent-two" \
+    "$(RUN_ID=two bash -c "source '$SCRIPTS_DIR/lib/common.sh'; echo \$KUBECONFIG_MGMT")"
 
 # Reusing an environment must need RUN_ID and nothing else: it records what
 # built it, and repeating the selection is a second chance to get it wrong.
@@ -112,17 +115,17 @@ for d in /usr/bin /bin /usr/local/bin; do
 done
 rm -f "$nogo/go" "$nogo/make" "$nogo/gmake"
 
-if [[ -x "$REPO_ROOT/.work/bin/yq" ]]; then
-    ln -sf "$REPO_ROOT/.work/bin/yq" "$nogo/yq"
+if [[ -x "$REPO_ROOT/.bin/yq" ]]; then
+    ln -sf "$REPO_ROOT/.bin/yq" "$nogo/yq"
 fi
 
 if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
-    out=$(PATH="$nogo" KCM_MODE=release BIN_DIR="$REPO_ROOT/.work/bin" \
+    out=$(PATH="$nogo" KCM_MODE=release BIN_DIR="$REPO_ROOT/.bin" \
           bash "$SCRIPTS_DIR/deps.sh" 2>&1)
     assert_eq "release mode succeeds without go/make" 0 "$?"
     assert_not_contains "does not ask for go" "$out" "'go' is required"
 
-    out=$(PATH="$nogo" KCM_MODE=source BIN_DIR="$REPO_ROOT/.work/bin" \
+    out=$(PATH="$nogo" KCM_MODE=source BIN_DIR="$REPO_ROOT/.bin" \
           bash "$SCRIPTS_DIR/deps.sh" 2>&1)
     assert_eq "source mode fails without go/make" 1 "$?"
     assert_contains "says which mode needs it" "$out" "KCM_MODE=source"
