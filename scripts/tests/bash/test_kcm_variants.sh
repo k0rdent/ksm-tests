@@ -22,8 +22,10 @@ assert_eq "src-main follows main" "main" "$(var_of src-main KCM_REF)"
 
 assert_eq "rel-1-11-0 uses the release chart" "release" "$(var_of rel-1-11-0 KCM_MODE)"
 assert_eq "rel-1-11-0 pins the version" "1.11.0" "$(var_of rel-1-11-0 KCM_VERSION)"
-# common.sh derives the tag from the version, so the checkout matches the chart.
-assert_eq "rel-1-11-0 checks out the matching tag" "v1.11.0" "$(var_of rel-1-11-0 KCM_REF)"
+# Release mode has no checkout to pin: the Release and template manifests come
+# from the kcm-templates chart of the same version, in the same registry.
+assert_eq "rel-1-11-0 needs no git ref" "oci://ghcr.io/k0rdent/kcm/charts" \
+    "$(var_of rel-1-11-0 OCI_URL)"
 
 
 # An ad-hoc version that is not a declared variant must stay testable.

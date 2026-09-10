@@ -12,8 +12,11 @@ assert_eq "release: templatesRepoURL is ghcr" \
     "oci://ghcr.io/k0rdent/kcm/charts" "$(value_of release TEMPLATES_REPO_URL)"
 assert_eq "release: registry is not insecure" \
     "false" "$(value_of release INSECURE_REGISTRY)"
-assert_eq "release: checkout pinned to the matching tag" \
-    "v1.11.0" "$(value_of release KCM_REF)"
+# Release mode needs no git at all: the manifests come from the registry, so
+# nothing has to correspond to a tag. That is what lets an -rc or a staging
+# build work, since their chart version is not one.
+assert_eq "release: the registry is the source of everything" \
+    "oci://ghcr.io/k0rdent/kcm/charts" "$(value_of release OCI_URL)"
 
 # Source mode reads them from the local registry over plain HTTP.
 assert_contains "source: templatesRepoURL is the local registry" \
@@ -50,8 +53,14 @@ assert_not_contains "make does not force a variant" "$(mk)" "KCM=src-main"
 assert_contains "a bare run is release 1.11.0" \
     "$(KCM='' bash -c "source '$SCRIPTS_DIR/lib/common.sh'; echo \$KCM_MODE \$KCM_VERSION")" \
     "release 1.11.0"
-assert_eq "KCM_VERSION alone picks that release" "v1.10.0" \
-    "$(KCM='' KCM_VERSION=1.10.0 bash -c "source '$SCRIPTS_DIR/lib/common.sh'; echo \$KCM_REF")"
+assert_eq "KCM alone is the version in release mode" "1.12.0-rc1" \
+    "$(KCM=1.12.0-rc1 bash -c "source '$SCRIPTS_DIR/lib/common.sh'; echo \$KCM_VERSION")"
+assert_eq "and the ref in source mode" "480aad76" \
+    "$(KCM=480aad76 KCM_MODE=source bash -c "source '$SCRIPTS_DIR/lib/common.sh'; echo \$KCM_REF")"
+# A typo is neither, and must not be taken for a chart version.
+out="$(KCM=rel-1-12-0 bash -c "source '$SCRIPTS_DIR/lib/common.sh'" 2>&1)"
+assert_eq "a typo is refused" 1 "$?"
+assert_contains "and lists the variants" "$out" "src-main"
 # Two configurations must not land in the same workdir and cluster names.
 assert_contains "RUN_ID follows the version" "$(mk KCM_VERSION=1.10.0)" "RUN_ID=local-1-10-0"
 assert_contains "RUN_ID follows the variant" "$(mk KCM=src-main)" "RUN_ID=local-src-main"
@@ -83,15 +92,13 @@ assert_eq "an unbuilt RUN_ID falls back to the defaults" "release" \
         "source '$SCRIPTS_DIR/lib/common.sh'; echo \$KCM_MODE")"
 
 # A fork and an arbitrary commit are both reachable without touching a variant.
-got="$(KCM_MODE=source KCM_SRC_URL=https://github.com/me/kcm.git KCM_REF=480aad76 \
-    bash -c "source '$SCRIPTS_DIR/lib/common.sh'; echo \$KCM_SRC_URL \$KCM_REF")"
+got="$(KCM_MODE=source SRC_URL=https://github.com/me/kcm.git KCM_REF=480aad76 \
+    bash -c "source '$SCRIPTS_DIR/lib/common.sh'; echo \$SRC_URL \$KCM_REF")"
 assert_eq "fork url and commit are honoured" "https://github.com/me/kcm.git 480aad76" "$got"
 
-# The template charts sit next to the kcm chart, so the registry is the parent.
-assert_eq "release url drives the template registry" \
-    "oci://reg.example/charts" \
-    "$(KCM_MODE=release KCM_RELEASE_URL=oci://reg.example/charts/kcm bash -c \
-        "source '$SCRIPTS_DIR/lib/common.sh'; echo \$TEMPLATES_REPO_URL")"
+assert_eq "OCI_URL is what KCM pulls its templates from" "oci://reg.example/charts" \
+    "$(KCM_MODE=release OCI_URL=oci://reg.example/charts bash -c \
+        "unset TEMPLATES_REPO_URL; source '$SCRIPTS_DIR/lib/common.sh'; echo \$TEMPLATES_REPO_URL")"
 
 # Release mode must run on a host with no Go toolchain: CI skips setup-go for
 # that leg, so an unconditional check here fails the whole job. Real tools are

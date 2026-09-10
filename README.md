@@ -89,14 +89,14 @@ another release, a fork, a specific commit — set the inputs directly.
 |---|---|---|
 | `KCM_MODE` | `release` | `release` pulls a published chart, `source` builds a checkout |
 | `KCM_VERSION` | `1.11.0` | chart version, release mode |
-| `KCM_RELEASE_URL` | `oci://ghcr.io/k0rdent/kcm/charts/kcm` | the chart to pull |
-| `KCM_SRC_URL` | `https://github.com/K0rdent/kcm.git` | repository to build, source mode |
+| `OCI_URL` | `oci://ghcr.io/k0rdent/kcm/charts/kcm` | the chart to pull |
+| `SRC_URL` | `https://github.com/K0rdent/kcm.git` | repository to build, source mode |
 | `KCM_REF` | the matching tag, or `main` | branch, tag or commit |
 
 ```bash
 make e2e SCENARIO=01_basic KCM_VERSION=1.10.0        # a release no variant declares
 make e2e SCENARIO=01_basic KCM_MODE=source \
-    KCM_SRC_URL=https://github.com/me/kcm.git KCM_REF=480aad76
+    SRC_URL=https://github.com/me/kcm.git KCM_REF=480aad76
 ```
 
 A full run — build, scenario, teardown — takes 9 to 11 minutes depending on

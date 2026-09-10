@@ -127,7 +127,7 @@ e2e-parallel: ## Every scenario at once, each with its own cluster.
 #:
 #:   make env-up
 #:   make env-up KCM=rel-1-11-0
-#:   make env-up KCM_MODE=source KCM_SRC_URL=https://github.com/me/kcm.git KCM_REF=480aad76
+#:   make env-up KCM_MODE=source SRC_URL=https://github.com/me/kcm.git KCM_REF=480aad76
 env-up: ## Build the cluster and KCM, up to a verified child cluster.
 	$(E2E) --env-up
 

@@ -112,7 +112,7 @@ jobs:
             fi
           }
           SRC_URL="${WANT_SRC_URL:-$(KCM='' KCM_MODE=source bash -c \
-            'source scripts/lib/common.sh; echo "$KCM_SRC_URL"')}"
+            'source scripts/lib/common.sh; echo "$SRC_URL"')}"
           ALL="$(jq -c --arg url "$SRC_URL" --arg want "$WANT_REF" '
             [ .[] | if .mode == "source"
                     then . + {ref: (if $want != "" then $want else .ref end)}

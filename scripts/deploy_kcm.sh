@@ -49,7 +49,7 @@ if [[ "$KCM_MODE" == "source" ]]; then
     # flux2 and rbac-manager come from remote repos, kcm-regional from file://.
     MAX_RETRIES=5 SLEEP=5 "$SCRIPTS_DIR/retry.sh" helm dependency update "$CHART_REF"
 else
-    CHART_REF="$KCM_RELEASE_URL"
+    CHART_REF="$OCI_URL/kcm"
     helm_args+=(--version "$KCM_VERSION")
 fi
 

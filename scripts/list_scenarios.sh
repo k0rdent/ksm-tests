@@ -56,4 +56,4 @@ done < <(list_kcm_variants)
 
 echo
 echo "Example: make e2e SCENARIO=02dep01_valid KCM=rel-1-11-0"
-echo "Anything else: KCM_VERSION=<v>, or KCM_MODE=source with KCM_SRC_URL/KCM_REF."
+echo "Anything else: KCM_VERSION=<v>, or KCM_MODE=source with SRC_URL/KCM_REF."
