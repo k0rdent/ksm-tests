@@ -26,7 +26,7 @@ if [[ "$KCM_MODE" == "release" ]]; then
     # under test, so they always match it.
     rm -rf "$(kcm_chart_root)"
     helm pull "$OCI_URL/kcm-templates" --version "$KCM_VERSION" \
-        --untar --untardir "$WORKDIR" >/dev/null \
+        --untar --untardir "$ENVDIR" >/dev/null \
         || die "No kcm-templates chart '$KCM_VERSION' in $OCI_URL"
     [[ -f "$(kcm_release_file)" ]] \
         || die "kcm-templates $KCM_VERSION has no $(kcm_release_file)"
@@ -86,10 +86,10 @@ fi
     echo "KCM_DESCRIBE='$KCM_DESCRIBE'"
     echo "KCM_COMMIT_DATE='$KCM_COMMIT_DATE'"
     echo "KCM_CHART_VERSION='$CHART_VERSION'"
-    # What selected this build, so status.sh can say how to reuse it.
+    # What selected this build, so get_k0rdent_clusters.sh can report it.
     echo "KCM_MODE='$KCM_MODE'"
     echo "KCM_VARIANT='$KCM'"
     echo "KCM_REF='$KCM_REF'"
-} > "$WORKDIR/kcm-build.env"
+} > "$ENVDIR/kcm-build.env"
 
 ok "KCM $CHART_VERSION ready ($KCM_MODE mode)"

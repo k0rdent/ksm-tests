@@ -1,7 +1,8 @@
 name: E2E scenario
 
 # Reusable: one scenario across every KCM variant, called once per scenario by
-# e2e.yml.
+# e2e.yml. The pipeline itself lives in the two entry points the README
+# documents, so CI runs exactly what a local run does.
 
 on:
   workflow_call:
@@ -16,11 +17,6 @@ on:
         required: true
       kcm_src_url:
         description: 'Override the KCM repository to build (source mode only)'
-        type: string
-        required: false
-        default: ''
-      kcm_ref:
-        description: 'Override the KCM ref (source mode only)'
         type: string
         required: false
         default: ''
@@ -44,16 +40,13 @@ jobs:
       matrix:
         kcm: ${{ fromJson(inputs.kcm_variants) }}
     env:
-      # common.sh expands KCM via kcm-variants.yaml, the same file a local run
-      # reads, so the mapping is not duplicated here.
-      KCM: ${{ matrix.kcm.id }}
+      # A chart version in release mode, a git ref in source mode -- the same
+      # single knob a local run uses.
+      KCM: ${{ matrix.kcm.kcm }}
+      KCM_MODE: ${{ matrix.kcm.mode }}
       SRC_URL: ${{ inputs.kcm_src_url }}
-      KCM_REF: ${{ inputs.kcm_ref }}
       SCENARIO: ${{ inputs.scenario }}
       TEST_MODE: self
-      # No scenario here: each combination has its own runner, and MCS_NAME
-      # already carries the scenario slug.
-      RUN_ID: ci${{ github.run_id }}-${{ matrix.kcm.id }}
     steps:
       - uses: actions/checkout@v7
 
@@ -63,7 +56,7 @@ jobs:
         run: echo "DEBUG=true" >> "$GITHUB_ENV"
 
       # Only the source build outgrows the runner disk: it adds two images and
-      # a local registry on top of the clusters. A release job starts with 87G
+      # a local registry on top of the cluster. A release job starts with 87G
       # free, and the cleanup costs 99s -- a quarter of its environment time.
       # Always report, so a job that does run short says so in its own log.
       - name: Free disk space
@@ -85,60 +78,13 @@ jobs:
           go-version: 'stable'
           cache: false
 
-      - name: Install dependencies
-        run: ./scripts/deps.sh
+      - name: Build the k0rdent cluster
+        run: ./scripts/deploy_k0rdent.sh
 
-      - name: Prepare KCM
-        run: ./scripts/prepare_kcm.sh
+      - name: Run the scenario
+        run: ./scripts/scenario_run.sh
 
-      # The local registry only serves charts we built ourselves.
-      - name: Deploy local registry
-        if: matrix.kcm.mode == 'source'
-        run: ./scripts/deploy_registry.sh
-
-      - name: Deploy management cluster
-        run: ./scripts/deploy_mgmt_cluster.sh
-
-      - name: Push images and charts
-        if: matrix.kcm.mode == 'source'
-        run: ./scripts/push_kcm_artifacts.sh
-
-      - name: Install KCM
-        run: ./scripts/deploy_kcm.sh
-
-      - name: Apply Release and templates
-        run: ./scripts/apply_release.sh
-
-      - name: Wait for templates
-        run: ./scripts/wait_for_templates.sh
-
-      - name: Apply Management
-        run: ./scripts/apply_management.sh
-
-      - name: Wait for Management
-        run: ./scripts/wait_for_management.sh
-
-      - name: Install ServiceTemplates
-        run: ./scripts/install_servicetemplate.sh
-
-      - name: Deploy services via MultiClusterService
-        run: ./scripts/deploy_mcs.sh
-
-      # No-op unless the scenario has an upgrade block.
-      - name: Upgrade services
-        run: ./scripts/upgrade_services.sh
-
-      # No-op unless the scenario declares upgrade.steps.
-      - name: Upgrade along the chain
-        run: ./scripts/upgrade_chain.sh
-
-      - name: Remove services
-        run: ./scripts/remove_services.sh
-
-      - name: Collect diagnostics
-        if: failure()
-        run: ./scripts/collect_logs.sh
-
+      # Both entry points collect diagnostics themselves when they fail.
       - name: Upload diagnostics
         if: failure()
         uses: actions/upload-artifact@v7
@@ -147,6 +93,6 @@ jobs:
           path: logs*/
           retention-days: 7
 
-      - name: Cleanup
+      - name: Remove the k0rdent cluster
         if: always() && !inputs.keep_cluster
-        run: ./scripts/cleanup.sh
+        run: ./scripts/remove_k0rdent.sh

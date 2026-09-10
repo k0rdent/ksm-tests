@@ -58,10 +58,11 @@ pod_uids() {
 # require_cluster -- fail loudly if the API is unreachable. Without this a
 # "does not exist, nothing to do" check silently passes against a dead cluster.
 require_cluster() {
-    # The kubeconfig is the whole contract: `make env-up` writes it, and a
+    # The kubeconfig is the whole contract: deploy_k0rdent.sh writes it, and a
     # cluster you built yourself works just as well if you put one there.
     [[ -f "$KUBECONFIG_MGMT" ]] || die "No kubeconfig at ${KUBECONFIG_MGMT#"$PROJECT_ROOT"/}.
-Run 'make env-up', or put the kubeconfig of your own k0rdent cluster there."
+Run KCM=<version> ./scripts/deploy_k0rdent.sh, or put the kubeconfig of your
+own k0rdent cluster there."
     kube version --request-timeout=10s >/dev/null 2>&1 \
         || die "Cannot reach the management cluster API using $KUBECONFIG_MGMT"
 }

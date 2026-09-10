@@ -15,7 +15,7 @@ source "$SCRIPTS_DIR/lib/k8s.sh"
 
 require_cmd kubectl
 
-RELEASE_ENV="$WORKDIR/release.env"
+RELEASE_ENV="$ENVDIR/release.env"
 [[ -f "$RELEASE_ENV" ]] || die "$RELEASE_ENV not found. Run ./scripts/apply_release.sh first."
 # shellcheck source=/dev/null
 source "$RELEASE_ENV"

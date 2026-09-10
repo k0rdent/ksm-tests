@@ -17,14 +17,14 @@ write_mock kubectl <<'EOF'
 exit 0
 EOF
 
-WORKDIR="$(mktemp -d)"
-KCM_SRC_DIR="$WORKDIR/kcm"
+ENVDIR="$(mktemp -d)"
+KCM_SRC_DIR="$ENVDIR/kcm"
 TPL="$KCM_SRC_DIR/templates/provider/kcm-templates/files/templates"
 mkdir -p "$TPL"
 # A checkout layout, so this is source mode: in release mode the manifests
 # come from the kcm-templates chart pulled into the workdir instead.
 KCM_MODE=source
-export WORKDIR KCM_SRC_DIR KCM_MODE
+export ENVDIR KCM_SRC_DIR KCM_MODE
 
 cat > "$KCM_SRC_DIR/templates/provider/kcm-templates/files/release.yaml" <<'EOF'
 apiVersion: k0rdent.mirantis.com/v1beta1
@@ -71,7 +71,7 @@ out=$(KCM_PROVIDERS="cluster-api-provider-docker projectsveltos" \
       bash "$SCRIPTS_DIR/apply_release.sh" 2>&1)
 assert_eq "succeeds with a valid provider subset" 0 "$?"
 
-trimmed="$(cat "$WORKDIR/release.trimmed.yaml")"
+trimmed="$(cat "$ENVDIR/release.trimmed.yaml")"
 assert_contains "keeps the docker provider" "$trimmed" "cluster-api-provider-docker"
 assert_contains "keeps sveltos" "$trimmed" "projectsveltos"
 assert_not_contains "drops aws" "$trimmed" "cluster-api-provider-aws"
@@ -80,7 +80,7 @@ assert_contains "keeps the core kcm template" "$trimmed" "kcm-1-11-0"
 assert_contains "keeps the capi template" "$trimmed" "cluster-api-1-1-15"
 
 # shellcheck source=/dev/null
-source "$WORKDIR/release.env"
+source "$ENVDIR/release.env"
 assert_eq "records the Release name" "kcm-1-11-0" "$RELEASE_NAME"
 assert_contains "records the provider templates" "$PROVIDER_TEMPLATES" "cluster-api-provider-docker-1-0-24"
 assert_contains "records the core templates" "$PROVIDER_TEMPLATES" "kcm-regional-1-11-0"
@@ -99,5 +99,5 @@ out=$(KCM_PROVIDERS="projectsveltos" KCM_CLUSTER_TEMPLATES="does-not-exist" \
 assert_eq "rejects a missing cluster template" 1 "$?"
 assert_contains "names the missing template" "$out" "does-not-exist"
 
-rm -rf "$WORKDIR" "$MOCK_BIN"
+rm -rf "$ENVDIR" "$MOCK_BIN"
 finish

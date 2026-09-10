@@ -113,15 +113,17 @@ jobs:
           }
           SRC_URL="${WANT_SRC_URL:-$(KCM='' KCM_MODE=source bash -c \
             'source scripts/lib/common.sh; echo "$SRC_URL"')}"
-          ALL="$(jq -c --arg url "$SRC_URL" --arg want "$WANT_REF" '
+          # kcm is the ref for a source variant, so a dispatch override lands
+          # in the one field the job actually passes to the scripts.
+          ALL="$(jq -c --arg want "$WANT_REF" '
             [ .[] | if .mode == "source"
-                    then . + {ref: (if $want != "" then $want else .ref end)}
+                    then . + {kcm: (if $want != "" then $want else .kcm end)}
                     else . end ]' <<< "$ALL")"
           while read -r vid vref; do
             [[ -n "$vid" ]] || continue
             ALL="$(jq -c --arg id "$vid" --arg n "$(src_name "$vref" "$SRC_URL")" \
               '[ .[] | if .id == $id then . + {name: $n} else . end ]' <<< "$ALL")"
-          done < <(jq -r '.[] | select(.mode == "source") | "\(.id) \(.ref)"' <<< "$ALL")
+          done < <(jq -r '.[] | select(.mode == "source") | "\(.id) \(.kcm)"' <<< "$ALL")
 
           PR_VARIANT="$(jq -r '[.[] | select(.prCheck == true) | .id][0] // empty' <<< "$ALL")"
           SRC_VARIANT="$(jq -r '[.[] | select(.mode == "source") | .id][0] // empty' <<< "$ALL")"
@@ -213,7 +215,7 @@ jobs:
                 # Values, templates, the cluster definition: these break every
                 # scenario the same way, so one is enough to see it.
                 scripts/config/*)              env_only=true ;;
-                scripts/*|Makefile)            everything=true ;;
+                scripts/*)                     everything=true ;;
               esac
             done <<< "$changed"
 
@@ -284,5 +286,4 @@ jobs:
       scenario: ${{ matrix.scenario.id }}
       kcm_variants: ${{ matrix.scenario.variants }}
       kcm_src_url: ${{ github.event.inputs.kcm_src_url || '' }}
-      kcm_ref: ${{ github.event.inputs.kcm_ref || '' }}
       keep_cluster: ${{ github.event.inputs.keep_cluster == 'true' }}

@@ -1,10 +1,9 @@
-# Working directory: kcm checkout, pulled charts, rendered manifests
-# (.work-<RUN_ID> for parallel runs)
+# Working directory: rendered manifests, plus k0rdent-<KCM>/ per cluster with
+# its kcm checkout and pulled charts
 .work/
-.work-*/
 
-# Downloaded CLI tools. Outside the workdir on purpose: `make clean` throws
-# the environment away, and re-downloading kubectl and helm with it is waste.
+# Downloaded CLI tools. Outside the workdir on purpose: removing a cluster
+# throws its directory away, and re-downloading kubectl and helm is waste.
 .bin/
 
 # Kubeconfigs written by the scripts

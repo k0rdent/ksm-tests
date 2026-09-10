@@ -38,7 +38,7 @@ log "Management enables $installed_count provider(s)"
 
 step "Waiting for ClusterTemplates to become valid"
 # These stay invalid until a Management exists, so they can only be checked here.
-RELEASE_ENV="$WORKDIR/release.env"
+RELEASE_ENV="$ENVDIR/release.env"
 if [[ -f "$RELEASE_ENV" ]]; then
     # shellcheck source=/dev/null
     source "$RELEASE_ENV"

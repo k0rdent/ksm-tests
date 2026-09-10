@@ -1,12 +1,17 @@
 #!/bin/bash
-# Tear the environment down. Best-effort: keep going even when pieces are
-# already gone, so this is safe to run from a trap or `if: always()`.
+# Remove one k0rdent test cluster: the containers, its kubeconfig and its
+# build state. Best-effort, so it is safe to run twice or from a trap.
+#
+#   export KCM=1.11.0                   # required: which cluster
+#   ./scripts/remove_k0rdent.sh
 set -uo pipefail
 
 # shellcheck source=scripts/lib/common.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
 
-step "Cleaning up"
+require_kcm
+
+step "Removing k0rdent $KCM"
 
 if command -v docker >/dev/null 2>&1; then
     for container in "$MGMT_CLUSTER_NAME" "$REGISTRY_NAME"; do
@@ -28,16 +33,23 @@ if command -v docker >/dev/null 2>&1; then
     fi
 fi
 
-rm -f "$KUBECONFIG_MGMT" "$KUBECONFIG_CHILD" "$KUBECONFIG_MGMT.bak"
-
-if [[ "${KEEP_WORKDIR:-false}" == "true" ]]; then
-    log "Keeping $WORKDIR (KEEP_WORKDIR=true)"
-else
-    # The KCM checkout is the expensive part; keep it unless it was ours to
-    # begin with... it is, but re-cloning costs minutes, so only drop the
-    # generated state.
-    rm -f "$WORKDIR"/*.yaml "$WORKDIR"/*.env 2>/dev/null
-    log "Removed generated manifests from $WORKDIR (KCM checkout kept)"
+rm -f "$KUBECONFIG_NAMED" "$KUBECONFIG_NAMED.bak"
+# Only if it is this cluster's: another environment may be the current one.
+if [[ -L "$KUBECONFIG_MGMT" && ! -e "$KUBECONFIG_MGMT" ]]; then
+    rm -f "$KUBECONFIG_MGMT"
 fi
 
-ok "Cleanup done"
+if [[ "${KEEP_WORKDIR:-false}" == "true" ]]; then
+    log "Keeping $ENVDIR (KEEP_WORKDIR=true)"
+else
+    # The KCM checkout is the expensive part -- re-cloning costs minutes -- so
+    # source mode keeps it and drops only the generated state.
+    if [[ "$KCM_MODE" == "source" ]]; then
+        rm -f "$ENVDIR"/*.yaml "$ENVDIR"/*.env 2>/dev/null
+        log "Removed generated manifests from $ENVDIR (KCM checkout kept)"
+    else
+        rm -rf "$ENVDIR"
+    fi
+fi
+
+ok "k0rdent $KCM removed"
