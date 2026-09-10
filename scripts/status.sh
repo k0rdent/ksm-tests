@@ -55,34 +55,41 @@ describe() {
 
         kcm="${mode:+$mode }${version:-?}"
         [[ -n "$commit" ]] && kcm="$kcm ($commit${date:+, $date})"
-        # RUN_ID is the whole selection: common.sh reads the rest back out of
-        # this same file, so there is nothing else to repeat.
-        [[ -n "$mode" ]] && reuse="RUN_ID=${id:-''} SCENARIO=<id>"
+        # Which KCM is in it comes from this same file, so only the name of
+        # the environment is worth repeating -- and the default one has none.
+        [[ -n "$mode" ]] && reuse="SCENARIO=<id>${id:+ RUN_ID=$id}"
     else
         kcm="not installed"
     fi
 
-    printf '  %-22s %-16s %s\n' "${id:-<none>}" "${mgmt:0:16}" "$kcm"
+    printf '  %-22s %-16s %s\n' "${id:-<default>}" "${mgmt:0:16}" "$kcm"
     [[ -n "$reuse" && -n "$mgmt" ]] \
         && printf '  %-22s %s\n' "" "↳ make scenario $reuse"
     return 0
 }
 
-step "Environments"
-printf '  %-22s %-16s %s\n' "RUN_ID" "CLUSTER" "KCM"
+# Only when something is actually up: a bare header over no rows reads as a
+# broken listing rather than as an empty one.
+running=()
 for key in $(printf '%s\n' "${!SEEN[@]}" | sort); do
-    [[ -n "${SEEN[$key]}" ]] || continue
-    describe "$key"
+    [[ -n "${SEEN[$key]}" ]] && running+=("$key")
 done
+if (( ${#running[@]} )); then
+    step "Environments"
+    printf '  %-22s %-16s %s\n' "RUN_ID" "CLUSTER" "KCM"
+    for key in "${running[@]}"; do describe "$key"; done
+else
+    step "No environment is up -- start one with 'make env-up'"
+fi
 
 # A workdir with no cluster is the common leftover: env-down removes the
-# containers, not the directory.
+# containers and the generated manifests, not the directory or the checkout.
 stale=()
 for key in $(printf '%s\n' "${!SEEN[@]}" | sort); do
-    [[ -n "${SEEN[$key]}" ]] || { id="${key#@}"; stale+=("${id:-<none>}"); }
+    [[ -n "${SEEN[$key]}" ]] || { id="${key#@}"; stale+=("${id:-<default>}"); }
 done
 if (( ${#stale[@]} )); then
     step "Working directories with no cluster"
     log "${stale[*]}"
-    log "Remove one with: make clean RUN_ID=<id>"
+    log "Remove one with: rm -rf .work-<id>, or .work for <default>"
 fi
