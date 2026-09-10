@@ -34,7 +34,7 @@ assert_eq "an unknown scenario is rejected" 1 "$?"
 assert_contains "lists the available scenarios" "$out" "02dep01_valid"
 
 # Underscores are legal in a filename but not in a Kubernetes object name, and
-# the scenario reaches CLD_NAME and MCS_NAME.
+# the scenario reaches MCS_NAME.
 slug="$(SCENARIO=02dep01_valid bash -c "source '$SCRIPTS_DIR/lib/common.sh'; echo \$SCENARIO_SLUG")"
 assert_eq "the slug has no underscores" "02dep01-valid" "$slug"
 mcs="$(SCENARIO=02dep01_valid bash -c "unset MCS_NAME; source '$SCRIPTS_DIR/lib/common.sh'; echo \$MCS_NAME")"
@@ -268,8 +268,7 @@ assert_contains "marks the catalog repo as OCI" "$tmpls" "type: oci"
 assert_eq "one HelmRepository per service" 3 "$(grep -c '^kind: HelmRepository' <<< "$tmpls")"
 assert_eq "one ServiceTemplate per service" 3 "$(grep -c '^kind: ServiceTemplate' <<< "$tmpls")"
 
-SKIP_CHILD_API_CHECK=true MCS_TIMEOUT=1 \
-    bash "$SCRIPTS_DIR/deploy_mcs.sh" >/dev/null 2>&1 || true
+MCS_TIMEOUT=1 bash "$SCRIPTS_DIR/deploy_mcs.sh" >/dev/null 2>&1 || true
 mcs="$(cat "$WORKDIR/service-mcs.rendered.yaml" 2>/dev/null)"
 assert_contains "MCS lists cert-manager" "$mcs" "- template: cert-manager-1-20-2"
 assert_contains "MCS targets the kserve namespace" "$mcs" "namespace: kserve"
