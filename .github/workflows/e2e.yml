@@ -8,28 +8,26 @@ name: E2E
 on:
   workflow_dispatch:
     inputs:
-      # Empty means everything.
+      KCM:
+        description: 'KCM version (chart version, branch, tag, sha)'
+        required: true
+      KCM_MODE:
+        description: 'KCM deployoment mode, options: source, release'
+        required: true
+      SRC_URL:
+        description: 'KCM source git repository (kcm_mode: source)'
+        required: false
+        default: 'https://github.com/k0rdent/kcm.git'
+      OCI_URL:
+        description: 'KCM release oci url (kcm_mode: release)'
+        required: false
+        # The registry, not one chart in it: the scripts pull kcm and
+        # kcm-templates from under this path.
+        default: 'oci://ghcr.io/k0rdent/kcm/charts'
       scenarios:
-        description: 'Scenarios to run, space or comma separated (empty = all)'
+        description: '(empty = all), e.g. "01_basic, 02dep01_valid"'
         required: false
         default: ''
-      kcm:
-        description: 'KCM variants to run, space or comma separated (empty = all)'
-        required: false
-        default: ''
-      kcm_src_url:
-        description: 'KCM repository to build, e.g. a fork (source mode only)'
-        required: false
-        default: ''
-      kcm_ref:
-        description: 'KCM branch, tag or SHA to test (source mode only)'
-        required: false
-        default: ''
-      keep_cluster:
-        description: 'Skip cleanup (for debugging)'
-        type: boolean
-        required: false
-        default: false
   schedule:
     - cron: '0 2 * * *'   # 02:00 UTC
   # Only main: on a branch with an open PR a push runs everything a second
@@ -79,9 +77,9 @@ jobs:
         # Via env, not inline interpolation: free-text dispatch input.
         env:
           WANT_SCENARIOS: ${{ github.event.inputs.scenarios }}
-          WANT_KCM: ${{ github.event.inputs.kcm }}
-          WANT_SRC_URL: ${{ github.event.inputs.kcm_src_url }}
-          WANT_REF: ${{ github.event.inputs.kcm_ref }}
+          WANT_KCM: ${{ github.event.inputs.KCM }}
+          WANT_KCM_MODE: ${{ github.event.inputs.KCM_MODE }}
+          WANT_SRC_URL: ${{ github.event.inputs.SRC_URL }}
           EVENT: ${{ github.event_name }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.sha }}
@@ -89,12 +87,9 @@ jobs:
         run: |
           set -euo pipefail
 
-          ALL="$(yq -o=json -I=0 '.variants' scripts/config/kcm-variants.yaml)"
-
-          # A source variant is named after what it will actually check out, not
-          # after the ref the variants file happens to declare: with kcm_ref set,
-          # 'src: main' named the wrong thing entirely. The commit has to be
-          # resolved here -- job names are fixed before any job clones anything.
+          # A source build is named after what it will actually check out, not
+          # after a ref that may have moved. The commit has to be resolved
+          # here -- job names are fixed before any job clones anything.
           #   a branch or tag -> 'src: <ref> (<sha>)'
           #   a commit        -> 'src: <sha>'
           src_name() {
@@ -111,58 +106,52 @@ jobs:
               echo "src: $ref"
             fi
           }
-          SRC_URL="${WANT_SRC_URL:-$(KCM='' KCM_MODE=source bash -c \
-            'source scripts/lib/common.sh; echo "$SRC_URL"')}"
-          # kcm is the ref for a source variant, so a dispatch override lands
-          # in the one field the job actually passes to the scripts.
-          ALL="$(jq -c --arg want "$WANT_REF" '
-            [ .[] | if .mode == "source"
-                    then . + {kcm: (if $want != "" then $want else .kcm end)}
-                    else . end ]' <<< "$ALL")"
-          while read -r vid vref; do
-            [[ -n "$vid" ]] || continue
-            ALL="$(jq -c --arg id "$vid" --arg n "$(src_name "$vref" "$SRC_URL")" \
-              '[ .[] | if .id == $id then . + {name: $n} else . end ]' <<< "$ALL")"
-          done < <(jq -r '.[] | select(.mode == "source") | "\(.id) \(.kcm)"' <<< "$ALL")
+
+          all_ids=()
+          for f in test_scenarios/*.yaml; do all_ids+=("$(basename "$f" .yaml)"); done
+
+          for want in ${WANT_SCENARIOS//,/ }; do
+            [[ " ${all_ids[*]} " == *" $want "* ]] \
+              || { echo "Unknown scenario '$want'. Available: ${all_ids[*]}" >&2; exit 1; }
+          done
+
+          if [[ "$EVENT" == "workflow_dispatch" ]]; then
+            # One KCM, the same single knob a local run takes. No matrix over
+            # versions here: the scheduled and push runs are what cover the set.
+            case "$WANT_KCM_MODE" in
+              source|release) ;;
+              *) echo "KCM_MODE must be 'source' or 'release', got '$WANT_KCM_MODE'" >&2
+                 exit 1 ;;
+            esac
+            if [[ "$WANT_KCM_MODE" == "source" ]]; then
+              VNAME="$(src_name "$WANT_KCM" "$WANT_SRC_URL")"
+            else
+              VNAME="release: $WANT_KCM"
+            fi
+            # The id reaches an artifact name, so keep it to safe characters.
+            VID="${WANT_KCM//[^A-Za-z0-9._-]/-}"
+            ALL="$(jq -nc --arg id "$VID" --arg n "$VNAME" \
+                          --arg k "$WANT_KCM" --arg m "$WANT_KCM_MODE" \
+                   '[{id: $id, name: $n, kcm: $k, mode: $m}]')"
+          else
+            ALL="$(yq -o=json -I=0 '.variants' scripts/config/kcm-variants.yaml)"
+            DEFAULT_SRC_URL="$(KCM='' KCM_MODE=source bash -c \
+              'source scripts/lib/common.sh; echo "$SRC_URL"')"
+            while read -r vid vref; do
+              [[ -n "$vid" ]] || continue
+              ALL="$(jq -c --arg id "$vid" --arg n "$(src_name "$vref" "$DEFAULT_SRC_URL")" \
+                '[ .[] | if .id == $id then . + {name: $n} else . end ]' <<< "$ALL")"
+            done < <(jq -r '.[] | select(.mode == "source") | "\(.id) \(.kcm)"' <<< "$ALL")
+          fi
 
           PR_VARIANT="$(jq -r '[.[] | select(.prCheck == true) | .id][0] // empty' <<< "$ALL")"
           SRC_VARIANT="$(jq -r '[.[] | select(.mode == "source") | .id][0] // empty' <<< "$ALL")"
           SMOKE=01_basic
           # Without it every pull request would select nothing and pass having
           # tested nothing.
-          [[ -n "$PR_VARIANT" ]] \
-            || { echo "No variant in kcm-variants.yaml has prCheck: true" >&2; exit 1; }
-
-          all_ids=()
-          for f in test_scenarios/*.yaml; do all_ids+=("$(basename "$f" .yaml)"); done
-
-          # A typo in a dispatch input used to match nothing and leave a green
-          # run that tested nothing at all.
-          for want in ${WANT_KCM//,/ }; do
-            jq -e --arg w "$want" 'any(.[]; .id == $w)' <<< "$ALL" >/dev/null \
-              || { echo "Unknown KCM variant '$want'. Available: $(jq -r '[.[].id] | join(" ")' <<< "$ALL")" >&2; exit 1; }
-          done
-          for want in ${WANT_SCENARIOS//,/ }; do
-            [[ " ${all_ids[*]} " == *" $want "* ]] \
-              || { echo "Unknown scenario '$want'. Available: ${all_ids[*]}" >&2; exit 1; }
-          done
-
-          # A repository or ref only means anything to a source build. Left to
-          # run against a release variant it would install the published chart
-          # and report green on code it never compiled.
-          if [[ -n "$WANT_SRC_URL$WANT_REF" ]]; then
-            SRC_IDS="$(jq -r '[.[] | select(.mode == "source") | .id] | join(" ")' <<< "$ALL")"
-            if [[ -z "${WANT_KCM// /}" ]]; then
-              WANT_KCM="$SRC_IDS"
-              echo "kcm_src_url/kcm_ref given, so running the source variants: $WANT_KCM"
-            else
-              for want in ${WANT_KCM//,/ }; do
-                [[ " $SRC_IDS " == *" $want "* ]] || {
-                  echo "kcm_src_url/kcm_ref only apply to a source build, but '$want' is a release variant." >&2
-                  echo "Pick one of: $SRC_IDS, or leave kcm empty." >&2
-                  exit 1; }
-              done
-            fi
+          if [[ "$EVENT" == "pull_request" && -z "$PR_VARIANT" ]]; then
+            echo "No variant in kcm-variants.yaml has prCheck: true" >&2
+            exit 1
           fi
 
           # scenario -> the variant ids it should run against
@@ -194,8 +183,15 @@ jobs:
             EXPECT='(.expect.failed != null)'
             PLAIN='((.templateChain // .upgrade // .multiClusterServices // .expect) == null)'
 
-            # One per feature area.
-            one_of() { using "$1" | head -1; }
+            # One per feature area. Not `using ... | head -1`: head closes the
+            # pipe, using dies of SIGPIPE and pipefail takes the whole script
+            # down with it.
+            one_of() {
+              local out
+              out="$(using "$1")"
+              [[ -n "$out" ]] && head -1 <<< "$out"
+              return 0
+            }
 
             targeted="" source_build=false everything=false pipeline=false env_only=false
             while read -r f; do
@@ -250,7 +246,7 @@ jobs:
             id="$(basename "$f" .yaml)"
             selected "$id" "$WANT_SCENARIOS" || continue
             ids=""
-            for v in ${SEL[$id]:-}; do selected "$v" "$WANT_KCM" && ids+="$v "; done
+            for v in ${SEL[$id]:-}; do ids+="$v "; done
             [[ -n "${ids// /}" ]] || continue
             # variants is a JSON string: the reusable workflow takes it as one
             # input and fromJson's it, which lets each scenario have its own set.
@@ -264,8 +260,8 @@ jobs:
           # manual run it means the filters matched nothing and the run would go
           # green having tested nothing.
           if [[ "$scenarios" == '[]' && "$EVENT" == "workflow_dispatch" ]]; then
-            echo "Nothing matches scenarios='$WANT_SCENARIOS' kcm='$WANT_KCM'" >&2
-            echo "Available: ${all_ids[*]} / $(jq -r '[.[].id] | join(" ")' <<< "$ALL")" >&2
+            echo "Nothing matches scenarios='$WANT_SCENARIOS'" >&2
+            echo "Available: ${all_ids[*]}" >&2
             exit 1
           fi
 
@@ -285,5 +281,5 @@ jobs:
     with:
       scenario: ${{ matrix.scenario.id }}
       kcm_variants: ${{ matrix.scenario.variants }}
-      kcm_src_url: ${{ github.event.inputs.kcm_src_url || '' }}
-      keep_cluster: ${{ github.event.inputs.keep_cluster == 'true' }}
+      src_url: ${{ github.event.inputs.SRC_URL || '' }}
+      oci_url: ${{ github.event.inputs.OCI_URL || '' }}

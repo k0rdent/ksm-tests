@@ -15,16 +15,16 @@ on:
         description: 'JSON array of KCM variants, from the discover job'
         type: string
         required: true
-      kcm_src_url:
+      src_url:
         description: 'Override the KCM repository to build (source mode only)'
         type: string
         required: false
         default: ''
-      keep_cluster:
-        description: 'Skip cleanup, for debugging'
-        type: boolean
+      oci_url:
+        description: 'Override the chart registry (release mode only)'
+        type: string
         required: false
-        default: false
+        default: ''
 
 # No concurrency group here on purpose: the caller's cancels these jobs too.
 
@@ -44,7 +44,9 @@ jobs:
       # single knob a local run uses.
       KCM: ${{ matrix.kcm.kcm }}
       KCM_MODE: ${{ matrix.kcm.mode }}
-      SRC_URL: ${{ inputs.kcm_src_url }}
+      # Empty falls through to the default in common.sh.
+      SRC_URL: ${{ inputs.src_url }}
+      OCI_URL: ${{ inputs.oci_url }}
       SCENARIO: ${{ inputs.scenario }}
       TEST_MODE: self
     steps:
@@ -145,5 +147,5 @@ jobs:
           retention-days: 7
 
       - name: Remove the k0rdent cluster
-        if: always() && !inputs.keep_cluster
+        if: always()
         run: ./scripts/remove_k0rdent.sh
