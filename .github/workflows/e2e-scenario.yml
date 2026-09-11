@@ -15,6 +15,16 @@ on:
         description: 'JSON array of KCM variants, from the discover job'
         type: string
         required: true
+      has_upgrade:
+        description: 'The scenario declares upgrade.services'
+        type: boolean
+        required: false
+        default: true
+      has_chain:
+        description: 'The scenario declares upgrade.steps'
+        type: boolean
+        required: false
+        default: true
       src_url:
         description: 'Override the KCM repository to build (source mode only)'
         type: string
@@ -123,12 +133,14 @@ jobs:
       - name: Deploy services via MultiClusterService
         run: ./scripts/deploy_mcs.sh
 
-      # No-op unless the scenario has an upgrade block.
+      # Skipped, not silently a no-op: most scenarios declare no upgrade, and a
+      # green step that did nothing reads as coverage this run does not have.
       - name: Upgrade services
+        if: inputs.has_upgrade
         run: ./scripts/upgrade_services.sh
 
-      # No-op unless the scenario declares upgrade.steps.
       - name: Upgrade along the chain
+        if: inputs.has_chain
         run: ./scripts/upgrade_chain.sh
 
       - name: Remove services
