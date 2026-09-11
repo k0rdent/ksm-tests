@@ -214,7 +214,7 @@ require_kcm() {
 require_yq() {
     require_cmd yq
     yq --version 2>&1 | grep -qi mikefarah \
-        || die "yq at $(command -v yq) is not mikefarah/yq. Run ./scripts/deps.sh"
+        || die "yq at $(command -v yq) is not mikefarah/yq. Run ./scripts/steps/deps.sh"
 }
 
 # require_cmd CMD [CMD...] -- fail unless every command is on PATH.
@@ -225,7 +225,7 @@ require_cmd() {
         command -v "$cmd" >/dev/null 2>&1 || missing+=("$cmd")
     done
     if [[ ${#missing[@]} -gt 0 ]]; then
-        die "Missing required command(s): ${missing[*]}. Run ./scripts/deps.sh"
+        die "Missing required command(s): ${missing[*]}. Run ./scripts/steps/deps.sh"
     fi
 }
 

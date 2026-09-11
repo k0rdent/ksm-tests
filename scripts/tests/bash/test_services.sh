@@ -258,7 +258,7 @@ export SERVICES_FILE
 
 # The mocked kubectl never reports a template as valid, so cap the wait: this
 # test is about what gets rendered, not about the cluster converging.
-TEMPLATES_TIMEOUT=1 bash "$SCRIPTS_DIR/install_servicetemplate.sh" >/dev/null 2>&1 || true
+TEMPLATES_TIMEOUT=1 bash "$SCRIPTS_DIR/steps/install_servicetemplate.sh" >/dev/null 2>&1 || true
 tmpls="$(cat "$WORKDIR/service-templates.rendered.yaml" 2>/dev/null)"
 assert_contains "renders the cert-manager ServiceTemplate" "$tmpls" "name: cert-manager-1-20-2"
 assert_contains "renders the kserve ServiceTemplate" "$tmpls" "name: kserve-resources-0-18-0"
@@ -268,7 +268,7 @@ assert_contains "marks the catalog repo as OCI" "$tmpls" "type: oci"
 assert_eq "one HelmRepository per service" 3 "$(grep -c '^kind: HelmRepository' <<< "$tmpls")"
 assert_eq "one ServiceTemplate per service" 3 "$(grep -c '^kind: ServiceTemplate' <<< "$tmpls")"
 
-MCS_TIMEOUT=1 bash "$SCRIPTS_DIR/deploy_mcs.sh" >/dev/null 2>&1 || true
+MCS_TIMEOUT=1 bash "$SCRIPTS_DIR/steps/deploy_mcs.sh" >/dev/null 2>&1 || true
 mcs="$(cat "$WORKDIR/service-mcs.rendered.yaml" 2>/dev/null)"
 assert_contains "MCS lists cert-manager" "$mcs" "- template: cert-manager-1-20-2"
 assert_contains "MCS targets the kserve namespace" "$mcs" "namespace: kserve"

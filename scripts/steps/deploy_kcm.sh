@@ -11,7 +11,7 @@ set -euo pipefail
 # apply_management.sh has to copy exactly these values into core.kcm.config.
 
 # shellcheck source=scripts/lib/common.sh
-source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../lib/common.sh"
 # shellcheck source=scripts/lib/k8s.sh
 source "$SCRIPTS_DIR/lib/k8s.sh"
 
@@ -47,7 +47,7 @@ if [[ "$KCM_MODE" == "source" ]]; then
 
     step "Resolving chart dependencies"
     # flux2 and rbac-manager come from remote repos, kcm-regional from file://.
-    MAX_RETRIES=5 SLEEP=5 "$SCRIPTS_DIR/retry.sh" helm dependency update "$CHART_REF"
+    MAX_RETRIES=5 SLEEP=5 "$SCRIPTS_DIR/utils/retry.sh" helm dependency update "$CHART_REF"
 else
     CHART_REF="$OCI_URL/kcm"
     helm_args+=(--version "$KCM_VERSION")
@@ -64,6 +64,6 @@ helm upgrade --install "$KCM_HELM_RELEASE_NAME" "$CHART_REF" \
     -f "$VALUES_FILE" \
     "${helm_args[@]}"
 
-NAMESPACE="$NAMESPACE" "$SCRIPTS_DIR/wait_for_deployment.sh"
+NAMESPACE="$NAMESPACE" "$SCRIPTS_DIR/utils/wait_for_deployment.sh"
 
 ok "KCM chart installed ($KCM_MODE mode)"

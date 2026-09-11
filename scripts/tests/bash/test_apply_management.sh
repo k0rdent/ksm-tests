@@ -23,7 +23,7 @@ controller:
 EOF
 
 KCM_PROVIDERS="cluster-api-provider-docker projectsveltos" \
-    bash "$SCRIPTS_DIR/apply_management.sh" >/dev/null 2>&1
+    bash "$SCRIPTS_DIR/steps/apply_management.sh" >/dev/null 2>&1
 assert_eq "renders and applies successfully" 0 "$?"
 
 rendered="$(cat "$ENVDIR/management.rendered.yaml")"
@@ -37,12 +37,12 @@ assert_contains "carries the local image into core.kcm.config" "$rendered" "loca
 
 # Missing inputs must fail loudly rather than render junk.
 rm -f "$ENVDIR/kcm-values.rendered.yaml"
-out=$(bash "$SCRIPTS_DIR/apply_management.sh" 2>&1)
+out=$(bash "$SCRIPTS_DIR/steps/apply_management.sh" 2>&1)
 assert_eq "fails without the rendered values" 1 "$?"
 assert_contains "points at deploy_kcm.sh" "$out" "deploy_kcm.sh"
 
 rm -f "$ENVDIR/release.env"
-out=$(bash "$SCRIPTS_DIR/apply_management.sh" 2>&1)
+out=$(bash "$SCRIPTS_DIR/steps/apply_management.sh" 2>&1)
 assert_eq "fails without release.env" 1 "$?"
 assert_contains "points at apply_release.sh" "$out" "apply_release.sh"
 

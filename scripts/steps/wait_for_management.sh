@@ -8,7 +8,7 @@ set -euo pipefail
 # converged, so this is the real "KCM is up" gate.
 
 # shellcheck source=scripts/lib/common.sh
-source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../lib/common.sh"
 # shellcheck source=scripts/lib/k8s.sh
 source "$SCRIPTS_DIR/lib/k8s.sh"
 
@@ -51,7 +51,7 @@ fi
 
 step "Waiting for the projectsveltos pods"
 if kube get namespace projectsveltos >/dev/null 2>&1; then
-    NAMESPACE=projectsveltos "$SCRIPTS_DIR/wait_for_deployment.sh"
+    NAMESPACE=projectsveltos "$SCRIPTS_DIR/utils/wait_for_deployment.sh"
 else
     warn "Namespace 'projectsveltos' does not exist -- skipping"
 fi

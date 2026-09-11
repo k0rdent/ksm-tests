@@ -15,7 +15,7 @@ set -euo pipefail
 # Adapted from k0rdent/catalog's scripts/wait_for_deployment.sh.
 
 # shellcheck source=scripts/lib/common.sh
-source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../lib/common.sh"
 
 require_cmd kubectl jq
 require_env NAMESPACE

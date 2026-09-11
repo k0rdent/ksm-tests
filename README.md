@@ -37,7 +37,9 @@ sits on them. Cloud provisioning is out of scope.
 
 ```
 test_scenarios/     one YAML per scenario -- the whole test definition
-scripts/            the pipeline, one script per step
+scripts/            the entry points below; everything you run by hand
+  steps/            one script per pipeline step, 1:1 with the steps in CI
+  utils/            subroutines the steps call; never run directly
   lib/              shared helpers; services.sh reads the scenario files
   config/           KCM values, the Management object, the CI matrix
   tests/bash/       unit tests for the scripts, no cluster needed

@@ -6,7 +6,7 @@ set -euo pipefail
 # reporting success is not proof the workloads are running.
 
 # shellcheck source=scripts/lib/common.sh
-source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../lib/common.sh"
 # shellcheck source=scripts/lib/k8s.sh
 source "$SCRIPTS_DIR/lib/k8s.sh"
 # shellcheck source=scripts/lib/services.sh
@@ -19,7 +19,7 @@ check_scenario
 
 # Scenarios with several MultiClusterServices are about how those interact,
 # which needs its own choreography.
-if is_multi_mcs; then exec "$SCRIPTS_DIR/deploy_mcs_group.sh"; fi
+if is_multi_mcs; then exec "$SCRIPTS_DIR/utils/deploy_mcs_group.sh"; fi
 
 export KUBECONFIG="$KUBECONFIG_MGMT"
 require_cluster
@@ -64,7 +64,7 @@ fi
 # Scenarios that assert the rollout stops have their own checks: waiting for
 # every service to be Ready would just time out on the one meant to fail.
 if expects_failure; then
-    SERVICE_SET="$sset" exec "$SCRIPTS_DIR/verify_mcs_failure.sh"
+    SERVICE_SET="$sset" exec "$SCRIPTS_DIR/utils/verify_mcs_failure.sh"
 fi
 
 [[ -f "$KUBECONFIG_CHILD" ]] \
@@ -88,7 +88,7 @@ while IFS="$SERVICE_SEP" read -r name _chart _version _repo namespace _dep waitf
     [[ -n "$waitfor" ]] || { log "no waitForPods for '$name', namespace is enough"; continue; }
 
     KUBECONFIG="$KUBECONFIG_CHILD" NAMESPACE="$namespace" \
-        WAIT_FOR_PODS="$waitfor" "$SCRIPTS_DIR/wait_for_deployment.sh"
+        WAIT_FOR_PODS="$waitfor" "$SCRIPTS_DIR/utils/wait_for_deployment.sh"
 done < <(services_rows)
 
 step "Deployed workloads"

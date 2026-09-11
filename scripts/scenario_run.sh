@@ -24,16 +24,16 @@ ensure_workdir
 
 START=$SECONDS
 trap 'rc=$?; (( rc == 0 )) || { warn "Scenario $SCENARIO failed"; \
-      "$SCRIPTS_DIR/collect_logs.sh" || true; }' EXIT
+      "$SCRIPTS_DIR/steps/collect_logs.sh" || true; }' EXIT
 
 step "Scenario $SCENARIO"
 
-"$SCRIPTS_DIR/install_servicetemplate.sh"
-"$SCRIPTS_DIR/deploy_mcs.sh"
+"$SCRIPTS_DIR/steps/install_servicetemplate.sh"
+"$SCRIPTS_DIR/steps/deploy_mcs.sh"
 # No-op unless the scenario has an upgrade block.
-"$SCRIPTS_DIR/upgrade_services.sh"
+"$SCRIPTS_DIR/steps/upgrade_services.sh"
 # No-op unless the scenario declares upgrade.steps.
-"$SCRIPTS_DIR/upgrade_chain.sh"
+"$SCRIPTS_DIR/steps/upgrade_chain.sh"
 
 if [[ "${SCENARIO_KEEP:-false}" == "true" ]]; then
     ok "$SCENARIO deployed in $(( (SECONDS - START) / 60 ))m$(( (SECONDS - START) % 60 ))s"
@@ -41,6 +41,6 @@ if [[ "${SCENARIO_KEEP:-false}" == "true" ]]; then
     exit 0
 fi
 
-"$SCRIPTS_DIR/remove_services.sh"
+"$SCRIPTS_DIR/steps/remove_services.sh"
 
 ok "$SCENARIO passed in $(( (SECONDS - START) / 60 ))m$(( (SECONDS - START) % 60 ))s"
