@@ -10,7 +10,7 @@ set -euo pipefail
 # moments against expect.orderedAfterDependencies and expect.neverDeployed.
 
 # shellcheck source=scripts/lib/common.sh
-source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../lib/common.sh"
 # shellcheck source=scripts/lib/k8s.sh
 source "$SCRIPTS_DIR/lib/k8s.sh"
 # shellcheck source=scripts/lib/services.sh
@@ -135,7 +135,7 @@ if [[ -z "${NEVER// /}" ]]; then
             || die "Service '$name' has no deployed helm release in the child cluster"
         [[ -n "$waitfor" ]] || continue
         KUBECONFIG="$KUBECONFIG_CHILD" NAMESPACE="$namespace" \
-            WAIT_FOR_PODS="$waitfor" "$SCRIPTS_DIR/wait_for_deployment.sh"
+            WAIT_FOR_PODS="$waitfor" "$SCRIPTS_DIR/utils/wait_for_deployment.sh"
     done < <(all_services_rows)
     fi
 

@@ -5,7 +5,7 @@ set -euo pipefail
 # network, so the controller reaches it by name while we push via localhost.
 
 # shellcheck source=scripts/lib/common.sh
-source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../lib/common.sh"
 # shellcheck source=scripts/lib/docker.sh
 source "$SCRIPTS_DIR/lib/docker.sh"
 
@@ -47,7 +47,7 @@ connect_network "$DOCKER_NETWORK" "$REGISTRY_NAME"
 REGISTRY_REPO="oci://127.0.0.1:$REGISTRY_PORT/charts"
 
 log "Waiting for the registry to answer on 127.0.0.1:$REGISTRY_PORT"
-MAX_RETRIES=30 SLEEP=2 "$SCRIPTS_DIR/retry.sh" \
+MAX_RETRIES=30 SLEEP=2 "$SCRIPTS_DIR/utils/retry.sh" \
     curl -fsS "http://127.0.0.1:$REGISTRY_PORT/v2/" -o /dev/null
 
 # The port may differ from the default, so record it for push_kcm_artifacts.sh.

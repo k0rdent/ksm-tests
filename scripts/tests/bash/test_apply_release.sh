@@ -68,7 +68,7 @@ emit_template adopted-cluster-1-0-2.yaml ClusterTemplate adopted-cluster-1-0-2
 
 out=$(KCM_PROVIDERS="cluster-api-provider-docker projectsveltos" \
       KCM_CLUSTER_TEMPLATES="adopted-cluster" \
-      bash "$SCRIPTS_DIR/apply_release.sh" 2>&1)
+      bash "$SCRIPTS_DIR/steps/apply_release.sh" 2>&1)
 assert_eq "succeeds with a valid provider subset" 0 "$?"
 
 trimmed="$(cat "$ENVDIR/release.trimmed.yaml")"
@@ -89,13 +89,13 @@ assert_eq "records the cluster template" "adopted-cluster-1-0-2" "$CLUSTER_TEMPL
 
 # A provider that is not in the Release is a typo, not a silent no-op.
 out=$(KCM_PROVIDERS="cluster-api-provider-nope" \
-      bash "$SCRIPTS_DIR/apply_release.sh" 2>&1)
+      bash "$SCRIPTS_DIR/steps/apply_release.sh" 2>&1)
 assert_eq "rejects an unknown provider" 1 "$?"
 assert_contains "names the unknown provider" "$out" "cluster-api-provider-nope"
 
 # A cluster template with no manifest must fail too.
 out=$(KCM_PROVIDERS="projectsveltos" KCM_CLUSTER_TEMPLATES="does-not-exist" \
-      bash "$SCRIPTS_DIR/apply_release.sh" 2>&1)
+      bash "$SCRIPTS_DIR/steps/apply_release.sh" 2>&1)
 assert_eq "rejects a missing cluster template" 1 "$?"
 assert_contains "names the missing template" "$out" "does-not-exist"
 

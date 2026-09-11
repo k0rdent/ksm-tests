@@ -17,9 +17,9 @@ strip() { sed -E 's#.*/##' | grep -vE "^($NOT_PIPELINE)\.sh$"; }
 # Only real invocations: a `run:` key in the workflow, and a command at the
 # start of a line in the entry points. Anchored so the usage comments at the
 # top of each script -- which name the script itself -- are not counted.
-ci="$(grep -oE '^ +run: \./scripts/[a-z_0-9]+\.sh$' "$WORKFLOW" | strip)"
+ci="$(grep -oE '^ +run: \./scripts/steps/[a-z_0-9]+\.sh$' "$WORKFLOW" | strip)"
 # shellcheck disable=SC2016 # $SCRIPTS_DIR is the literal text being matched
-local_run="$(grep -hoE '^ *"\$SCRIPTS_DIR/[a-z_0-9]+\.sh"' \
+local_run="$(grep -hoE '^ *"\$SCRIPTS_DIR/steps/[a-z_0-9]+\.sh"' \
     "$SCRIPTS_DIR/deploy_k0rdent.sh" "$SCRIPTS_DIR/scenario_run.sh" \
     | tr -d '"' | strip)"
 

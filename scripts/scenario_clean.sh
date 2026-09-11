@@ -16,4 +16,4 @@ check_scenario
 require_cluster
 ensure_workdir
 
-"$SCRIPTS_DIR/remove_services.sh"
+"$SCRIPTS_DIR/steps/remove_services.sh"

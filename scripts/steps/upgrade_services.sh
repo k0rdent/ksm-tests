@@ -9,7 +9,7 @@ set -euo pipefail
 #   rolledBackTo -- the failed upgrade is undone and the release ends healthy
 
 # shellcheck source=scripts/lib/common.sh
-source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../lib/common.sh"
 # shellcheck source=scripts/lib/k8s.sh
 source "$SCRIPTS_DIR/lib/k8s.sh"
 # shellcheck source=scripts/lib/services.sh
@@ -234,7 +234,7 @@ if [[ -n "$ROLLED_BACK_TO" ]]; then
     waitfor="$(service_field "$name" waitForPods)"
     if [[ -n "$waitfor" ]]; then
         KUBECONFIG="$KUBECONFIG_CHILD" NAMESPACE="$ns" \
-            WAIT_FOR_PODS="$waitfor" "$SCRIPTS_DIR/wait_for_deployment.sh"
+            WAIT_FOR_PODS="$waitfor" "$SCRIPTS_DIR/utils/wait_for_deployment.sh"
     fi
 fi
 

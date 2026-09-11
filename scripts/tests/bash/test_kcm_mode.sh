@@ -122,12 +122,12 @@ fi
 
 if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
     out=$(PATH="$nogo" KCM_MODE=release BIN_DIR="$REPO_ROOT/.bin" \
-          bash "$SCRIPTS_DIR/deps.sh" 2>&1)
+          bash "$SCRIPTS_DIR/steps/deps.sh" 2>&1)
     assert_eq "release mode succeeds without go/make" 0 "$?"
     assert_not_contains "does not ask for go" "$out" "'go' is required"
 
     out=$(PATH="$nogo" KCM_MODE=source BIN_DIR="$REPO_ROOT/.bin" \
-          bash "$SCRIPTS_DIR/deps.sh" 2>&1)
+          bash "$SCRIPTS_DIR/steps/deps.sh" 2>&1)
     assert_eq "source mode fails without go/make" 1 "$?"
     assert_contains "says which mode needs it" "$out" "KCM_MODE=source"
 else

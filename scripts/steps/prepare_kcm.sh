@@ -14,7 +14,7 @@ set -euo pipefail
 # are kind-specific.
 
 # shellcheck source=scripts/lib/common.sh
-source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../lib/common.sh"
 
 ensure_workdir
 

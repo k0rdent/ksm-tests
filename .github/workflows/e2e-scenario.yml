@@ -92,60 +92,60 @@ jobs:
       # local run; nothing enforces that the two stay in step, so a script
       # added there has to be added here too.
       - name: Install dependencies
-        run: ./scripts/deps.sh
+        run: ./scripts/steps/deps.sh
 
       - name: Prepare KCM
-        run: ./scripts/prepare_kcm.sh
+        run: ./scripts/steps/prepare_kcm.sh
 
       # The local registry only serves charts we built ourselves.
       - name: Deploy local registry
         if: matrix.kcm.mode == 'source'
-        run: ./scripts/deploy_registry.sh
+        run: ./scripts/steps/deploy_registry.sh
 
       - name: Deploy k0rdent cluster
-        run: ./scripts/deploy_mgmt_cluster.sh
+        run: ./scripts/steps/deploy_mgmt_cluster.sh
 
       - name: Push images and charts
         if: matrix.kcm.mode == 'source'
-        run: ./scripts/push_kcm_artifacts.sh
+        run: ./scripts/steps/push_kcm_artifacts.sh
 
       - name: Install KCM
-        run: ./scripts/deploy_kcm.sh
+        run: ./scripts/steps/deploy_kcm.sh
 
       - name: Apply Release and templates
-        run: ./scripts/apply_release.sh
+        run: ./scripts/steps/apply_release.sh
 
       - name: Wait for templates
-        run: ./scripts/wait_for_templates.sh
+        run: ./scripts/steps/wait_for_templates.sh
 
       - name: Apply Management
-        run: ./scripts/apply_management.sh
+        run: ./scripts/steps/apply_management.sh
 
       - name: Wait for Management
-        run: ./scripts/wait_for_management.sh
+        run: ./scripts/steps/wait_for_management.sh
 
       - name: Install ServiceTemplates
-        run: ./scripts/install_servicetemplate.sh
+        run: ./scripts/steps/install_servicetemplate.sh
 
       - name: Deploy services via MultiClusterService
-        run: ./scripts/deploy_mcs.sh
+        run: ./scripts/steps/deploy_mcs.sh
 
       # Skipped, not silently a no-op: most scenarios declare no upgrade, and a
       # green step that did nothing reads as coverage this run does not have.
       - name: Upgrade services
         if: inputs.has_upgrade
-        run: ./scripts/upgrade_services.sh
+        run: ./scripts/steps/upgrade_services.sh
 
       - name: Upgrade along the chain
         if: inputs.has_chain
-        run: ./scripts/upgrade_chain.sh
+        run: ./scripts/steps/upgrade_chain.sh
 
       - name: Remove services
-        run: ./scripts/remove_services.sh
+        run: ./scripts/steps/remove_services.sh
 
       - name: Collect diagnostics
         if: failure()
-        run: ./scripts/collect_logs.sh
+        run: ./scripts/steps/collect_logs.sh
 
       - name: Upload diagnostics
         if: failure()

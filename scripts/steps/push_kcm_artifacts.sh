@@ -5,7 +5,7 @@ set -euo pipefail
 # node's containerd, template charts into the local OCI registry.
 
 # shellcheck source=scripts/lib/common.sh
-source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../lib/common.sh"
 # shellcheck source=scripts/lib/docker.sh
 source "$SCRIPTS_DIR/lib/docker.sh"
 

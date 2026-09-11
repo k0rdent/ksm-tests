@@ -8,7 +8,7 @@ set -euo pipefail
 # FORCE_INSTALL_DEPS=1 to install the pinned versions regardless.
 
 # shellcheck source=scripts/lib/common.sh
-source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../lib/common.sh"
 
 KUBECTL_VERSION="${KUBECTL_VERSION:-v1.35.0}"
 HELM_VERSION="${HELM_VERSION:-v3.21.3}"
