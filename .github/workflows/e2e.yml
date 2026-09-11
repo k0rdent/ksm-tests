@@ -254,8 +254,15 @@ jobs:
             # input and fromJson's it, which lets each scenario have its own set.
             vjson="$(jq -c --arg ids "$ids" \
               '[ .[] | select(.id as $i | ($ids | split(" ") | index($i))) ]' <<< "$ALL")"
+            # The two upgrade steps are no-ops for most scenarios. These mirror
+            # the guards the scripts themselves use, so CI greys the steps out
+            # instead of reporting a pass for work it never did.
+            up="$(yq -r '((.upgrade // "" | tag) == "!!map")
+                         and (([.upgrade.steps[]?] | length) == 0)' "$f")"
+            ch="$(yq -r '([.upgrade.steps[]?] | length) > 0' "$f")"
             scenarios="$(jq -c --arg id "$id" --arg v "$vjson" \
-              '. + [{id: $id, variants: $v}]' <<< "$scenarios")"
+              --argjson up "$up" --argjson ch "$ch" \
+              '. + [{id: $id, variants: $v, upgrade: $up, chain: $ch}]' <<< "$scenarios")"
           done
 
           # Nothing to run is normal for a docs-only pull request, but for a
@@ -283,5 +290,7 @@ jobs:
     with:
       scenario: ${{ matrix.scenario.id }}
       kcm_variants: ${{ matrix.scenario.variants }}
+      has_upgrade: ${{ matrix.scenario.upgrade }}
+      has_chain: ${{ matrix.scenario.chain }}
       src_url: ${{ github.event.inputs.SRC_URL || '' }}
       oci_url: ${{ github.event.inputs.OCI_URL || '' }}
