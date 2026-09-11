@@ -70,13 +70,10 @@ jobs:
       # Only the source build outgrows the runner disk: it adds two images and
       # a local registry on top of the cluster. A release job starts with 87G
       # free, and the cleanup costs 99s -- a quarter of its environment time.
-      # Always report, so a job that does run short says so in its own log.
       - name: Free disk space
-        env:
-          BUILDS_IMAGES: ${{ matrix.kcm.mode == 'source' }}
+        if: matrix.kcm.mode == 'source'
         run: |
           df -h /
-          [[ "$BUILDS_IMAGES" == "true" ]] || exit 0
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
                       /usr/local/share/boost "$AGENT_TOOLSDIRECTORY" || true
           sudo apt-get clean
