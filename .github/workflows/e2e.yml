@@ -13,7 +13,8 @@ on:
         required: true
       KCM_MODE:
         description: 'KCM deployoment mode, options: source, release'
-        required: true
+        required: false
+        default: 'source'
       SRC_URL:
         description: 'KCM source git repository (kcm_mode: source)'
         required: false
