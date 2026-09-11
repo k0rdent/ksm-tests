@@ -27,8 +27,12 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y shellcheck
 
       - name: Run ShellCheck
-        run: shellcheck scripts/*.sh scripts/steps/*.sh scripts/utils/*.sh \
-               scripts/lib/*.sh scripts/tests/bash/*.sh
+        # Block scalar, not a plain one: in a plain scalar YAML folds the
+        # newline to a space and the trailing backslash then escapes it,
+        # turning the next glob into one argument with a leading space.
+        run: |
+          shellcheck scripts/*.sh scripts/steps/*.sh scripts/utils/*.sh \
+            scripts/lib/*.sh scripts/tests/bash/*.sh
 
   actionlint:
     name: actionlint
