@@ -10,11 +10,12 @@ on:
     inputs:
       KCM:
         description: 'KCM version (chart version, branch, tag, sha)'
-        required: true
+        required: false
+        default: 1.12.0-rc.3
       KCM_MODE:
         description: 'KCM deployoment mode, options: source, release'
         required: false
-        default: 'source'
+        default: 'release'
       SRC_URL:
         description: 'KCM source git repository (kcm_mode: source)'
         required: false
