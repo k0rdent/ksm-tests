@@ -98,5 +98,16 @@ while read -r ns; do
     kube_child get pods -n "$ns" 2>/dev/null || true
 done < <(service_namespaces)
 
+# Running workloads are not the same as KCM having accepted them: the
+# ServiceSet collects each service's state afterwards, so the MCS still reads
+# 0/1 for a while. Removing it in that window tears down a rollout KCM never
+# finished, and the step above would have reported success for it.
+# ClusterInReadyState is the condition behind the CLUSTERS column; under
+# selfManagement the denominator is 1, for the cluster KCM runs in.
+step "Waiting for '$MCS_NAME' to report its clusters ready"
+wait_for_condition MultiClusterService "$MCS_NAME" "" \
+    ClusterInReadyState "$MCS_TIMEOUT" \
+    || die "MultiClusterService '$MCS_NAME' never reported its clusters ready"
+
 kube get multiclusterservice "$MCS_NAME"
 ok "All services deployed via MultiClusterService"
