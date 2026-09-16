@@ -8,8 +8,10 @@ metadata:
 spec:
   release: ${RELEASE_NAME}
   core:
+    # No capi block: an empty component fails the schema (Component requires at
+    # least one property since KCM 1d435a32, after 1.12.0-rc2), and KCM takes
+    # the template from the Release when core.capi is absent.
     kcm:
       config: {}
-    capi: {}
   providers:
 ${MANAGEMENT_PROVIDERS}
