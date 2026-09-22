@@ -17,26 +17,9 @@ require_cmd docker
 
 PREFIX="k0rdent-"
 
-# Containers first, then build directories: a cluster can have either without
-# the other -- a removed container leaves the directory behind, and a
-# hand-deleted directory leaves the container.
-declare -A SEEN=()
-while read -r name status; do
-    [[ -n "$name" ]] || continue
-    SEEN["${name#"$PREFIX"}"]="$status"
-done < <(docker ps -a --filter "name=^$PREFIX" --format '{{.Names}}\t{{.Status}}' 2>/dev/null)
+mapfile -t CLUSTERS < <(k0rdent_clusters)
 
-for dir in "$WORKDIR/$PREFIX"*; do
-    [[ -d "$dir" ]] || continue
-    key="$(basename "$dir")"
-    key="${key#"$PREFIX"}"
-    # A directory with no KCM in its name is left over from a run that had
-    # none. Bash rejects the empty subscript anyway.
-    [[ -n "$key" ]] || continue
-    [[ -v "SEEN[$key]" ]] || SEEN["$key"]=""
-done
-
-(( ${#SEEN[@]} )) || {
+(( ${#CLUSTERS[@]} )) || {
     ok "No k0rdent cluster exists. Build one with KCM=1.12.0-rc.3 ./scripts/deploy_k0rdent.sh"
     exit 0
 }
@@ -48,8 +31,14 @@ if [[ -L "$KUBECONFIG_MGMT" ]]; then
     current="${current#kcfg_k0rdent_}"
 fi
 
-printf '  %-20s %-18s %-8s %s\n' "KCM" "CLUSTER" "CURRENT" "BUILD"
-for kcm in $(printf '%s\n' "${!SEEN[@]}" | sort); do
+# The number is what `./scripts/remove_k0rdent.sh <N>` takes, so it is printed
+# rather than counted by hand off the listing.
+printf '  %-3s %-20s %-18s %-8s %s\n' "#" "KCM" "CLUSTER" "CURRENT" "BUILD"
+index=0
+for entry in "${CLUSTERS[@]}"; do
+    index=$((index + 1))
+    kcm="${entry%%$'\t'*}"
+    status="${entry#*$'\t'}"
     env_file="$WORKDIR/$PREFIX$kcm/kcm-build.env"
     build="not installed"
     if [[ -f "$env_file" ]]; then
@@ -60,9 +49,9 @@ for kcm in $(printf '%s\n' "${!SEEN[@]}" | sort); do
         build="${mode:+$mode }${version:-?}"
         [[ -n "$commit" ]] && build="$build ($commit${date:+, $date})"
     fi
-    status="${SEEN[$kcm]:-gone}"
-    printf '  %-20s %-18s %-8s %s\n' \
-        "$kcm" "${status:0:18}" "$([[ "$kcm" == "$current" ]] && echo '*' || echo '')" "$build"
+    printf '  %-3s %-20s %-18s %-8s %s\n' \
+        "$index" "$kcm" "${status:-gone}" \
+        "$([[ "$kcm" == "$current" ]] && echo '*' || echo '')" "$build"
 done
 
 echo
@@ -72,4 +61,4 @@ else
     warn "./kcfg_k0rdent points at no cluster -- scenarios have nothing to run against."
 fi
 log "Switch:  ln -sfn kcfg_k0rdent_<KCM> kcfg_k0rdent"
-log "Remove:  KCM=<KCM> ./scripts/remove_k0rdent.sh"
+log "Remove:  KCM=<KCM> ./scripts/remove_k0rdent.sh   (or ./scripts/remove_k0rdent.sh <#>)"

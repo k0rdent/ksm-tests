@@ -289,6 +289,39 @@ list_scenarios() {
     done | sort
 }
 
+# k0rdent_clusters -- one "KCM<TAB>container status" line per environment on this
+# machine, sorted by KCM. The order is what an index selects, so it lives here
+# rather than in the script that prints the report.
+#
+# Containers and build directories are both sources: a cluster can have either
+# without the other -- a removed container leaves the directory behind, and a
+# hand-deleted directory leaves the container. The status is empty in that second
+# case, left to the caller to word.
+k0rdent_clusters() {
+    local prefix="k0rdent-" name status dir key
+    declare -A seen=()
+
+    while read -r name status; do
+        [[ -n "$name" ]] || continue
+        seen["${name#"$prefix"}"]="$status"
+    done < <(docker ps -a --filter "name=^$prefix" --format '{{.Names}}\t{{.Status}}' 2>/dev/null)
+
+    for dir in "$WORKDIR/$prefix"*; do
+        [[ -d "$dir" ]] || continue
+        key="$(basename "$dir")"
+        key="${key#"$prefix"}"
+        # A directory with no KCM in its name is left over from a run that had
+        # none. Bash rejects the empty subscript anyway.
+        [[ -n "$key" ]] || continue
+        [[ -v "seen[$key]" ]] || seen["$key"]=""
+    done
+
+    (( ${#seen[@]} )) || return 0
+    for key in $(printf '%s\n' "${!seen[@]}" | sort); do
+        printf '%s\t%s\n' "$key" "${seen[$key]}"
+    done
+}
+
 # check_scenario -- a typo should say what is available, not just refuse.
 check_scenario() {
     [[ -f "$SERVICES_FILE" ]] && return 0
