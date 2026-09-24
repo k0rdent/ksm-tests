@@ -5,7 +5,53 @@ name: E2E
 # test_scenarios/*.yaml and kcm-variants.yaml -- so adding either is a YAML
 # change with no workflow edit.
 
+# Cross-repo calls check this out by name: in a called workflow the github
+# context describes the caller, so github.repository is not this repository and
+# a bare checkout clones the wrong one. Moves with the repository, alongside
+# the caller's uses: line.
+env:
+  SELF_REPO: josef-hak/k0rdent-ksm-tests
+
 on:
+  # Same knobs as workflow_dispatch, for another repository to run its own build
+  # through this pipeline. k0rdent/kcm calls it per pull request with the head
+  # commit, which is why a call is treated exactly like a manual run below.
+  workflow_call:
+    inputs:
+      KCM:
+        description: 'KCM version (chart version, branch, tag, sha)'
+        type: string
+        required: false
+        default: ''
+      KCM_MODE:
+        description: 'KCM deployoment mode, options: source, release'
+        type: string
+        required: false
+        default: 'release'
+      SRC_URL:
+        description: 'KCM source git repository (kcm_mode: source)'
+        type: string
+        required: false
+        default: 'https://github.com/k0rdent/kcm.git'
+      OCI_URL:
+        description: 'KCM release oci url (kcm_mode: release)'
+        type: string
+        required: false
+        default: 'oci://ghcr.io/k0rdent/kcm/charts'
+      scenarios:
+        description: '(empty = all), e.g. "101_basic, 201_svcdep"'
+        type: string
+        required: false
+        default: ''
+      ksm_ref:
+        description: >-
+          The ref of THIS repository to run, matching the one in the caller's
+          uses:. Required, and not discoverable from here: in a called workflow
+          the github context describes the caller, and no context exposes the
+          called workflow's own ref.
+        type: string
+        required: true
+
   workflow_dispatch:
     inputs:
       KCM:
@@ -70,6 +116,8 @@ jobs:
       # Full history: the pull-request selection diffs against the base commit.
       - uses: actions/checkout@v7
         with:
+          repository: ${{ inputs.ksm_ref && env.SELF_REPO || github.repository }}
+          ref:        ${{ inputs.ksm_ref || github.ref }}
           fetch-depth: 0
 
       - name: Install yq
@@ -82,11 +130,16 @@ jobs:
         id: scan
         # Via env, not inline interpolation: free-text dispatch input.
         env:
-          WANT_SCENARIOS: ${{ github.event.inputs.scenarios }}
-          WANT_KCM: ${{ github.event.inputs.KCM }}
-          WANT_KCM_MODE: ${{ github.event.inputs.KCM_MODE }}
-          WANT_SRC_URL: ${{ github.event.inputs.SRC_URL }}
-          EVENT: ${{ github.event_name }}
+          WANT_SCENARIOS: ${{ inputs.scenarios }}
+          WANT_KCM: ${{ inputs.KCM }}
+          WANT_KCM_MODE: ${{ inputs.KCM_MODE }}
+          WANT_SRC_URL: ${{ inputs.SRC_URL }}
+          # A cross-repo call is a manual run whose inputs happen to come from
+          # another repository: one build, the scenarios it asked for, and none
+          # of the diff-based selection below -- github.event_name says
+          # 'pull_request' there, but the diff and the base sha belong to the
+          # caller, not to this repository.
+          EVENT: ${{ inputs.ksm_ref && 'workflow_dispatch' || github.event_name }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.sha }}
           FULL_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'ci:full') }}
@@ -281,7 +334,12 @@ jobs:
           echo "scenarios=$scenarios" >> "$GITHUB_OUTPUT"
           jq -r '.[] | "  \(.id): \(.variants | fromjson | map(.id) | join(", "))"' <<< "$scenarios"
 
-  e2e:
+  # The called job repeats the scenario, on purpose: a reusable workflow's job is
+  # shown under the names of every job above it and the sidebar shows only the
+  # last segment, so each has to stand on its own. Not omitted -- a matrix job
+  # without a name is labelled with its matrix entry, and these are objects, so
+  # the whole JSON ends up in the title.
+  scenario:
     name: ${{ matrix.scenario.id }}
     needs: discover
     # A docs-only pull request selects nothing.
@@ -296,5 +354,6 @@ jobs:
       kcm_variants: ${{ matrix.scenario.variants }}
       has_upgrade: ${{ matrix.scenario.upgrade }}
       has_chain: ${{ matrix.scenario.chain }}
-      src_url: ${{ github.event.inputs.SRC_URL || '' }}
-      oci_url: ${{ github.event.inputs.OCI_URL || '' }}
+      src_url: ${{ inputs.SRC_URL || '' }}
+      oci_url: ${{ inputs.OCI_URL || '' }}
+      ksm_ref: ${{ inputs.ksm_ref || '' }}
