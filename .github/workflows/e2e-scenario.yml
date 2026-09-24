@@ -43,7 +43,7 @@ jobs:
     # The name already says which ref and commit a source build uses: discover
     # resolves it, because a job name is fixed before the job can clone.
     name: ${{ matrix.kcm.name }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 90
     strategy:
       fail-fast: false
