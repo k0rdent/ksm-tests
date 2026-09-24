@@ -1,4 +1,4 @@
-name: 02dep02_invalid
+name: 202_svcdep_invalid
 group: Service dependencies
 description: >-
   Issue #2, scenario 2: a dependsOn chain whose middle service is invalid.

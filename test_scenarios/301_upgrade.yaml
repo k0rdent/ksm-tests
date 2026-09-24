@@ -1,4 +1,4 @@
-name: 03upg01_valid
+name: 301_upgrade
 group: Service upgrades
 description: >-
   Issue #3, scenario 1: a deployed dependsOn chain where one service is then

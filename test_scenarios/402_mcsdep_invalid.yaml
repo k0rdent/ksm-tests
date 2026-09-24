@@ -1,4 +1,4 @@
-name: 04mcs02_invalid_dependency
+name: 402_mcsdep_invalid
 group: MultiClusterService dependencies
 description: >-
   Issue #4, scenario 2: the MultiClusterService that others depend on declares

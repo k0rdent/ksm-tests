@@ -17,14 +17,14 @@ source "$SCRIPTS_DIR/lib/common.sh"
 source "$SCRIPTS_DIR/lib/services.sh"
 
 # ── The flat form must keep behaving exactly as before ───────────────────────
-SERVICES_FILE="$SCENARIOS_DIR/01_basic.yaml"
+SERVICES_FILE="$SCENARIOS_DIR/101_basic.yaml"
 assert_eq "a flat scenario is not multi-MCS" "1" "$(is_multi_mcs && echo 0 || echo 1)"
 assert_eq "and counts as one MCS" "1" "$(mcs_count)"
 assert_eq "its object name is unsuffixed" "$MCS_NAME" "$(mcs_object_name 0)"
 assert_eq "its services are still readable" "1" "$(service_count)"
 
-# ── 04mcs01_valid ────────────────────────────────────────────────────────────
-SERVICES_FILE="$SCENARIOS_DIR/04mcs01_valid.yaml"
+# ── 401_mcsdep_valid ────────────────────────────────────────────────────────────
+SERVICES_FILE="$SCENARIOS_DIR/401_mcsdep_valid.yaml"
 assert_eq "declares two MultiClusterServices" "2" "$(mcs_count)"
 assert_eq "is recognised as multi-MCS" "0" "$(is_multi_mcs && echo 0 || echo 1)"
 assert_eq "first is base" "base" "$(mcs_key 0)"
@@ -68,8 +68,8 @@ tmpl="$(mktemp)"
 render_templates "$tmpl" initial
 assert_eq "templates are rendered for both" "2" "$(grep -c '^kind: ServiceTemplate' "$tmpl")"
 
-# ── 04mcs02_invalid_dependency ───────────────────────────────────────────────
-SERVICES_FILE="$SCENARIOS_DIR/04mcs02_invalid_dependency.yaml"
+# ── 402_mcsdep_invalid ───────────────────────────────────────────────
+SERVICES_FILE="$SCENARIOS_DIR/402_mcsdep_invalid.yaml"
 assert_eq "the dependent one must never deploy" "dependent" \
     "$(expect_list neverDeployed | tr '\n' ' ' | sed 's/ $//')"
 assert_eq "with a grace window" "180" "$(expect_field graceSeconds)"
@@ -89,7 +89,7 @@ for f in neverDeployed orderedAfterDependencies; do
         assert_contains "expect.$f '$n' is a declared MCS" "$keys" "$n"
     done < <(expect_list "$f")
 done
-SERVICES_FILE="$SCENARIOS_DIR/04mcs01_valid.yaml"
+SERVICES_FILE="$SCENARIOS_DIR/401_mcsdep_valid.yaml"
 while read -r n; do
     [[ -n "$n" ]] || continue
     assert_contains "expect.orderedAfterDependencies '$n' is a declared MCS" "$keys" "$n"
