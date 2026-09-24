@@ -7,6 +7,51 @@ version (source or release).
 - **Local** - run tests locally in your machine (docker) for troubleshooting.
 - **CI** - run tests in GitHub CI workflows.
 
+## Testing Scenario Phases
+
+```mermaid
+%%{init: {'flowchart': {'padding': 16, 'nodeSpacing': 40, 'rankSpacing': 45}}}%%
+flowchart LR
+    subgraph P1["1: Build environment"]
+        direction TB
+        subgraph KCMSRC["Prepare KCM"]
+            direction LR
+            E1["Build KCM (source)"] -. "OR" .- E2["Pull KCM (release)"]
+        end
+        E3["Start k0s cluster (Docker)"]
+        E4["Install KCM"]
+        E5["Apply Management object"]
+        KCMSRC --> E3 --> E4 --> E5
+    end
+
+    subgraph P2["2: Deploy services"]
+        direction TB
+        D1["Install ServiceTemplates"] --> D2["Deploy MultiClusterService"]
+    end
+
+    subgraph P3["3: Upgrade services"]
+        direction TB
+        U1["Direct upgrade"] -. "OR" .- U2["Upgrade via ServiceTemplateChain"]
+    end
+
+    subgraph P4["4: Clean up"]
+        direction TB
+        C1["Remove services"] --> C2["Remove k0s cluster"]
+    end
+
+    P1 --> P2 --> P3 --> P4
+
+    classDef env fill:#dbeafe,stroke:#2563eb,color:#0b1220
+    classDef dep fill:#ede9fe,stroke:#7c3aed,color:#0b1220
+    classDef upg fill:#fef3c7,stroke:#d97706,color:#0b1220
+    classDef out fill:#dcfce7,stroke:#16a34a,color:#0b1220
+
+    class E1,E2,E3,E4,E5 env
+    class D1,D2 dep
+    class U1,U2 upg
+    class C1,C2 out
+```
+
 ## Self-management testing
 Tests are run in `self-management` mode to keep testing environment as simple as
 possible, because it just requires a single testing k0s cluster.
