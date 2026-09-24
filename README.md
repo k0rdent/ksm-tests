@@ -1,12 +1,19 @@
-# k0rdent-ksm-tests
+# k0rdent KSM Tests
 
-End-to-end tests for **KSM** — the state-management layer of
-[k0rdent KCM](https://github.com/k0rdent/kcm) that turns a `MultiClusterService`
-into services running on a child cluster.
+Run different testing `Scenarios` on any [k0rdent KCM](https://github.com/k0rdent/kcm)
+version (source or release).
 
-Everything is a shell script, so CI runs exactly what you run locally.
+## Modes
+- **Local** - run tests locally in your machine (docker) for troubleshooting.
+- **CI** - run tests in GitHub CI workflows.
 
-## What it tests
+## Self-management testing
+Tests are run in `self-management` mode to keep testing environment as simple as
+possible, because it just requires a single testing k0s cluster.
+
+Everything is a shell script, same scripts run in CI and locally.
+
+## Testing Scenarios
 
 Each scenario builds a throwaway environment — one k0s cluster in Docker
 running KCM — exercises one KSM behaviour and tears it down. Nothing is
@@ -87,6 +94,6 @@ ln -sfn kcfg_k0rdent_1.12.0-rc1 kcfg_k0rdent
 
 ### Delete testing k0rdent cluster
 ~~~bash
-export KCM=1.12.0-rc.3 # (required)
-./scripts/remove_k0rdent.sh # remove k0rdent-<KCM> in-docker cluster, remove kcfg_k0rdent and kcfg_k0rdent_<KCM>
+# remove test environment (cluster) by given index (see ./scripts/k0rdent_clusters.sh output)
+./scripts/remove_k0rdent.sh 1
 ~~~
