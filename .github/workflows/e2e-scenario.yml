@@ -91,52 +91,52 @@ jobs:
       # anyone opening a log. deploy_k0rdent.sh runs the same sequence for a
       # local run; nothing enforces that the two stay in step, so a script
       # added there has to be added here too.
-      - name: Install dependencies
+      - name: '1) Build environment: Install dependencies'
         run: ./scripts/steps/deps.sh
 
-      - name: Prepare KCM
+      - name: '1) Build environment: Prepare KCM'
         run: ./scripts/steps/prepare_kcm.sh
 
       # The local registry only serves charts we built ourselves.
-      - name: Deploy local registry
+      - name: '1) Build environment: Deploy local registry'
         if: matrix.kcm.mode == 'source'
         run: ./scripts/steps/deploy_registry.sh
 
-      - name: Deploy k0rdent cluster
+      - name: '1) Build environment: Start k0s cluster (Docker)'
         run: ./scripts/steps/deploy_mgmt_cluster.sh
 
-      - name: Push images and charts
+      - name: '1) Build environment: Push images and charts'
         if: matrix.kcm.mode == 'source'
         run: ./scripts/steps/push_kcm_artifacts.sh
 
-      - name: Install KCM
+      - name: '1) Build environment: Install KCM'
         run: ./scripts/steps/deploy_kcm.sh
 
-      - name: Apply Release and templates
+      - name: '1) Build environment: Apply Release and templates'
         run: ./scripts/steps/apply_release.sh
 
-      - name: Wait for templates
+      - name: '1) Build environment: Wait for templates'
         run: ./scripts/steps/wait_for_templates.sh
 
-      - name: Apply Management
+      - name: '1) Build environment: Apply Management object'
         run: ./scripts/steps/apply_management.sh
 
-      - name: Wait for Management
+      - name: '1) Build environment: Wait for Management'
         run: ./scripts/steps/wait_for_management.sh
 
-      - name: Install ServiceTemplates
+      - name: '2) Deploy services: Install ServiceTemplates'
         run: ./scripts/steps/install_servicetemplate.sh
 
-      - name: Deploy services via MultiClusterService
+      - name: '2) Deploy services: Deploy MultiClusterService'
         run: ./scripts/steps/deploy_mcs.sh
 
       # Skipped, not silently a no-op: most scenarios declare no upgrade, and a
       # green step that did nothing reads as coverage this run does not have.
-      - name: Upgrade services
+      - name: '3) Upgrade services: Direct upgrade'
         if: inputs.has_upgrade
         run: ./scripts/steps/upgrade_services.sh
 
-      - name: Upgrade along the chain
+      - name: '3) Upgrade services: Upgrade via ServiceTemplateChain'
         if: inputs.has_chain
         run: ./scripts/steps/upgrade_chain.sh
 
@@ -145,7 +145,7 @@ jobs:
       # them, so helm can never uninstall it (kcm#3021). Skipped rather than left
       # red, so the rest of the matrix stays readable. Delete this `if:` to put
       # the step back.
-      - name: Remove services
+      - name: '4) Clean up: Remove services'
         if: inputs.scenario != '201_svcdep'
         run: ./scripts/steps/remove_services.sh
 
@@ -161,6 +161,6 @@ jobs:
           path: logs*/
           retention-days: 7
 
-      - name: Remove the k0rdent cluster
+      - name: '4) Clean up: Remove k0s cluster'
         if: always()
         run: ./scripts/remove_k0rdent.sh
