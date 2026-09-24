@@ -50,8 +50,12 @@ on:
       - .github/workflows/e2e-scenario.yml
 
 # Grouped by branch, not github.ref, so a second push to a PR cancels the first.
+# Manual runs are also keyed by what they were asked to run, so two dispatches
+# with different inputs run side by side and only a repeat of the same one
+# cancels its predecessor. The inputs are empty for push, schedule and PR, which
+# leaves those grouped by branch alone.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}-${{ inputs.KCM || '' }}-${{ inputs.KCM_MODE || '' }}-${{ inputs.SRC_URL || '' }}-${{ inputs.OCI_URL || '' }}-${{ inputs.scenarios || '' }}
   cancel-in-progress: true
 
 jobs:
