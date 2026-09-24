@@ -335,7 +335,7 @@ ensure_workdir() {
     mkdir -p "$WORKDIR" "$BIN_DIR"
     # Only a named environment gets a directory. Without the guard a scenario
     # run, which has no KCM, leaves a phantom ".work/k0rdent-" behind and
-    # get_k0rdent_clusters.sh lists it as a cluster.
+    # k0rdent_clusters.sh lists it as a cluster.
     [[ -n "$KCM" ]] && mkdir -p "$ENVDIR"
     return 0
 }

@@ -6,7 +6,7 @@
 #   ./scripts/remove_k0rdent.sh
 #
 #   ./scripts/remove_k0rdent.sh 1     # or: the # column of
-#                                     # ./scripts/get_k0rdent_clusters.sh
+#                                     # ./scripts/k0rdent_clusters.sh
 set -uo pipefail
 
 LIB="$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
@@ -21,7 +21,7 @@ LIB="$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
 # sourcing it here with no KCM is what would poison the environment.
 if (( $# )); then
     [[ "$1" =~ ^[1-9][0-9]*$ ]] || {
-        echo "❌ Not an index: '$1'. Pass the # of a cluster in ./scripts/get_k0rdent_clusters.sh, or set KCM." >&2
+        echo "❌ Not an index: '$1'. Pass the # of a cluster in ./scripts/k0rdent_clusters.sh, or set KCM." >&2
         exit 1
     }
 
@@ -43,7 +43,7 @@ RESOLVE
         exit 1
     }
     (( $1 <= ${#rows[@]} )) || {
-        echo "❌ No #$1: there $( (( ${#rows[@]} == 1 )) && echo "is 1 cluster" || echo "are ${#rows[@]} clusters" ). See ./scripts/get_k0rdent_clusters.sh" >&2
+        echo "❌ No #$1: there $( (( ${#rows[@]} == 1 )) && echo "is 1 cluster" || echo "are ${#rows[@]} clusters" ). See ./scripts/k0rdent_clusters.sh" >&2
         exit 1
     }
 
@@ -69,7 +69,7 @@ if [[ -z "$KCM" ]]; then
     if command -v docker >/dev/null 2>&1; then
         available="$(k0rdent_clusters | cut -f1 | nl -ba -w4 -s'  ')"
     fi
-    die "Which cluster? Name it with KCM, or pass its # from ./scripts/get_k0rdent_clusters.sh:
+    die "Which cluster? Name it with KCM, or pass its # from ./scripts/k0rdent_clusters.sh:
   KCM=1.12.0-rc.3 ./scripts/remove_k0rdent.sh
   ./scripts/remove_k0rdent.sh 1${available:+
 
@@ -124,5 +124,5 @@ ok "k0rdent $KCM removed"
 # Said here rather than only in the usage comment: this is the moment the index
 # form is useful, and what is left over is what it would select next.
 if command -v docker >/dev/null 2>&1 && (( $(k0rdent_clusters | wc -l) )); then
-    log "Remove another by its # in ./scripts/get_k0rdent_clusters.sh:  ./scripts/remove_k0rdent.sh <#>"
+    log "Remove another by its # in ./scripts/k0rdent_clusters.sh:  ./scripts/remove_k0rdent.sh <#>"
 fi
