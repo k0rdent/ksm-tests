@@ -72,7 +72,7 @@ export KCM=1.12.0-rc.3 # (required), can be any release tag of OCI_URL chart
 export SCENARIO=101_basic # (required) scenario id, fail for invalid, list available scenarios.
 # export SCENARIO_KEEP=false (default) # optionally keep resources created by scenario 
 ./scripts/run_scenario.sh
-# ./scripts/scenario_clean.sh # remove scenario objects (after SCENARIO_KEEP=true)
+# ./scripts/clean_scenario.sh # remove scenario objects (after SCENARIO_KEEP=true)
 ~~~
 
 ### List available testing scenarios

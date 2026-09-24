@@ -8,7 +8,7 @@ set -euo pipefail
 #   ./scripts/run_scenario.sh
 #
 #   SCENARIO_KEEP=true                  # stop before removing, to look around
-#   ./scripts/scenario_clean.sh         # remove them afterwards
+#   ./scripts/clean_scenario.sh         # remove them afterwards
 #
 # Needs no KCM: it runs against whatever k0rdent ./kcfg_k0rdent points at,
 # whether deploy_k0rdent.sh built it or you did.
@@ -37,7 +37,7 @@ step "Scenario $SCENARIO"
 
 if [[ "${SCENARIO_KEEP:-false}" == "true" ]]; then
     ok "$SCENARIO deployed in $(( (SECONDS - START) / 60 ))m$(( (SECONDS - START) % 60 ))s"
-    log "Services left running. Remove them with ./scripts/scenario_clean.sh"
+    log "Services left running. Remove them with ./scripts/clean_scenario.sh"
     exit 0
 fi
 
