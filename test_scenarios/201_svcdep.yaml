@@ -1,4 +1,4 @@
-name: 02dep01_valid
+name: 201_svcdep
 group: Service dependencies
 description: >-
   A valid dependsOn chain: cert-manager provides the webhook certificates, the

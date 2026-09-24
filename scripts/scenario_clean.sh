@@ -4,7 +4,7 @@ set -euo pipefail
 # Remove the services a SCENARIO_KEEP=true run left behind, running the same
 # teardown assertions scenario_run.sh would have.
 #
-#   export SCENARIO=01_basic            # the same one, or it looks for the
+#   export SCENARIO=101_basic            # the same one, or it looks for the
 #   ./scripts/scenario_clean.sh         # wrong MultiClusterService
 
 # shellcheck source=scripts/lib/common.sh

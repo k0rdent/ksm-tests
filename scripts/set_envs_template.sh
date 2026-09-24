@@ -35,8 +35,8 @@
 
 # ── Scenario (services deployed through a MultiClusterService) ───────────────
 # A scenario is a file in test_scenarios/. ./scripts/get_scenarios.sh lists them.
-# export SCENARIO="01_basic"
-# export SERVICES_FILE="$PWD/test_scenarios/01_basic.yaml"   # or a file of your own
+# export SCENARIO="101_basic"
+# export SERVICES_FILE="$PWD/test_scenarios/101_basic.yaml"   # or a file of your own
 # export SCENARIO_KEEP="true"           # leave the services running
 
 # ── Environment names ────────────────────────────────────────────────────────

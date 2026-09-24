@@ -22,22 +22,22 @@ source "$SCRIPTS_DIR/lib/services.sh"
 set_file() {
     SCENARIO="$1" bash -c "unset SERVICES_FILE; source '$SCRIPTS_DIR/lib/common.sh'; echo \$SERVICES_FILE"
 }
-assert_contains "01_basic is the default" "$(set_file '')" "01_basic.yaml"
-assert_contains "SCENARIO picks the file" "$(set_file 02dep01_valid)" "02dep01_valid.yaml"
+assert_contains "101_basic is the default" "$(set_file '')" "101_basic.yaml"
+assert_contains "SCENARIO picks the file" "$(set_file 201_svcdep)" "201_svcdep.yaml"
 assert_eq "scenarios are discovered from the directory" \
-    "01_basic 02dep01_valid 02dep02_invalid 03upg01_valid 03upg02_invalid_atomic 04mcs01_valid 04mcs02_invalid_dependency 05chain01_no_chain 05chain02_boundary 05chain03_direct_to_latest 05chain04_stepwise" \
+    "101_basic 201_svcdep 202_svcdep_invalid 301_upgrade 302_upgrade_invalid_atomic 401_mcsdep_valid 402_mcsdep_invalid 501_no_chain 502_chain_boundary 503_direct_chain 504_stepwise_chain" \
     "$(list_scenarios | tr '\n' ' ' | sed 's/ $//')"
 
 # A typo must say what is available rather than just refuse.
 out=$(SCENARIO=nope bash -c "unset SERVICES_FILE; source '$SCRIPTS_DIR/lib/common.sh'; check_scenario" 2>&1)
 assert_eq "an unknown scenario is rejected" 1 "$?"
-assert_contains "lists the available scenarios" "$out" "02dep01_valid"
+assert_contains "lists the available scenarios" "$out" "201_svcdep"
 
 # Underscores are legal in a filename but not in a Kubernetes object name, and
 # the scenario reaches MCS_NAME.
-slug="$(SCENARIO=02dep01_valid bash -c "source '$SCRIPTS_DIR/lib/common.sh'; echo \$SCENARIO_SLUG")"
-assert_eq "the slug has no underscores" "02dep01-valid" "$slug"
-mcs="$(SCENARIO=02dep01_valid bash -c "unset MCS_NAME; source '$SCRIPTS_DIR/lib/common.sh'; echo \$MCS_NAME")"
+slug="$(SCENARIO=201_svcdep bash -c "source '$SCRIPTS_DIR/lib/common.sh'; echo \$SCENARIO_SLUG")"
+assert_eq "the slug has no underscores" "201-svcdep" "$slug"
+mcs="$(SCENARIO=201_svcdep bash -c "unset MCS_NAME; source '$SCRIPTS_DIR/lib/common.sh'; echo \$MCS_NAME")"
 assert_not_contains "MCS_NAME has no underscores" "$mcs" "_"
 
 # Metadata and filename must agree, or `make scenarios` and CI would disagree.
@@ -52,9 +52,9 @@ while read -r id; do
 done < <(list_scenarios)
 
 assert_eq "the dependency cases share one group" "Service dependencies" \
-    "$(yq -r '.group' "$SCENARIOS_DIR/02dep01_valid.yaml")"
+    "$(yq -r '.group' "$SCENARIOS_DIR/201_svcdep.yaml")"
 assert_eq "both dependency cases are in it" "Service dependencies" \
-    "$(yq -r '.group' "$SCENARIOS_DIR/02dep02_invalid.yaml")"
+    "$(yq -r '.group' "$SCENARIOS_DIR/202_svcdep_invalid.yaml")"
 
 # Every chart must come from catalog's registry, which is what the values
 # nesting below assumes.
@@ -62,14 +62,14 @@ all_repos="$(yq -r '.services[].repo' "$SCENARIOS_DIR"/*.yaml | grep -v '^---$' 
 assert_eq "all charts come from the catalog registry" \
     "oci://ghcr.io/k0rdent/catalog/charts" "$all_repos"
 
-# ── 01_basic ────────────────────────────────────────────────────────────
-SERVICES_FILE="$SCENARIOS_DIR/01_basic.yaml"
+# ── 101_basic ────────────────────────────────────────────────────────────
+SERVICES_FILE="$SCENARIOS_DIR/101_basic.yaml"
 assert_eq "01 has one service" 1 "$(service_count)"
 assert_eq "traefik has no dependsOn" "" "$(service_field traefik dependsOn)"
 assert_eq "traefik waits for its pods" "traefik-" "$(service_field traefik waitForPods)"
 
-# ── 02dep01_valid ──────────────────────────────────────────────────────
-SERVICES_FILE="$SCENARIOS_DIR/02dep01_valid.yaml"
+# ── 201_svcdep ──────────────────────────────────────────────────────
+SERVICES_FILE="$SCENARIOS_DIR/201_svcdep.yaml"
 assert_eq "02 has three services" 3 "$(service_count)"
 assert_eq "declaration order puts dependencies first" \
     "cert-manager kserve-crd kserve-resources " \
@@ -104,13 +104,13 @@ assert_contains "cert-manager values are nested under the chart name" \
 assert_contains "kserve values are nested under the chart name" \
     "$(service_values kserve-resources)" "kserve-resources:"
 
-# ── 02dep02_invalid: the expect block ────────────────────────────────────────
-SERVICES_FILE="$SCENARIOS_DIR/01_basic.yaml"
-assert_eq "01_basic expects no failure" "1" "$(expects_failure && echo 0 || echo 1)"
-SERVICES_FILE="$SCENARIOS_DIR/02dep01_valid.yaml"
+# ── 202_svcdep_invalid: the expect block ────────────────────────────────────────
+SERVICES_FILE="$SCENARIOS_DIR/101_basic.yaml"
+assert_eq "101_basic expects no failure" "1" "$(expects_failure && echo 0 || echo 1)"
+SERVICES_FILE="$SCENARIOS_DIR/201_svcdep.yaml"
 assert_eq "the valid chain expects no failure" "1" "$(expects_failure && echo 0 || echo 1)"
 
-SERVICES_FILE="$SCENARIOS_DIR/02dep02_invalid.yaml"
+SERVICES_FILE="$SCENARIOS_DIR/202_svcdep_invalid.yaml"
 assert_eq "the invalid chain expects a failure" "0" "$(expects_failure && echo 0 || echo 1)"
 assert_eq "it names the failing service" "cert-manager" "$(expect_field failed)"
 assert_eq "graceSeconds is set" "120" "$(expect_field graceSeconds)"
@@ -156,10 +156,10 @@ while read -r n; do
 done < <(expect_list deployed)
 
 # ── Upgrades ─────────────────────────────────────────────────────────────────
-SERVICES_FILE="$SCENARIOS_DIR/01_basic.yaml"
-assert_eq "01_basic has no upgrade block" "1" "$(has_upgrade && echo 0 || echo 1)"
+SERVICES_FILE="$SCENARIOS_DIR/101_basic.yaml"
+assert_eq "101_basic has no upgrade block" "1" "$(has_upgrade && echo 0 || echo 1)"
 
-SERVICES_FILE="$SCENARIOS_DIR/03upg01_valid.yaml"
+SERVICES_FILE="$SCENARIOS_DIR/301_upgrade.yaml"
 assert_eq "the valid upgrade has one" "0" "$(has_upgrade && echo 0 || echo 1)"
 assert_eq "it upgrades cert-manager" "cert-manager" "$(upgrade_names | tr '\n' ' ' | sed 's/ $//')"
 assert_eq "to a version that exists" "1.21.1" "$(upgrade_field cert-manager version)"
@@ -184,7 +184,7 @@ assert_eq "the upgraded MCS pins the new one" "cert-manager-1-21-1" \
 assert_eq "untouched services keep their template" "traefik-41-2-0" \
     "$(yq -r '.spec.serviceSpec.services[] | select(.name=="traefik") | .template' "$after")"
 
-SERVICES_FILE="$SCENARIOS_DIR/03upg02_invalid_atomic.yaml"
+SERVICES_FILE="$SCENARIOS_DIR/302_upgrade_invalid_atomic.yaml"
 assert_eq "the atomic scenario sets atomic" "true" \
     "$(scenario_helm_options 0 | yq -r '.atomic')"
 assert_eq "it expects a failure" "cert-manager" "$(upgrade_expect_field failed)"
@@ -221,7 +221,7 @@ assert_eq "atomic keeps the history default too" "10" \
     "$(yq -r '.spec.serviceSpec.services[] | select(.name=="cert-manager") | .helmOptions.upgradeOptions.maxHistory' "$after")"
 rm -f "$before" "$after"
 
-SERVICES_FILE="$SCENARIOS_DIR/05chain04_stepwise.yaml"
+SERVICES_FILE="$SCENARIOS_DIR/504_stepwise_chain.yaml"
 chain_mcs="$(mktemp)"; render_mcs "$chain_mcs" initial
 assert_eq "a chain scenario gets the history default" "10" \
     "$(yq -r '.spec.serviceSpec.services[0].helmOptions.upgradeOptions.maxHistory' "$chain_mcs")"
@@ -239,9 +239,9 @@ for f in rolledOut untouched; do
     done < <(upgrade_expect_list "$f")
 done
 
-# ── Rendering 02dep01_valid ────────────────────────────────────────────
+# ── Rendering 201_svcdep ────────────────────────────────────────────
 # Back to the valid chain: the block above pointed SERVICES_FILE elsewhere.
-SERVICES_FILE="$SCENARIOS_DIR/02dep01_valid.yaml"
+SERVICES_FILE="$SCENARIOS_DIR/201_svcdep.yaml"
 setup_mock_bin
 write_mock kubectl <<'EOF'
 #!/bin/bash

@@ -1,4 +1,4 @@
-name: 05chain01_no_chain
+name: 501_no_chain
 group: Sequential upgrades
 description: >-
   Issue #5, scenario 1: several versions exist as ServiceTemplates but no

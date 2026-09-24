@@ -4,7 +4,7 @@ set -euo pipefail
 # Run one scenario against ./kcfg_k0rdent: install the ServiceTemplates, deploy
 # the services through a MultiClusterService, verify them, remove them again.
 #
-#   export SCENARIO=01_basic            # required; ./scripts/get_scenarios.sh lists them
+#   export SCENARIO=101_basic            # required; ./scripts/get_scenarios.sh lists them
 #   ./scripts/scenario_run.sh
 #
 #   SCENARIO_KEEP=true                  # stop before removing, to look around

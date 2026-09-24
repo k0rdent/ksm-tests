@@ -168,7 +168,7 @@ export KSM_PROVIDER
 # dependencies. SCENARIO picks one by filename stem; SERVICES_FILE overrides
 # the path outright.
 SCENARIOS_DIR="${SCENARIOS_DIR:-$PROJECT_ROOT/test_scenarios}"
-SCENARIO="${SCENARIO:-01_basic}"
+SCENARIO="${SCENARIO:-101_basic}"
 SERVICES_FILE="${SERVICES_FILE:-$SCENARIOS_DIR/$SCENARIO.yaml}"
 # Scenario stems use underscores, which RFC 1123 forbids in object names.
 SCENARIO_SLUG="${SCENARIO//_/-}"

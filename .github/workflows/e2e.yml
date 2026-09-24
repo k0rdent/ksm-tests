@@ -27,7 +27,7 @@ on:
         # kcm-templates from under this path.
         default: 'oci://ghcr.io/k0rdent/kcm/charts'
       scenarios:
-        description: '(empty = all), e.g. "01_basic, 02dep01_valid"'
+        description: '(empty = all), e.g. "101_basic, 201_svcdep"'
         required: false
         default: ''
   schedule:
@@ -152,7 +152,7 @@ jobs:
 
           PR_VARIANT="$(jq -r '[.[] | select(.prCheck == true) | .id][0] // empty' <<< "$ALL")"
           SRC_VARIANT="$(jq -r '[.[] | select(.mode == "source") | .id][0] // empty' <<< "$ALL")"
-          SMOKE=01_basic
+          SMOKE=101_basic
           # Without it every pull request would select nothing and pass having
           # tested nothing.
           if [[ "$EVENT" == "pull_request" && -z "$PR_VARIANT" ]]; then

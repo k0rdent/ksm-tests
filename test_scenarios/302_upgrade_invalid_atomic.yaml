@@ -1,4 +1,4 @@
-name: 03upg02_invalid_atomic
+name: 302_upgrade_invalid_atomic
 group: Service upgrades
 description: >-
   Issue #3, scenario 2: the same chain deploys cleanly, then one service gets
@@ -6,7 +6,7 @@ description: >-
   the release on the previous healthy version, and the rest of the chain must
   not move.
 
-# Unlike 02dep02_invalid there IS a previous healthy state to roll back to.
+# Unlike 202_svcdep_invalid there IS a previous healthy state to roll back to.
 # atomic is set from the first deploy, not added at upgrade time: adding it
 # later makes sveltos reinstall rather than upgrade.
 helmOptions:

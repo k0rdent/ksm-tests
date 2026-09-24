@@ -1,4 +1,4 @@
-name: 04mcs01_valid
+name: 401_mcsdep_valid
 group: MultiClusterService dependencies
 description: >-
   Issue #4, scenario 1: two MultiClusterServices target the same cluster and

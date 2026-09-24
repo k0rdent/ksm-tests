@@ -1,33 +1,25 @@
-name: 05chain04_stepwise
+name: 503_direct_chain
 group: Sequential upgrades
 description: >-
-  Issue #5, scenario 4: the chain defines the path 1.20.2 -> 1.20.3 -> 1.21.1.
-  Asking for the latest must walk through the intermediate version rather than
-  jumping straight there.
-
-# KNOWN FAILURE on KCM 1.11.0, in "Upgrade along the chain": the release goes
-# straight from 1.20.2 to 1.21.1 in one helm upgrade instead of passing through
-# the intermediate version. The chain is valid and all three templates exist,
-# and 05chain02/03 show it *is* consulted -- so it constrains which versions
-# may be reached, not the route. Contrary to issue #5 scenario 4.
+  Issue #5, scenario 3: the chain allows a direct jump to the latest version
+  but nothing else. The intermediate version must be refused; the latest must
+  be accepted.
 
 templateChain:
   supportedTemplates:
     - version: 1.20.2
       availableUpgrades:
-        - 1.20.3
-    - version: 1.20.3
-      availableUpgrades:
         - 1.21.1
     - version: 1.21.1
 
 upgrade:
+  graceSeconds: 120
   steps:
+    # Not reachable per the chain, though its ServiceTemplate exists.
+    - version: 1.20.3
+      expect: rejected
     - version: 1.21.1
       expect: applied
-      # Checked against helm history: watching for it live would be a race.
-      viaVersions:
-        - 1.20.3
 
 services:
   - name: cert-manager

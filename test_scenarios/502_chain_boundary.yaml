@@ -1,4 +1,4 @@
-name: 05chain02_boundary
+name: 502_chain_boundary
 group: Sequential upgrades
 description: >-
   Issue #5, scenario 2: the chain lists only the version already deployed, so

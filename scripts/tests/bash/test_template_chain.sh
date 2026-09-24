@@ -17,14 +17,14 @@ source "$SCRIPTS_DIR/lib/common.sh"
 source "$SCRIPTS_DIR/lib/services.sh"
 
 # ── Scenarios without a chain are unaffected ─────────────────────────────────
-SERVICES_FILE="$SCENARIOS_DIR/01_basic.yaml"
-assert_eq "01_basic has no chain" "1" "$(has_template_chain && echo 0 || echo 1)"
+SERVICES_FILE="$SCENARIOS_DIR/101_basic.yaml"
+assert_eq "101_basic has no chain" "1" "$(has_template_chain && echo 0 || echo 1)"
 assert_eq "and no upgrade steps" "0" "$(upgrade_steps)"
-SERVICES_FILE="$SCENARIOS_DIR/03upg01_valid.yaml"
+SERVICES_FILE="$SCENARIOS_DIR/301_upgrade.yaml"
 assert_eq "the plain upgrade scenario has no steps either" "0" "$(upgrade_steps)"
 
-# ── 05chain01: steps but no chain ────────────────────────────────────────────
-SERVICES_FILE="$SCENARIOS_DIR/05chain01_no_chain.yaml"
+# ── 501: steps but no chain ────────────────────────────────────────────
+SERVICES_FILE="$SCENARIOS_DIR/501_no_chain.yaml"
 assert_eq "no chain is declared" "1" "$(has_template_chain && echo 0 || echo 1)"
 assert_eq "one upgrade step" "1" "$(upgrade_steps)"
 assert_eq "straight to the latest" "1.21.1" "$(upgrade_step_field 0 version)"
@@ -33,16 +33,16 @@ assert_eq "and it must land" "applied" "$(upgrade_step_field 0 expect)"
 assert_eq "templates are needed for both versions" "1.20.2 1.21.1" \
     "$(all_versions_for cert-manager | tr '\n' ' ' | sed 's/ $//')"
 
-# ── 05chain02: a chain that allows nothing ───────────────────────────────────
-SERVICES_FILE="$SCENARIOS_DIR/05chain02_boundary.yaml"
+# ── 502: a chain that allows nothing ───────────────────────────────────
+SERVICES_FILE="$SCENARIOS_DIR/502_chain_boundary.yaml"
 assert_eq "a chain is declared" "0" "$(has_template_chain && echo 0 || echo 1)"
 assert_eq "it names one version" "1.20.2" "$(chain_versions | tr '\n' ' ' | sed 's/ $//')"
 # The whole point: no upgrades offered, so the step must be refused.
 assert_eq "which offers no upgrades" "" "$(chain_upgrades_for 1.20.2)"
 assert_eq "so the step is expected to be rejected" "rejected" "$(upgrade_step_field 0 expect)"
 
-# ── 05chain03: direct jump allowed, intermediate not ─────────────────────────
-SERVICES_FILE="$SCENARIOS_DIR/05chain03_direct_to_latest.yaml"
+# ── 503: direct jump allowed, intermediate not ─────────────────────────
+SERVICES_FILE="$SCENARIOS_DIR/503_direct_chain.yaml"
 assert_eq "1.20.2 may go straight to 1.21.1" "1.21.1" "$(chain_upgrades_for 1.20.2)"
 assert_eq "two steps" "2" "$(upgrade_steps)"
 assert_eq "the intermediate is refused" "rejected" "$(upgrade_step_field 0 expect)"
@@ -52,8 +52,8 @@ assert_eq "the latest is accepted" "applied" "$(upgrade_step_field 1 expect)"
 assert_not_contains "the refused target is not in the chain's upgrades" \
     "$(chain_upgrades_for 1.20.2)" "$(upgrade_step_field 0 version)"
 
-# ── 05chain04: stepwise ──────────────────────────────────────────────────────
-SERVICES_FILE="$SCENARIOS_DIR/05chain04_stepwise.yaml"
+# ── 504: stepwise ──────────────────────────────────────────────────────
+SERVICES_FILE="$SCENARIOS_DIR/504_stepwise_chain.yaml"
 assert_eq "the chain steps through 1.20.3" "1.20.3" "$(chain_upgrades_for 1.20.2)"
 assert_eq "and then to 1.21.1" "1.21.1" "$(chain_upgrades_for 1.20.3)"
 assert_eq "the step asks for the latest" "1.21.1" "$(upgrade_step_field 0 version)"
