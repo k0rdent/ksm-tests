@@ -5,7 +5,7 @@ set -euo pipefail
 # teardown assertions run_scenario.sh would have.
 #
 #   export SCENARIO=101_basic            # the same one, or it looks for the
-#   ./scripts/scenario_clean.sh         # wrong MultiClusterService
+#   ./scripts/clean_scenario.sh         # wrong MultiClusterService
 
 # shellcheck source=scripts/lib/common.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
