@@ -5,7 +5,7 @@ set -euo pipefail
 # points at. Deliberately ignores $KCM: the question it answers is "what do I
 # have?", which the caller cannot express as a selection.
 #
-#   ./scripts/get_k0rdent_clusters.sh
+#   ./scripts/k0rdent_clusters.sh
 
 # Cleared before sourcing so an invalid KCM in the environment cannot stop the
 # report, and so no cluster looks selected.

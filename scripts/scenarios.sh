@@ -3,7 +3,7 @@ set -euo pipefail
 
 # The available scenarios, one per line, with what each asserts.
 #
-#   ./scripts/get_scenarios.sh
+#   ./scripts/scenarios.sh
 
 # shellcheck source=scripts/lib/common.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"

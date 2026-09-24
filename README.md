@@ -64,13 +64,13 @@ export KCM=1.12.0-rc.3 # (required), can be any release tag of OCI_URL chart
 # Run scenario on KUBECONFIG=kcfg_k0rdent
 export SCENARIO=101_basic # (required) scenario id, fail for invalid, list available scenarios.
 # export SCENARIO_KEEP=false (default) # optionally keep resources created by scenario 
-./scripts/scenario_run.sh
+./scripts/run_scenario.sh
 # ./scripts/scenario_clean.sh # remove scenario objects (after SCENARIO_KEEP=true)
 ~~~
 
 ### List available testing scenarios
 ~~~bash
-./scripts/get_scenarios.sh
+./scripts/scenarios.sh
 # 101_basic        # one service reaches the child cluster and can be removed
 # 201_svcdep   # a `dependsOn` chain deploys in order
 # ...
@@ -79,7 +79,7 @@ export SCENARIO=101_basic # (required) scenario id, fail for invalid, list avail
 ### List testing k0rdent clusters
 ~~~bash
 # Every k0rdent-<KCM> cluster, and which one kcfg_k0rdent points at
-./scripts/get_k0rdent_clusters.sh
+./scripts/k0rdent_clusters.sh
 
 # Switch the scenarios to another one
 ln -sfn kcfg_k0rdent_1.12.0-rc1 kcfg_k0rdent

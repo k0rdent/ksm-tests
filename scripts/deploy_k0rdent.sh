@@ -51,4 +51,4 @@ fi
 
 ok "k0rdent $KCM is up in $(( (SECONDS - START) / 60 ))m$(( (SECONDS - START) % 60 ))s"
 log "export KUBECONFIG=${KUBECONFIG_MGMT#"$PROJECT_ROOT"/}"
-log "Run a scenario: SCENARIO=101_basic ./scripts/scenario_run.sh"
+log "Run a scenario: SCENARIO=101_basic ./scripts/run_scenario.sh"

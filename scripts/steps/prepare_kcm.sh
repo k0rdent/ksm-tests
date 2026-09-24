@@ -86,7 +86,7 @@ fi
     echo "KCM_DESCRIBE='$KCM_DESCRIBE'"
     echo "KCM_COMMIT_DATE='$KCM_COMMIT_DATE'"
     echo "KCM_CHART_VERSION='$CHART_VERSION'"
-    # What selected this build, so get_k0rdent_clusters.sh can report it.
+    # What selected this build, so k0rdent_clusters.sh can report it.
     echo "KCM_MODE='$KCM_MODE'"
     echo "KCM_VARIANT='$KCM'"
     echo "KCM_REF='$KCM_REF'"

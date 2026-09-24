@@ -1,6 +1,6 @@
 #!/bin/bash
 # CI runs one step per script so a failure is visible in the step list, while a
-# local run goes through deploy_k0rdent.sh and scenario_run.sh. That is the
+# local run goes through deploy_k0rdent.sh and run_scenario.sh. That is the
 # same pipeline written twice, so assert the two agree -- a script added to one
 # and forgotten in the other is exactly the drift this catches.
 # shellcheck source=scripts/tests/bash/helpers.sh
@@ -20,7 +20,7 @@ strip() { sed -E 's#.*/##' | grep -vE "^($NOT_PIPELINE)\.sh$"; }
 ci="$(grep -oE '^ +run: \./scripts/steps/[a-z_0-9]+\.sh$' "$WORKFLOW" | strip)"
 # shellcheck disable=SC2016 # $SCRIPTS_DIR is the literal text being matched
 local_run="$(grep -hoE '^ *"\$SCRIPTS_DIR/steps/[a-z_0-9]+\.sh"' \
-    "$SCRIPTS_DIR/deploy_k0rdent.sh" "$SCRIPTS_DIR/scenario_run.sh" \
+    "$SCRIPTS_DIR/deploy_k0rdent.sh" "$SCRIPTS_DIR/run_scenario.sh" \
     | tr -d '"' | strip)"
 
 assert_eq "CI runs the same scripts, in the same order, as the entry points" \
