@@ -7,7 +7,7 @@ name: E2E scenario
 # See e2e.yml: a called workflow's github context describes the caller, so a
 # bare checkout clones the wrong repository.
 env:
-  SELF_REPO: josef-hak/k0rdent-ksm-tests
+  SELF_REPO: k0rdent/ksm-tests
 
 on:
   workflow_call:
