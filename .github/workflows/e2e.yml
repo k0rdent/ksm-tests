@@ -10,7 +10,7 @@ name: E2E
 # a bare checkout clones the wrong one. Moves with the repository, alongside
 # the caller's uses: line.
 env:
-  SELF_REPO: josef-hak/k0rdent-ksm-tests
+  SELF_REPO: k0rdent/ksm-tests
 
 on:
   # Same knobs as workflow_dispatch, for another repository to run its own build
