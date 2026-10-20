@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Tests for scripts/lib/k8s.sh against a mocked kubectl.
 # shellcheck source=scripts/tests/bash/helpers.sh
 source "$(dirname "${BASH_SOURCE[0]}")/helpers.sh"

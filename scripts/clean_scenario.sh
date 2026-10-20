@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 
 # Remove the services a SCENARIO_KEEP=true run left behind, running the same

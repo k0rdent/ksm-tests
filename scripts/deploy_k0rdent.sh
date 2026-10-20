@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 
 # Build a k0rdent test cluster: one k0s node in Docker with KCM installed.

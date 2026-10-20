@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 
 # Run one scenario against ./kcfg_k0rdent: install the ServiceTemplates, deploy

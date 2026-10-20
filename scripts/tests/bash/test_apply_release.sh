@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Tests the Release trimming in scripts/apply_release.sh against a fake KCM tree.
 # shellcheck source=scripts/tests/bash/helpers.sh
 source "$(dirname "${BASH_SOURCE[0]}")/helpers.sh"

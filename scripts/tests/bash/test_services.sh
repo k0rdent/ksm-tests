@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # The service sets and the manifests rendered from them.
 # shellcheck source=scripts/tests/bash/helpers.sh
 source "$(dirname "${BASH_SOURCE[0]}")/helpers.sh"

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 
 # Walk a scenario's upgrade.steps against what the ServiceTemplateChain allows.

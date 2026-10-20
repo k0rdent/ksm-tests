@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 
 # Upgrade some services of a deployed MultiClusterService and check what moved.

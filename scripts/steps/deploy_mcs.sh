@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 
 # Deploy every service in $SERVICES_FILE to the child cluster through a single

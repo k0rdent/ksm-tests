@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 
 # Wait for the ProviderTemplates to become valid and the Release to go Ready.

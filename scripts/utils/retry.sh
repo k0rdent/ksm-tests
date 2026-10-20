@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 
 # Retry a command until it succeeds or MAX_RETRIES is exhausted.

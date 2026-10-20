@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # ServiceTemplateChain scenarios and the versions they need.
 # shellcheck source=scripts/tests/bash/helpers.sh
 source "$(dirname "${BASH_SOURCE[0]}")/helpers.sh"

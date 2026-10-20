@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -uo pipefail
 
 # Runner for the bash tests. Each test_*.sh runs in its own process.

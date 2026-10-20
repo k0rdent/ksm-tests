@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Helpers for reading $SERVICES_FILE. Expects common.sh to be sourced first.
 
 # ── One or several MultiClusterServices ──────────────────────────────────────

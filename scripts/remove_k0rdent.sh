@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Remove one k0rdent test cluster: the containers, its kubeconfig and its
 # build state. Best-effort, so it is safe to run twice or from a trap.
 #

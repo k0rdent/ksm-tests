@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 
 # Verify a scenario whose `expect:` block says the rollout must stop:

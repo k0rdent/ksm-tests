@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Template for local runs. Copy it, adjust, and source it:
 #
 #   cp scripts/set_envs_template.sh set_envs.sh

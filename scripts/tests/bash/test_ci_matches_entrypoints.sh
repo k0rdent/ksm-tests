@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # CI runs one step per script so a failure is visible in the step list, while a
 # local run goes through deploy_k0rdent.sh and run_scenario.sh. That is the
 # same pipeline written twice, so assert the two agree -- a script added to one

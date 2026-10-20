@@ -1,6 +1,13 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Shared config and helpers. Sourcing must stay side-effect free apart from
 # setting variables -- the unit tests source this directly.
+
+# First: bash 3.2 (macOS /bin/bash) fails on the helpers below with a parse
+# error that names no cause.
+if [ "${BASH_VERSINFO[0]:-0}" -lt 4 ]; then
+    echo "❌ bash 4+ required, running $BASH_VERSION ($BASH). On macOS: brew install bash" >&2
+    exit 1
+fi
 
 # Resolved from this file, so scripts work from any working directory.
 KCMT_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

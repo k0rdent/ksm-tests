@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Dependency-free assertions for the bash tests. Each test_*.sh sources this,
 # asserts, and calls `finish`.
 

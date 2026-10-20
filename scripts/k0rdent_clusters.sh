@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 
 # Every k0rdent test cluster on this machine, and which one ./kcfg_k0rdent

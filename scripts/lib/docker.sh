@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Docker helpers. Expects scripts/lib/common.sh to be sourced first.
 
 # container_exists NAME -- true for running *or* stopped containers.

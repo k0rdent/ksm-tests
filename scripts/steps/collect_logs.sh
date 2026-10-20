@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Dump diagnostics into $LOG_DIR. No `set -e`: one missing resource must not
 # cost us the rest of the dump.
 set -uo pipefail

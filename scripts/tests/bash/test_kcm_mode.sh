@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # KCM selects the build and names the environment; KCM_MODE switches between
 # the published chart and a source build.
 # shellcheck source=scripts/tests/bash/helpers.sh

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 
 # Make the built artifacts reachable from the cluster: images go into the k0s

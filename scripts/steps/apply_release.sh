@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 
 # Apply a Release trimmed to $KCM_PROVIDERS plus the templates it references.

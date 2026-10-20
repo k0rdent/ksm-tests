@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 
 # The k0rdent cluster itself: a single k0s node in Docker. Writes

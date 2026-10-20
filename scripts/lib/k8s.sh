@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # kubectl helpers. Expects scripts/lib/common.sh to be sourced first.
 
 # kube ... -- kubectl against the management cluster.

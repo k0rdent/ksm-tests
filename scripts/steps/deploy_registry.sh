@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 
 # Local OCI registry for KCM's template charts. Shares the cluster's docker
