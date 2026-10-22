@@ -17,56 +17,12 @@ step "Deploying management cluster '$MGMT_CLUSTER_NAME'"
 
 ensure_network "$DOCKER_NETWORK"
 
-if container_running "$MGMT_CLUSTER_NAME"; then
-    log "Management cluster container already running"
-    # Reuse whatever port it was actually started with.
-    MGMT_API_PORT="$(published_port "$MGMT_CLUSTER_NAME" 6443)"
-    [[ -n "$MGMT_API_PORT" ]] || die "Container '$MGMT_CLUSTER_NAME' publishes no port for 6443"
-    log "API published on 127.0.0.1:$MGMT_API_PORT"
-else
-    if container_exists "$MGMT_CLUSTER_NAME"; then
-        log "Removing stale container '$MGMT_CLUSTER_NAME'"
-        docker rm -vf "$MGMT_CLUSTER_NAME" >/dev/null
-    fi
-
-    if port_in_use "$MGMT_API_PORT"; then
-        new_port="$(free_port "$MGMT_API_PORT")" \
-            || die "No free port near $MGMT_API_PORT for the API server"
-        warn "Port $MGMT_API_PORT is taken, using $new_port instead"
-        MGMT_API_PORT="$new_port"
-    fi
-
-    log "Starting $K0S_IMAGE"
-    docker run -d \
-        --name "$MGMT_CLUSTER_NAME" \
-        --hostname "$MGMT_CLUSTER_NAME" \
-        --network "$DOCKER_NETWORK" \
-        --privileged \
-        -v /var/lib/k0s \
-        -v /var/log/pods \
-        -v /var/run/docker.sock:/var/run/docker.sock \
-        --tmpfs /run \
-        -p "127.0.0.1:$MGMT_API_PORT:6443" \
-        "$K0S_IMAGE" >/dev/null
-
-    log "Waiting for the k0s admin kubeconfig..."
-    until docker exec "$MGMT_CLUSTER_NAME" k0s kubeconfig admin >/dev/null 2>&1; do
-        sleep 2
-    done
-fi
-
-# hostPath mounts with propagation (used by the CAPD controller and by the CSI
-# bits of the child clusters) need a recursively shared root. kind sets this up
-# for its nodes; the plain k0s image does not.
-docker exec "$MGMT_CLUSTER_NAME" mount --make-rshared /
+start_k0s_container "$MGMT_CLUSTER_NAME" "$MGMT_API_PORT"
+MGMT_API_PORT="$K0S_API_PORT"
 
 step "Writing kubeconfig to $KUBECONFIG_NAMED"
-docker exec "$MGMT_CLUSTER_NAME" k0s kubeconfig admin > "$KUBECONFIG_NAMED"
-# k0s points the kubeconfig at the container's internal address; we reach the
-# API through the published port instead.
-sed -i.bak "s#server:.*#server: https://127.0.0.1:$MGMT_API_PORT#" "$KUBECONFIG_NAMED"
-rm -f "$KUBECONFIG_NAMED.bak"
-chmod 0600 "$KUBECONFIG_NAMED"
+# We reach the API through the published port.
+write_k0s_kubeconfig "$MGMT_CLUSTER_NAME" "https://127.0.0.1:$MGMT_API_PORT" "$KUBECONFIG_NAMED"
 
 # kcfg_k0rdent is whichever cluster the scenario scripts will talk to. A link,
 # so switching environments is one ln and `ls -l` says which one is current.

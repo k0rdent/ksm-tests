@@ -138,12 +138,17 @@ export TEMPLATES_REPO_URL INSECURE_REGISTRY
 # ── Kubernetes ───────────────────────────────────────────────────────────────
 NAMESPACE="${NAMESPACE:-kcm-system}"
 KCM_HELM_RELEASE_NAME="${KCM_HELM_RELEASE_NAME:-kcm}"
-# self -- KCM deploys the services into the cluster it runs in, so there is one
-# cluster, no ClusterDeployment and nothing to adopt.
+# Where the services land:
+#   self    -- KCM deploys them into the cluster it runs in, so there is one
+#              cluster, no ClusterDeployment and nothing to adopt.
+#   adopted -- a second k0s container, handed to KCM through the
+#              adopted-cluster ClusterTemplate and selected by label. Slower,
+#              but it covers everything that depends on the target being a
+#              cluster KCM reaches over the network.
 TEST_MODE="${TEST_MODE:-self}"
 case "$TEST_MODE" in
-    self) ;;
-    *) die "Invalid TEST_MODE='$TEST_MODE'. Allowed values: self
+    self|adopted) ;;
+    *) die "Invalid TEST_MODE='$TEST_MODE'. Allowed values: self adopted
 Hint: 'unset TEST_MODE' if it is left over from another project." ;;
 esac
 
@@ -152,9 +157,30 @@ esac
 # a matter of pointing kcfg_k0rdent at another kcfg_k0rdent_<KCM>.
 KUBECONFIG_MGMT="${KUBECONFIG_MGMT:-$PROJECT_ROOT/kcfg_k0rdent}"
 KUBECONFIG_NAMED="${KUBECONFIG_NAMED:-$PROJECT_ROOT/kcfg_k0rdent_$KCM}"
+# The adopted cluster: a second k0s container on the same docker network, so
+# KCM can reach its API there while we reach it on a published port.
+ADOPTED_CLUSTER_NAME="${ADOPTED_CLUSTER_NAME:-adopted-$KCM}"
+ADOPTED_API_PORT="${ADOPTED_API_PORT:-6444}"
+KUBECONFIG_ADOPTED="${KUBECONFIG_ADOPTED:-$PROJECT_ROOT/kcfg_adopted_$KCM}"
+# What the MultiClusterService selects on. The label sits on the
+# ClusterDeployment: that is what MCS.spec.clusterSelector matches.
+ADOPTED_LABEL_KEY="${ADOPTED_LABEL_KEY:-test_cld}"
+ADOPTED_LABEL_VALUE="${ADOPTED_LABEL_VALUE:-adopted}"
+# The three objects that adopt it, named as KCM's own config/dev manifests do.
+ADOPTED_CLD_NAME="${ADOPTED_CLD_NAME:-adopted-cluster}"
+ADOPTED_CRED_NAME="${ADOPTED_CRED_NAME:-adopted-cluster-cred}"
+ADOPTED_SECRET_NAME="${ADOPTED_SECRET_NAME:-adopted-cluster-kubeconf}"
+export ADOPTED_CLUSTER_NAME ADOPTED_API_PORT KUBECONFIG_ADOPTED
+export ADOPTED_LABEL_KEY ADOPTED_LABEL_VALUE
+export ADOPTED_CLD_NAME ADOPTED_CRED_NAME ADOPTED_SECRET_NAME
+
 # Kept as its own name so the scripts still read "child" where they check what
 # was deployed; under self-management it is the same cluster.
-KUBECONFIG_CHILD="${KUBECONFIG_CHILD:-$KUBECONFIG_MGMT}"
+if [[ "$TEST_MODE" == "adopted" ]]; then
+    KUBECONFIG_CHILD="${KUBECONFIG_CHILD:-$KUBECONFIG_ADOPTED}"
+else
+    KUBECONFIG_CHILD="${KUBECONFIG_CHILD:-$KUBECONFIG_MGMT}"
+fi
 export NAMESPACE KCM_HELM_RELEASE_NAME TEST_MODE
 export KUBECONFIG_MGMT KUBECONFIG_NAMED KUBECONFIG_CHILD
 
@@ -164,7 +190,14 @@ export KUBECONFIG_MGMT KUBECONFIG_NAMED KUBECONFIG_CHILD
 # self-management nothing is provisioned at all, so sveltos is the whole list
 # and no cluster template is needed.
 KCM_PROVIDERS="${KCM_PROVIDERS:-projectsveltos}"
-KCM_CLUSTER_TEMPLATES="${KCM_CLUSTER_TEMPLATES:-}"
+# An adopted cluster is a SveltosCluster pointed at a kubeconfig -- no infra
+# provider, so projectsveltos is still the whole list, but the ClusterTemplate
+# has to be installed for the ClusterDeployment to reference it.
+if [[ "$TEST_MODE" == "adopted" ]]; then
+    KCM_CLUSTER_TEMPLATES="${KCM_CLUSTER_TEMPLATES:-adopted-cluster}"
+else
+    KCM_CLUSTER_TEMPLATES="${KCM_CLUSTER_TEMPLATES:-}"
+fi
 export KCM_PROVIDERS KCM_CLUSTER_TEMPLATES
 
 KSM_PROVIDER="${KSM_PROVIDER:-ksm-projectsveltos}"

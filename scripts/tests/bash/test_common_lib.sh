@@ -25,6 +25,15 @@ assert_contains "sveltos is enabled" "$KCM_PROVIDERS" "projectsveltos"
 # just be a chart KCM reconciles for nothing.
 assert_eq "sveltos is the whole provider list" "projectsveltos" "$KCM_PROVIDERS"
 assert_eq "and no cluster template is needed" "" "$KCM_CLUSTER_TEMPLATES"
+
+# Adopted mode is the same environment plus a second cluster: the checks have
+# to read back through that one, and the ClusterTemplate it is built from has
+# to be installed. The unsets are because sourcing the library above exported
+# the self-management answers -- a child shell would inherit them.
+adopted="$(env -u KUBECONFIG_CHILD -u KCM_CLUSTER_TEMPLATES TEST_MODE=adopted bash -c \
+    "source '$SCRIPTS_DIR/lib/common.sh'; echo \"\$KUBECONFIG_CHILD \$KCM_PROVIDERS \$KCM_CLUSTER_TEMPLATES\"")"
+assert_eq "adopted mode targets the adopted cluster, on sveltos alone" \
+    "$KUBECONFIG_ADOPTED projectsveltos adopted-cluster" "$adopted"
 assert_not_contains "aws provider is off" "$KCM_PROVIDERS" "cluster-api-provider-aws"
 assert_not_contains "azure provider is off" "$KCM_PROVIDERS" "cluster-api-provider-azure"
 # Only source mode uses the local registry; release mode pulls from the URL.

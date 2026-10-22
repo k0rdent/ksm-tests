@@ -51,9 +51,14 @@ assert_eq "mode defaults to release" "release" \
 
 # TEST_MODE is validated the same way, and for the same reason: a value left
 # over from another project used to reach the cluster build.
-out=$(TEST_MODE=adopted bash -c "source '$SCRIPTS_DIR/lib/common.sh'" 2>&1)
+out=$(TEST_MODE=kind bash -c "source '$SCRIPTS_DIR/lib/common.sh'" 2>&1)
 assert_eq "invalid TEST_MODE is rejected" 1 "$?"
-assert_contains "names the bad value" "$out" "adopted"
+assert_contains "names the bad value" "$out" "kind"
+
+for mode in self adopted; do
+    TEST_MODE="$mode" bash -c "source '$SCRIPTS_DIR/lib/common.sh'" >/dev/null 2>&1
+    assert_eq "TEST_MODE '$mode' is accepted" 0 "$?"
+done
 
 # ── KCM is the version, the ref, and the name ────────────────────────────────
 assert_eq "KCM is the chart version in release mode" "1.12.0-rc1" \

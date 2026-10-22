@@ -81,8 +81,20 @@ all_service_namespaces() {
     all_services_rows | cut -d'|' -f5 | awk 'NF && !seen[$0]++'
 }
 
-# service_values NAME -- the values block for one service, empty if it has none.
+# service_values NAME -- the values block for one service, empty if it has none,
+# preferring valuesAdopted in adopted mode. Some values only exist to work
+# around self-management: the services land in KCM's own cluster there, so a
+# chart must not fight it over CRDs or object names. On an adopted cluster none
+# of that is true, and the workaround becomes the bug -- cert-manager
+# installing no CRDs leaves the next chart unable to render its Certificate.
 service_values() {
+    local v
+    if [[ "$TEST_MODE" == "adopted" ]]; then
+        v="$(NAME="$1" yq -r \
+            "$(mcs_root).services[] | select(.name == strenv(NAME)) | .valuesAdopted // \"\"" \
+            "$SERVICES_FILE")"
+        [[ -n "$v" ]] && { echo "$v"; return; }
+    fi
     NAME="$1" yq -r "$(mcs_root).services[] | select(.name == strenv(NAME)) | .values // \"\"" "$SERVICES_FILE"
 }
 
@@ -333,17 +345,31 @@ EOF
         echo "    - $(mcs_object_name "$(mcs_index_of "$dep")")" >> "$out"
     done < <(mcs_depends_on "${MCS_IDX:-0}")
 
-    # provider before services, and both after dependsOn: dependsOn sits on the
-    # MCS itself, one level above serviceSpec.
+    # clusterSelector sits on the MCS itself, like dependsOn, and matches
+    # ClusterDeployment labels. Under self-management there is no
+    # ClusterDeployment to match, so the provider carries the target instead.
+    if [[ "$TEST_MODE" == "adopted" ]]; then
+        cat >> "$out" <<EOF
+  clusterSelector:
+    matchLabels:
+      $ADOPTED_LABEL_KEY: $ADOPTED_LABEL_VALUE
+EOF
+    fi
+
+    # provider before services, and both after dependsOn and clusterSelector.
     cat >> "$out" <<EOF
   serviceSpec:
     provider:
       name: $KSM_PROVIDER
+EOF
+    if [[ "$TEST_MODE" != "adopted" ]]; then
+        cat >> "$out" <<EOF
       # KCM deploys into the cluster it runs in, so there is no
       # ClusterDeployment to select and no second cluster to reach.
       selfManagement: true
-    services:
 EOF
+    fi
+    echo "    services:" >> "$out"
 
     local name chart version _repo namespace dep _wait values
     while IFS="$SERVICE_SEP" read -r name chart version _repo namespace dep _wait; do

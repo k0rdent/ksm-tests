@@ -79,7 +79,7 @@ fi
 step "Removing k0rdent $KCM"
 
 if command -v docker >/dev/null 2>&1; then
-    for container in "$MGMT_CLUSTER_NAME" "$REGISTRY_NAME"; do
+    for container in "$MGMT_CLUSTER_NAME" "$ADOPTED_CLUSTER_NAME" "$REGISTRY_NAME"; do
         if docker ps -a --format '{{.Names}}' | grep -qx "$container"; then
             log "Removing container '$container'"
             docker rm -vf "$container" >/dev/null 2>&1
@@ -98,7 +98,7 @@ if command -v docker >/dev/null 2>&1; then
     fi
 fi
 
-rm -f "$KUBECONFIG_NAMED" "$KUBECONFIG_NAMED.bak"
+rm -f "$KUBECONFIG_NAMED" "$KUBECONFIG_NAMED.bak" "$KUBECONFIG_ADOPTED" "$KUBECONFIG_ADOPTED.bak"
 # Only if it is this cluster's: another environment may be the current one.
 if [[ -L "$KUBECONFIG_MGMT" && ! -e "$KUBECONFIG_MGMT" ]]; then
     rm -f "$KUBECONFIG_MGMT"

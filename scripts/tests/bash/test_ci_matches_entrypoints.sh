@@ -10,7 +10,7 @@ WORKFLOW="$REPO_ROOT/.github/workflows/e2e-scenario.yml"
 
 # Teardown and diagnostics are the job's own business, not part of the
 # pipeline: CI runs them on failure and cleanup, the entry points in a trap.
-NOT_PIPELINE='collect_logs|remove_k0rdent'
+NOT_PIPELINE='collect_logs|remove_k0rdent|remove_adopted_cluster'
 
 strip() { sed -E 's#.*/##' | grep -vE "^($NOT_PIPELINE)\.sh$"; }
 

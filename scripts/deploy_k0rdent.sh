@@ -3,7 +3,9 @@ set -euo pipefail
 
 # Build a k0rdent test cluster: one k0s node in Docker with KCM installed.
 # Around 5 minutes. Nothing is provisioned -- the scenarios use KCM's
-# selfManagement, so the services land in this same cluster.
+# selfManagement, so the services land in this same cluster. With
+# TEST_MODE=adopted a second k0s node is built and adopted, and the services
+# land there instead.
 #
 #   export KCM=1.12.0-rc.3            # required: a published chart version
 #   ./scripts/deploy_k0rdent.sh
@@ -48,6 +50,9 @@ fi
 "$SCRIPTS_DIR/steps/wait_for_templates.sh"
 "$SCRIPTS_DIR/steps/apply_management.sh"
 "$SCRIPTS_DIR/steps/wait_for_management.sh"
+# A no-op unless TEST_MODE is adopted. Last: it needs the adopted-cluster
+# ClusterTemplate, which only goes valid once the Management exists.
+"$SCRIPTS_DIR/steps/deploy_adopted_cluster.sh"
 
 ok "k0rdent $KCM is up in $(( (SECONDS - START) / 60 ))m$(( (SECONDS - START) % 60 ))s"
 log "export KUBECONFIG=${KUBECONFIG_MGMT#"$PROJECT_ROOT"/}"

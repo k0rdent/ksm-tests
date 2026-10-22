@@ -30,6 +30,13 @@ services:
         crds:
           enabled: false
         fullnameOverride: scenario-cert-manager
+    # An adopted cluster has no cert-manager of its own, so this copy has to
+    # bring the CRDs: kserve-resources renders a Certificate and an Issuer, and
+    # without them its release never installs.
+    valuesAdopted: |
+      cert-manager:
+        crds:
+          enabled: true
 
   - name: kserve-crd
     chart: kserve-crd
