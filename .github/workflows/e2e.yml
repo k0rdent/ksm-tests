@@ -152,7 +152,10 @@ jobs:
           WANT_SRC_URL: ${{ inputs.SRC_URL }}
           # Empty for push, schedule and pull_request: an input default only
           # applies to the events that declare the input.
-          WANT_TEST_MODE: ${{ inputs.TEST_MODE || 'self' }}
+          # TEMPORARY: 'adopted', to run every scenario against an adopted
+          # ClusterDeployment on this pull request. Put back to 'self' before
+          # merging -- that is the documented default.
+          WANT_TEST_MODE: ${{ inputs.TEST_MODE || 'adopted' }}
           # A cross-repo call is a manual run whose inputs happen to come from
           # another repository: one build, the scenarios it asked for, and none
           # of the diff-based selection below -- github.event_name says
