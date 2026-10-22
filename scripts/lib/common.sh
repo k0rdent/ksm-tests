@@ -364,9 +364,18 @@ k0rdent_clusters() {
 
 # check_scenario -- a typo should say what is available, not just refuse.
 check_scenario() {
-    [[ -f "$SERVICES_FILE" ]] && return 0
-    die "Unknown scenario '$SCENARIO' (no $SERVICES_FILE).
+    [[ -f "$SERVICES_FILE" ]] \
+        || die "Unknown scenario '$SCENARIO' (no $SERVICES_FILE).
 Available: $(list_scenarios | tr '\n' ' ')"
+
+    # A scenario that only makes sense in one mode says so in its own file. CI
+    # reads it when it picks the jobs; locally the environment is already built
+    # by then, so the only thing left to do is refuse -- running it against the
+    # other mode would pass while testing something else.
+    local want
+    want="$(yq -r '.testMode // ""' "$SERVICES_FILE")"
+    [[ -z "$want" || "$want" == "$TEST_MODE" ]] \
+        || die "Scenario '$SCENARIO' only runs in TEST_MODE=$want, this environment is '$TEST_MODE'."
 }
 
 # ── Filesystem helpers ───────────────────────────────────────────────────────

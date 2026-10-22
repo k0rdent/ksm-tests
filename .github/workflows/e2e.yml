@@ -38,6 +38,11 @@ on:
         type: string
         required: false
         default: 'oci://ghcr.io/k0rdent/kcm/staging'
+      TEST_MODE:
+        description: 'Where the services land, options: self, adopted'
+        type: string
+        required: false
+        default: 'self'
       scenarios:
         description: '(empty = all), e.g. "101_basic, 201_svcdep"'
         type: string
@@ -79,6 +84,10 @@ on:
         # The registry, not one chart in it: the scripts pull kcm and
         # kcm-templates from under this path.
         default: 'oci://ghcr.io/k0rdent/kcm/staging'
+      TEST_MODE:
+        description: 'Where the services land, options: self, adopted'
+        required: false
+        default: 'self'
       scenarios:
         description: '(empty = all), e.g. "101_basic, 201_svcdep"'
         required: false
@@ -108,7 +117,7 @@ on:
 # cancels its predecessor. The inputs are empty for push, schedule and PR, which
 # leaves those grouped by branch alone.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}-${{ inputs.KCM || '' }}-${{ inputs.KCM_MODE || '' }}-${{ inputs.SRC_URL || '' }}-${{ inputs.OCI_URL || '' }}-${{ inputs.scenarios || '' }}
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}-${{ inputs.KCM || '' }}-${{ inputs.KCM_MODE || '' }}-${{ inputs.SRC_URL || '' }}-${{ inputs.OCI_URL || '' }}-${{ inputs.TEST_MODE || '' }}-${{ inputs.scenarios || '' }}
   cancel-in-progress: true
 
 jobs:
@@ -141,6 +150,9 @@ jobs:
           WANT_KCM: ${{ inputs.KCM }}
           WANT_KCM_MODE: ${{ inputs.KCM_MODE }}
           WANT_SRC_URL: ${{ inputs.SRC_URL }}
+          # Empty for push, schedule and pull_request: an input default only
+          # applies to the events that declare the input.
+          WANT_TEST_MODE: ${{ inputs.TEST_MODE || 'self' }}
           # A cross-repo call is a manual run whose inputs happen to come from
           # another repository: one build, the scenarios it asked for, and none
           # of the diff-based selection below -- github.event_name says
@@ -172,6 +184,12 @@ jobs:
               echo "src: $ref"
             fi
           }
+
+          case "$WANT_TEST_MODE" in
+            self|adopted) ;;
+            *) echo "TEST_MODE must be 'self' or 'adopted', got '$WANT_TEST_MODE'" >&2
+               exit 1 ;;
+          esac
 
           all_ids=()
           for f in test_scenarios/*.yaml; do all_ids+=("$(basename "$f" .yaml)"); done
@@ -324,9 +342,17 @@ jobs:
             up="$(yq -r '((.upgrade // "" | tag) == "!!map")
                          and (([.upgrade.steps[]?] | length) == 0)' "$f")"
             ch="$(yq -r '([.upgrade.steps[]?] | length) > 0' "$f")"
-            scenarios="$(jq -c --arg id "$id" --arg v "$vjson" \
+            # The run says where the services land; a scenario that only makes
+            # sense in one mode says so itself and wins.
+            tm="$(yq -r ".testMode // \"$WANT_TEST_MODE\"" "$f")"
+            case "$tm" in
+              self|adopted) ;;
+              *) echo "$f: testMode must be 'self' or 'adopted', got '$tm'" >&2
+                 exit 1 ;;
+            esac
+            scenarios="$(jq -c --arg id "$id" --arg v "$vjson" --arg tm "$tm" \
               --argjson up "$up" --argjson ch "$ch" \
-              '. + [{id: $id, variants: $v, upgrade: $up, chain: $ch}]' <<< "$scenarios")"
+              '. + [{id: $id, variants: $v, upgrade: $up, chain: $ch, test_mode: $tm}]' <<< "$scenarios")"
           done
 
           # Nothing to run is normal for a docs-only pull request, but for a
@@ -339,7 +365,7 @@ jobs:
           fi
 
           echo "scenarios=$scenarios" >> "$GITHUB_OUTPUT"
-          jq -r '.[] | "  \(.id): \(.variants | fromjson | map(.id) | join(", "))"' <<< "$scenarios"
+          jq -r '.[] | "  \(.id) [\(.test_mode)]: \(.variants | fromjson | map(.id) | join(", "))"' <<< "$scenarios"
 
   # The called job repeats the scenario, on purpose: a reusable workflow's job is
   # shown under the names of every job above it and the sidebar shows only the
@@ -361,6 +387,7 @@ jobs:
       kcm_variants: ${{ matrix.scenario.variants }}
       has_upgrade: ${{ matrix.scenario.upgrade }}
       has_chain: ${{ matrix.scenario.chain }}
+      test_mode: ${{ matrix.scenario.test_mode }}
       src_url: ${{ inputs.SRC_URL || '' }}
       oci_url: ${{ inputs.OCI_URL || '' }}
       ksm_ref: ${{ inputs.ksm_ref || '' }}

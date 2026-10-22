@@ -61,6 +61,9 @@ adopted `ClusterDeployment`, labelled `test_cld: adopted`, which the
 `MultiClusterService` selects on. Slower, but it covers what self-management
 cannot: the services landing on a cluster KCM reaches over the network.
 
+A run picks one mode for everything; a scenario that only makes sense in one
+of them says so with `testMode:` in its own file, and that wins.
+
 Everything is a shell script, same scripts run in CI and locally.
 
 ## Testing Scenarios

@@ -33,6 +33,18 @@ out=$(SCENARIO=nope bash -c "unset SERVICES_FILE; source '$SCRIPTS_DIR/lib/commo
 assert_eq "an unknown scenario is rejected" 1 "$?"
 assert_contains "lists the available scenarios" "$out" "201_svcdep"
 
+# A scenario pinned to one mode has to refuse the other: CI reads testMode
+# when it picks the jobs, but a local environment is built before anyone looks
+# at the scenario file, so nothing else would notice the mismatch.
+pinned="$(mktemp --suffix=.yaml)"
+printf 'name: pinned\ntestMode: adopted\nservices: []\n' > "$pinned"
+out=$(SERVICES_FILE="$pinned" bash -c "source '$SCRIPTS_DIR/lib/common.sh'; check_scenario" 2>&1)
+assert_eq "a scenario pinned to adopted is refused in self mode" 1 "$?"
+assert_contains "and says which mode it needs" "$out" "TEST_MODE=adopted"
+SERVICES_FILE="$pinned" TEST_MODE=adopted bash -c \
+    "source '$SCRIPTS_DIR/lib/common.sh'; check_scenario" >/dev/null 2>&1
+assert_eq "and accepted in that one" 0 "$?"
+
 # Underscores are legal in a filename but not in a Kubernetes object name, and
 # the scenario reaches MCS_NAME.
 slug="$(SCENARIO=201_svcdep bash -c "source '$SCRIPTS_DIR/lib/common.sh'; echo \$SCENARIO_SLUG")"
