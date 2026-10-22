@@ -20,18 +20,18 @@ upgrade:
       version: 1.21.1
       values: |
         cert-manager:
+          crds:
+            enabled: true
+          replicaCount: -1
+      # The self-management override, which carries the workaround above with
+      # it. replicaCount is what the upgrade is supposed to trip over, so it
+      # has to be repeated in both.
+      valuesTestModeSelf: |
+        cert-manager:
           # KCM owns the cert-manager CRDs in this cluster; see the note above.
           crds:
             enabled: false
           fullnameOverride: scenario-cert-manager
-          replicaCount: -1
-      # Same override for an adopted cluster, where this copy owns the CRDs.
-      # replicaCount is what the upgrade is supposed to trip over, so it has to
-      # be repeated here too.
-      valuesAdopted: |
-        cert-manager:
-          crds:
-            enabled: true
           replicaCount: -1
   expect:
     failed: cert-manager
@@ -57,23 +57,22 @@ services:
     namespace: cert-manager
     dependsOn: traefik
     waitForPods: cert-manager-
+    # A cluster of its own has no cert-manager, so this copy has to bring the
+    # CRDs. With atomic set helm waits for the release to come up, and without
+    # them it never does -- the install sits in pending-install until the
+    # timeout.
     values: |
-      cert-manager:
-        # KCM runs its own cert-manager in this management cluster and its helm
-        # release owns the CRDs, so this copy must not install them and needs
-        # names of its own. Under self-management there is nowhere else to put
-        # it.
-        crds:
-          enabled: false
-        fullnameOverride: scenario-cert-manager
-    # An adopted cluster has no cert-manager of its own, so this copy has to
-    # bring the CRDs. With atomic set, helm waits for the release to come up,
-    # and without them it never does -- the install sits in pending-install
-    # until the timeout.
-    valuesAdopted: |
       cert-manager:
         crds:
           enabled: true
+    # Under self-management KCM runs its own cert-manager in this very cluster
+    # and its helm release owns the CRDs, so this copy must not install them
+    # and needs names of its own.
+    valuesTestModeSelf: |
+      cert-manager:
+        crds:
+          enabled: false
+        fullnameOverride: scenario-cert-manager
 
   - name: kserve-crd
     chart: kserve-crd

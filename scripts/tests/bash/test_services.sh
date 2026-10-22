@@ -116,14 +116,16 @@ assert_contains "cert-manager values are nested under the chart name" \
 assert_contains "kserve values are nested under the chart name" \
     "$(service_values kserve-resources)" "kserve-resources:"
 
-# valuesAdopted replaces values outright in adopted mode -- not merged, so the
-# block has to be read whole and only for the service that declares one.
-assert_contains "adopted mode takes valuesAdopted" \
-    "$(TEST_MODE=adopted service_values cert-manager)" "enabled: true"
-assert_contains "and self mode does not" \
+# valuesTestModeSelf replaces values outright under self-management -- not
+# merged, so the block has to be read whole and only for the service that
+# declares one. values is what every other mode gets, now and later.
+assert_contains "self mode takes valuesTestModeSelf" \
     "$(TEST_MODE=self service_values cert-manager)" "enabled: false"
+assert_contains "and adopted mode takes the plain values" \
+    "$(TEST_MODE=adopted service_values cert-manager)" "enabled: true"
 assert_eq "a service without one keeps its values" \
-    "$(service_values kserve-resources)" "$(TEST_MODE=adopted service_values kserve-resources)"
+    "$(TEST_MODE=adopted service_values kserve-resources)" \
+    "$(TEST_MODE=self service_values kserve-resources)"
 
 # ── 202_svcdep_invalid: the expect block ────────────────────────────────────────
 SERVICES_FILE="$SCENARIOS_DIR/101_basic.yaml"
@@ -243,12 +245,14 @@ assert_contains "the override repeats what must survive" \
     "$(effective_values cert-manager upgraded)" "crds:"
 assert_not_contains "the initial values are not invalid" \
     "$(effective_values cert-manager initial)" "replicaCount"
-# The adopted override replaces the whole block as well, so it has to carry
-# the invalid value too -- without it the upgrade would succeed and the
+# The self-management override replaces the whole block as well, so it has to
+# carry the invalid value too -- without it the upgrade would succeed and the
 # scenario would assert a rollback that never happened.
-assert_contains "the adopted override still breaks the upgrade" \
-    "$(TEST_MODE=adopted effective_values cert-manager upgraded)" "replicaCount: -1"
-assert_contains "and keeps the CRDs the cluster has nowhere else to get" \
+assert_contains "the self-management override still breaks the upgrade" \
+    "$(TEST_MODE=self effective_values cert-manager upgraded)" "replicaCount: -1"
+assert_contains "and keeps the CRDs out of KCM's way" \
+    "$(TEST_MODE=self effective_values cert-manager upgraded)" "enabled: false"
+assert_contains "while every other mode installs them" \
     "$(TEST_MODE=adopted effective_values cert-manager upgraded)" "enabled: true"
 
 render_mcs "$after" upgraded

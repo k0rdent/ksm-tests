@@ -82,16 +82,16 @@ all_service_namespaces() {
 }
 
 # service_values NAME -- the values block for one service, empty if it has none,
-# preferring valuesAdopted in adopted mode. Some values only exist to work
-# around self-management: the services land in KCM's own cluster there, so a
-# chart must not fight it over CRDs or object names. On an adopted cluster none
-# of that is true, and the workaround becomes the bug -- cert-manager
-# installing no CRDs leaves the next chart unable to render its Certificate.
+# preferring valuesTestModeSelf under self-management. values is what a real
+# cluster gets, in every mode there will ever be; the exception is the cluster
+# KCM runs in, where a chart must not fight KCM's own releases over CRDs or
+# object names. Keeping that workaround out of values means a mode added later
+# inherits the real thing rather than the exception.
 service_values() {
     local v
-    if [[ "$TEST_MODE" == "adopted" ]]; then
+    if [[ "$TEST_MODE" == "self" ]]; then
         v="$(NAME="$1" yq -r \
-            "$(mcs_root).services[] | select(.name == strenv(NAME)) | .valuesAdopted // \"\"" \
+            "$(mcs_root).services[] | select(.name == strenv(NAME)) | .valuesTestModeSelf // \"\"" \
             "$SERVICES_FILE")"
         [[ -n "$v" ]] && { echo "$v"; return; }
     fi
@@ -179,11 +179,11 @@ effective_version() {
 effective_values() {
     local v
     if [[ "${2:-}" == "upgraded" ]]; then
-        # valuesAdopted wins here for the same reason it does in
-        # service_values: the override carries the self-management workaround
-        # with it, so adopted mode needs its own copy.
-        if [[ "$TEST_MODE" == "adopted" ]]; then
-            v="$(upgrade_field "$1" valuesAdopted)"
+        # valuesTestModeSelf wins here for the same reason it does in
+        # service_values: an override replaces, so it carries the
+        # self-management workaround with it or loses it.
+        if [[ "$TEST_MODE" == "self" ]]; then
+            v="$(upgrade_field "$1" valuesTestModeSelf)"
             [[ -n "$v" ]] && { echo "$v"; return; }
         fi
         v="$(upgrade_field "$1" values)"
