@@ -179,6 +179,13 @@ effective_version() {
 effective_values() {
     local v
     if [[ "${2:-}" == "upgraded" ]]; then
+        # valuesAdopted wins here for the same reason it does in
+        # service_values: the override carries the self-management workaround
+        # with it, so adopted mode needs its own copy.
+        if [[ "$TEST_MODE" == "adopted" ]]; then
+            v="$(upgrade_field "$1" valuesAdopted)"
+            [[ -n "$v" ]] && { echo "$v"; return; }
+        fi
         v="$(upgrade_field "$1" values)"
         [[ -n "$v" ]] && { echo "$v"; return; }
     fi

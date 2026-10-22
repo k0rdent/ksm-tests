@@ -243,6 +243,13 @@ assert_contains "the override repeats what must survive" \
     "$(effective_values cert-manager upgraded)" "crds:"
 assert_not_contains "the initial values are not invalid" \
     "$(effective_values cert-manager initial)" "replicaCount"
+# The adopted override replaces the whole block as well, so it has to carry
+# the invalid value too -- without it the upgrade would succeed and the
+# scenario would assert a rollback that never happened.
+assert_contains "the adopted override still breaks the upgrade" \
+    "$(TEST_MODE=adopted effective_values cert-manager upgraded)" "replicaCount: -1"
+assert_contains "and keeps the CRDs the cluster has nowhere else to get" \
+    "$(TEST_MODE=adopted effective_values cert-manager upgraded)" "enabled: true"
 
 render_mcs "$after" upgraded
 assert_eq "atomic reaches every service in the MCS" "true" \

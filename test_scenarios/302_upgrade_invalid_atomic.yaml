@@ -25,6 +25,14 @@ upgrade:
             enabled: false
           fullnameOverride: scenario-cert-manager
           replicaCount: -1
+      # Same override for an adopted cluster, where this copy owns the CRDs.
+      # replicaCount is what the upgrade is supposed to trip over, so it has to
+      # be repeated here too.
+      valuesAdopted: |
+        cert-manager:
+          crds:
+            enabled: true
+          replicaCount: -1
   expect:
     failed: cert-manager
     # After the rollback the release must be serving this chart version again,
@@ -58,6 +66,14 @@ services:
         crds:
           enabled: false
         fullnameOverride: scenario-cert-manager
+    # An adopted cluster has no cert-manager of its own, so this copy has to
+    # bring the CRDs. With atomic set, helm waits for the release to come up,
+    # and without them it never does -- the install sits in pending-install
+    # until the timeout.
+    valuesAdopted: |
+      cert-manager:
+        crds:
+          enabled: true
 
   - name: kserve-crd
     chart: kserve-crd
