@@ -171,11 +171,24 @@ jobs:
       # what asserts the cluster is clean afterwards, and a failed step stops
       # the job, so the fail-fast behaviour is the same either way.
       - name: Select the scenarios
+        env:
+          EVENT: ${{ github.event_name }}
+          # What a pull request runs when it is not told otherwise. Not the
+          # whole set: a pull request is here to check that the serial pipeline
+          # works, and the parallel one already covers every scenario. These
+          # two are the structurally different paths -- a dependsOn chain of
+          # three services, and two MultiClusterServices ordered against each
+          # other -- so between them they exercise the interesting wiring.
+          PR_SCENARIOS: '201_svcdep 401_mcsdep_valid'
         run: |
           # Padded, so `contains` cannot match a prefix of a longer id.
           list="${SCENARIOS//,/ }"
           if [[ -z "${list// /}" ]]; then
-            for f in test_scenarios/*.yaml; do list+=" $(basename "$f" .yaml)"; done
+            if [[ "$EVENT" == "pull_request" ]]; then
+              list="$PR_SCENARIOS"
+            else
+              for f in test_scenarios/*.yaml; do list+=" $(basename "$f" .yaml)"; done
+            fi
           fi
           echo "SCENARIO_LIST= ${list# } " >> "$GITHUB_ENV"
           echo "Running: ${list# }"
