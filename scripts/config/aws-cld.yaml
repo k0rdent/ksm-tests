@@ -1,0 +1,21 @@
+apiVersion: k0rdent.mirantis.com/v1beta1
+kind: ClusterDeployment
+metadata:
+  name: CLD_NAME
+  namespace: kcm-system
+  labels:
+    type: aws
+    group: demo
+spec:
+  template: CT_AWS_STANDALONE_CP
+  credential: aws-credential
+  config:
+    controlPlane:
+      instanceType: AWS_EC2_FAMILY.small
+    controlPlaneNumber: 1
+    publicIP: false
+    region: AWS_REGION
+    worker:
+      instanceType: AWS_EC2_FAMILY.medium
+      rootVolumeSize: 16
+    workersNumber: 1

@@ -145,12 +145,26 @@ KCM_HELM_RELEASE_NAME="${KCM_HELM_RELEASE_NAME:-kcm}"
 #              adopted-cluster ClusterTemplate and selected by label. Slower,
 #              but it covers everything that depends on the target being a
 #              cluster KCM reaches over the network.
+#   aws
+#   azure    -- a cluster k0rdent provisions at the provider. Same shape as
+#   gcp         adopted from here on: a ClusterDeployment the services are
+#               selected onto. Costs money and needs credentials.
+#
+# The values other than 'self' are k0rdent/catalog's, deliberately: the two
+# repositories mean the same thing by TEST_MODE, so scripts/catalog/ can be
+# copied from there rather than translated.
 TEST_MODE="${TEST_MODE:-self}"
 case "$TEST_MODE" in
-    self|adopted) ;;
-    *) die "Invalid TEST_MODE='$TEST_MODE'. Allowed values: self adopted
+    self|adopted|aws|azure|gcp) ;;
+    *) die "Invalid TEST_MODE='$TEST_MODE'. Allowed values: self adopted aws azure gcp
 Hint: 'unset TEST_MODE' if it is left over from another project." ;;
 esac
+
+# is_cloud_mode -- the cluster is provisioned at a provider, so it needs
+# credentials, costs money, and must be removed even when the run fails.
+is_cloud_mode() {
+    [[ "$TEST_MODE" == "aws" || "$TEST_MODE" == "azure" || "$TEST_MODE" == "gcp" ]]
+}
 
 # The scenario scripts read this one, and only this one. deploy_k0rdent.sh
 # writes the cluster's kubeconfig to both names, so switching environments is
@@ -174,10 +188,21 @@ export ADOPTED_CLUSTER_NAME ADOPTED_API_PORT KUBECONFIG_ADOPTED
 export ADOPTED_LABEL_KEY ADOPTED_LABEL_VALUE
 export ADOPTED_CLD_NAME ADOPTED_CRED_NAME ADOPTED_SECRET_NAME
 
+# The provisioned cluster, named after the mode that built it so two providers
+# can be in flight on one host. CLD_NAME is catalog's variable for the same
+# thing; the default differs because ours carries $KCM.
+# Dots are legal in $KCM and forbidden in an object name, and an empty $KCM
+# would leave a trailing dash.
+CLD_NAME="${CLD_NAME:-ksm-$TEST_MODE${KCM:+-${KCM//./-}}}"
+KUBECONFIG_CLOUD="${KUBECONFIG_CLOUD:-$PROJECT_ROOT/kcfg_$TEST_MODE}"
+export CLD_NAME KUBECONFIG_CLOUD
+
 # Kept as its own name so the scripts still read "child" where they check what
 # was deployed; under self-management it is the same cluster.
 if [[ "$TEST_MODE" == "adopted" ]]; then
     KUBECONFIG_CHILD="${KUBECONFIG_CHILD:-$KUBECONFIG_ADOPTED}"
+elif is_cloud_mode; then
+    KUBECONFIG_CHILD="${KUBECONFIG_CHILD:-$KUBECONFIG_CLOUD}"
 else
     KUBECONFIG_CHILD="${KUBECONFIG_CHILD:-$KUBECONFIG_MGMT}"
 fi
@@ -189,15 +214,25 @@ export KUBECONFIG_MGMT KUBECONFIG_NAMED KUBECONFIG_CHILD
 # Helm chart KCM need not reconcile, which is most of the install time. Under
 # self-management nothing is provisioned at all, so sveltos is the whole list
 # and no cluster template is needed.
-KCM_PROVIDERS="${KCM_PROVIDERS:-projectsveltos}"
-# An adopted cluster is a SveltosCluster pointed at a kubeconfig -- no infra
-# provider, so projectsveltos is still the whole list, but the ClusterTemplate
-# has to be installed for the ClusterDeployment to reference it.
-if [[ "$TEST_MODE" == "adopted" ]]; then
-    KCM_CLUSTER_TEMPLATES="${KCM_CLUSTER_TEMPLATES:-adopted-cluster}"
-else
-    KCM_CLUSTER_TEMPLATES="${KCM_CLUSTER_TEMPLATES:-}"
-fi
+#
+# A provisioned cluster needs its infra provider and k0smotron on top; the
+# lists are the ones catalog's scripts/config/<mode>-kcm-management.yaml
+# carries, which is where its own e2e gets them.
+case "$TEST_MODE" in
+    aws|azure|gcp)
+        KCM_PROVIDERS="${KCM_PROVIDERS:-cluster-api-provider-$TEST_MODE cluster-api-provider-k0sproject-k0smotron projectsveltos}"
+        KCM_CLUSTER_TEMPLATES="${KCM_CLUSTER_TEMPLATES:-$TEST_MODE-standalone-cp}" ;;
+    # An adopted cluster is a SveltosCluster pointed at a kubeconfig -- no
+    # infra provider, so projectsveltos is still the whole list, but the
+    # ClusterTemplate has to be installed for the ClusterDeployment to
+    # reference it.
+    adopted)
+        KCM_PROVIDERS="${KCM_PROVIDERS:-projectsveltos}"
+        KCM_CLUSTER_TEMPLATES="${KCM_CLUSTER_TEMPLATES:-adopted-cluster}" ;;
+    *)
+        KCM_PROVIDERS="${KCM_PROVIDERS:-projectsveltos}"
+        KCM_CLUSTER_TEMPLATES="${KCM_CLUSTER_TEMPLATES:-}" ;;
+esac
 export KCM_PROVIDERS KCM_CLUSTER_TEMPLATES
 
 KSM_PROVIDER="${KSM_PROVIDER:-ksm-projectsveltos}"
@@ -220,10 +255,14 @@ MANAGEMENT_TIMEOUT="${MANAGEMENT_TIMEOUT:-1500}"   # 25 min
 TEMPLATES_TIMEOUT="${TEMPLATES_TIMEOUT:-900}"      # 15 min
 PODS_TIMEOUT="${PODS_TIMEOUT:-900}"                # 15 min
 MCS_TIMEOUT="${MCS_TIMEOUT:-900}"                  # 15 min
+# Provisioning and deprovisioning at a cloud provider, which is slower than
+# anything else here -- and the removal needs the same budget as the creation.
+CLUSTER_TIMEOUT="${CLUSTER_TIMEOUT:-2400}"         # 40 min
 # Teardown separately, and much shorter: a removal that has not finished in a
 # minute is wedged, and waiting the deploy budget out only delays the report.
 REMOVE_TIMEOUT="${REMOVE_TIMEOUT:-60}"             # 1 min
 export MANAGEMENT_TIMEOUT TEMPLATES_TIMEOUT PODS_TIMEOUT MCS_TIMEOUT REMOVE_TIMEOUT
+export CLUSTER_TIMEOUT
 
 # ── Assertions ───────────────────────────────────────────────────────────────
 

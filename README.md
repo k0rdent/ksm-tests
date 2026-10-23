@@ -61,8 +61,24 @@ adopted `ClusterDeployment`, labelled `test_cld: adopted`, which the
 `MultiClusterService` selects on. Slower, but it covers what self-management
 cannot: the services landing on a cluster KCM reaches over the network.
 
+`TEST_MODE=aws`, `azure` or `gcp` has k0rdent provision the cluster at the
+provider. Same shape as adopted from the scenarios' point of view — a
+`ClusterDeployment` carrying the same label — but it costs money and needs
+credentials, so it is never part of a pull request. The ClusterDeployment
+definitions, the credential charts and the checks that refuse to provision on
+bad credentials are taken from [k0rdent/catalog](https://github.com/k0rdent/catalog);
+see [`scripts/catalog/`](scripts/catalog/README.md) for what was copied and
+what was not.
+
+| mode | needs |
+|---|---|
+| `aws` | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, `AWS_EC2_FAMILY` |
+| `azure` | `AZURE_SP_APP_ID`, `AZURE_SP_PASSWORD`, `AZURE_SP_TENANT_ID`, `AZURE_SUB_ID`, `AZURE_LOCATION` |
+| `gcp` | `GCP_B64ENCODED_CREDENTIALS`, `GCP_PROJECT`, `GCP_REGION` |
+
 A run picks one mode for everything; a scenario that only makes sense in one
-of them says so with `testMode:` in its own file, and that wins.
+of them says so with `testMode:` in its own file, and that wins. `e2e-serial.yml`
+takes a list — `adopted, aws, gcp` — and runs one job per entry.
 
 Everything is a shell script, same scripts run in CI and locally.
 
