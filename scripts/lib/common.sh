@@ -376,6 +376,16 @@ Available: $(list_scenarios | tr '\n' ' ')"
     want="$(yq -r '.testMode // ""' "$SERVICES_FILE")"
     [[ -z "$want" || "$want" == "$TEST_MODE" ]] \
         || die "Scenario '$SCENARIO' only runs in TEST_MODE=$want, this environment is '$TEST_MODE'."
+
+    # MCS_NAME is derived from SCENARIO but overridable, so one exported by an
+    # earlier scenario wins over the current SCENARIO -- and SERVICES_FILE,
+    # exported alongside it, takes the services with it. That is invisible: the
+    # run passes, having tested the wrong file under the right name. It is what
+    # a serial run does if the loop lets the pair through, so it is checked
+    # rather than trusted.
+    [[ "$MCS_NAME" == "mcs-$SCENARIO_SLUG" ]] \
+        || die "SCENARIO='$SCENARIO' but MCS_NAME='$MCS_NAME', not 'mcs-$SCENARIO_SLUG'.
+Unset MCS_NAME: it is left over from another scenario."
 }
 
 # ── Filesystem helpers ───────────────────────────────────────────────────────

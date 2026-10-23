@@ -103,7 +103,10 @@ scripts/            the entry points below; everything you run by hand
   lib/              shared helpers; services.sh reads the scenario files
   config/           KCM values, the Management object, the CI matrix
   tests/bash/       unit tests for the scripts, no cluster needed
-.github/workflows/  e2e.yml picks what to run, e2e-scenario.yml runs it
+.github/workflows/  e2e.yml picks what to run, e2e-scenario.yml runs it --
+                    one environment per scenario. e2e-serial.yml is separate:
+                    one environment, every scenario on it in turn, on a pull
+                    request here or by hand
 ```
 
 ## Running locally
@@ -127,6 +130,14 @@ export SCENARIO=101_basic # (required) scenario id, fail for invalid, list avail
 # export SCENARIO_KEEP=false (default) # optionally keep resources created by scenario 
 ./scripts/run_scenario.sh
 # ./scripts/clean_scenario.sh # remove scenario objects (after SCENARIO_KEEP=true)
+~~~
+
+### Run several scenarios on the same cluster
+~~~bash
+# One cluster, one scenario after another, a summary at the end. The run stops
+# at the first failure and says what it never got to.
+export SCENARIOS="101_basic 201_svcdep"   # empty = every scenario
+./scripts/run_scenarios.sh
 ~~~
 
 ### List available testing scenarios

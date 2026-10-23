@@ -1,0 +1,247 @@
+name: E2E serial
+
+# One environment, every selected scenario run on it in turn. The counterpart
+# is e2e.yml, which builds an environment per scenario -- cheap for a
+# container, not for a cluster that has to be provisioned.
+#
+# Standalone on purpose: one KCM per run, no diff-based selection, and nothing
+# here is wired into e2e.yml. It runs on pull requests to THIS repository, so a
+# change to the scripts is checked against the serial pipeline too; a pull
+# request in k0rdent/kcm reaches e2e.yml through workflow_call and never gets
+# here, which is what keeps this out of their checks.
+#
+# The phase-1 steps repeat deploy_k0rdent.sh; test_ci_matches_entrypoints.sh
+# asserts the two lists stay in step.
+
+on:
+  workflow_dispatch:
+    inputs:
+      KCM:
+        description: 'KCM version (chart version, branch, tag, sha)'
+        required: false
+        default: 1.12.0-rc.3
+      KCM_MODE:
+        description: 'KCM deployoment mode, options: source, release'
+        required: false
+        type: choice
+        options: [release, source]
+        default: release
+      SRC_URL:
+        description: 'KCM source git repository (kcm_mode: source)'
+        required: false
+        default: 'https://github.com/k0rdent/kcm.git'
+      OCI_URL:
+        description: 'KCM release oci url (kcm_mode: release)'
+        required: false
+        default: 'oci://ghcr.io/k0rdent/kcm/staging'
+      scenarios:
+        description: '(empty = all), e.g. "101_basic, 201_svcdep"'
+        required: false
+        default: ''
+      TEST_MODE:
+        description: 'Where the services land, options: self, adopted'
+        required: false
+        type: choice
+        options: [adopted, self]
+        default: adopted
+
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'scripts/**'
+      - 'test_scenarios/**'
+      - .github/workflows/e2e-serial.yml
+
+# Keyed by what the run was asked to do, so two dispatches with different
+# inputs run side by side and only a repeat of the same one cancels its
+# predecessor. The inputs are empty for a pull request, which leaves those
+# grouped by branch alone.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}-${{ inputs.KCM || '' }}-${{ inputs.KCM_MODE || '' }}-${{ inputs.scenarios || '' }}-${{ inputs.TEST_MODE || '' }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    # Quoted: an unquoted ': ' inside the name would end the YAML key. A pull
+    # request has no inputs and resolves its build later, so it is just 'serial'.
+    name: "${{ inputs.KCM && format('serial ({0}: {1})', inputs.KCM_MODE, inputs.KCM) || 'serial' }}"
+    runs-on: ubuntu-24.04
+    # Every scenario on one cluster, so the budget is the whole set, not one.
+    timeout-minutes: 300
+    # KCM, KCM_MODE and OCI_URL are deliberately not here: a pull request has
+    # no inputs, so they are resolved in the step below and written to
+    # GITHUB_ENV. Declaring them at job level as well would be two sources for
+    # one value, and which of them wins is not worth having to know.
+    env:
+      SRC_URL: ${{ inputs.SRC_URL }}
+      SCENARIOS: ${{ inputs.scenarios }}
+      # Empty on a pull request, and the point of running it there is the
+      # adopted path, so that is the default here rather than common.sh's self.
+      TEST_MODE: ${{ inputs.TEST_MODE || 'adopted' }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Pick the KCM build
+        env:
+          WANT_KCM: ${{ inputs.KCM }}
+          WANT_KCM_MODE: ${{ inputs.KCM_MODE }}
+          WANT_OCI_URL: ${{ inputs.OCI_URL }}
+        run: |
+          set -euo pipefail
+          if [[ -n "$WANT_KCM" ]]; then
+            kcm="$WANT_KCM"; mode="$WANT_KCM_MODE"; oci="$WANT_OCI_URL"
+          else
+            # A pull request carries no inputs, so it takes the build the
+            # parallel pipeline already marks for pull requests -- one place
+            # names the version, and this does not drift from it.
+            sudo curl -fsSL -o /usr/local/bin/yq \
+              https://github.com/mikefarah/yq/releases/download/v4.53.3/yq_linux_amd64
+            sudo chmod +x /usr/local/bin/yq
+            sel='.variants[] | select(.prCheck == true)'
+            kcm="$(yq -r "$sel | .kcm" scripts/config/kcm-variants.yaml)"
+            mode="$(yq -r "$sel | .mode" scripts/config/kcm-variants.yaml)"
+            oci="$(yq -r "$sel | .oci // \"\"" scripts/config/kcm-variants.yaml)"
+            [[ -n "$kcm" && "$kcm" != "null" ]] \
+              || { echo "No variant in kcm-variants.yaml has prCheck: true" >&2; exit 1; }
+          fi
+          { echo "KCM=$kcm"; echo "KCM_MODE=$mode"; echo "OCI_URL=$oci"; } >> "$GITHUB_ENV"
+          echo "KCM=$kcm ($mode)${oci:+, registry $oci}"
+
+      - name: Enable debug output
+        if: runner.debug == '1'
+        run: echo "DEBUG=true" >> "$GITHUB_ENV"
+
+      - name: Free disk space
+        if: env.KCM_MODE == 'source'
+        run: |
+          df -h /
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+                      /usr/local/share/boost "$AGENT_TOOLSDIRECTORY" || true
+          sudo apt-get clean
+          df -h /
+
+      - uses: actions/setup-go@v7
+        if: env.KCM_MODE == 'source'
+        with:
+          go-version: 'stable'
+          cache: false
+
+      - name: '1) Build environment: Install dependencies'
+        run: ./scripts/steps/deps.sh
+
+      - name: '1) Build environment: Prepare KCM'
+        run: ./scripts/steps/prepare_kcm.sh
+
+      - name: '1) Build environment: Deploy local registry'
+        if: env.KCM_MODE == 'source'
+        run: ./scripts/steps/deploy_registry.sh
+
+      - name: '1) Build environment: Start k0s cluster (Docker)'
+        run: ./scripts/steps/deploy_mgmt_cluster.sh
+
+      - name: '1) Build environment: Push images and charts'
+        if: env.KCM_MODE == 'source'
+        run: ./scripts/steps/push_kcm_artifacts.sh
+
+      - name: '1) Build environment: Install KCM'
+        run: ./scripts/steps/deploy_kcm.sh
+
+      - name: '1) Build environment: Apply Release and templates'
+        run: ./scripts/steps/apply_release.sh
+
+      - name: '1) Build environment: Wait for templates'
+        run: ./scripts/steps/wait_for_templates.sh
+
+      - name: '1) Build environment: Apply Management object'
+        run: ./scripts/steps/apply_management.sh
+
+      - name: '1) Build environment: Wait for Management'
+        run: ./scripts/steps/wait_for_management.sh
+
+      - name: '1) Build environment: Deploy adopted ClusterDeployment'
+        if: env.TEST_MODE == 'adopted'
+        run: ./scripts/steps/deploy_adopted_cluster.sh
+
+      # One step per scenario, so the step list says which one failed without
+      # anyone opening a 2000-line log. Actions has no per-step matrix, so the
+      # set is written out; test_ci_matches_entrypoints.sh asserts it still
+      # matches test_scenarios/, because a missing step is silent coverage loss.
+      #
+      # Each runs through run_scenarios.sh rather than run_scenario.sh: that is
+      # what asserts the cluster is clean afterwards, and a failed step stops
+      # the job, so the fail-fast behaviour is the same either way.
+      - name: Select the scenarios
+        run: |
+          # Padded, so `contains` cannot match a prefix of a longer id.
+          list="${SCENARIOS//,/ }"
+          if [[ -z "${list// /}" ]]; then
+            for f in test_scenarios/*.yaml; do list+=" $(basename "$f" .yaml)"; done
+          fi
+          echo "SCENARIO_LIST= ${list# } " >> "$GITHUB_ENV"
+          echo "Running: ${list# }"
+
+      - name: '2-4) 101_basic'
+        if: contains(env.SCENARIO_LIST, ' 101_basic ')
+        run: SCENARIOS=101_basic ./scripts/run_scenarios.sh
+
+      - name: '2-4) 201_svcdep'
+        if: contains(env.SCENARIO_LIST, ' 201_svcdep ')
+        run: SCENARIOS=201_svcdep ./scripts/run_scenarios.sh
+
+      - name: '2-4) 202_svcdep_invalid'
+        if: contains(env.SCENARIO_LIST, ' 202_svcdep_invalid ')
+        run: SCENARIOS=202_svcdep_invalid ./scripts/run_scenarios.sh
+
+      - name: '2-4) 301_upgrade'
+        if: contains(env.SCENARIO_LIST, ' 301_upgrade ')
+        run: SCENARIOS=301_upgrade ./scripts/run_scenarios.sh
+
+      - name: '2-4) 302_upgrade_invalid_atomic'
+        if: contains(env.SCENARIO_LIST, ' 302_upgrade_invalid_atomic ')
+        run: SCENARIOS=302_upgrade_invalid_atomic ./scripts/run_scenarios.sh
+
+      - name: '2-4) 401_mcsdep_valid'
+        if: contains(env.SCENARIO_LIST, ' 401_mcsdep_valid ')
+        run: SCENARIOS=401_mcsdep_valid ./scripts/run_scenarios.sh
+
+      - name: '2-4) 402_mcsdep_invalid'
+        if: contains(env.SCENARIO_LIST, ' 402_mcsdep_invalid ')
+        run: SCENARIOS=402_mcsdep_invalid ./scripts/run_scenarios.sh
+
+      - name: '2-4) 501_no_chain'
+        if: contains(env.SCENARIO_LIST, ' 501_no_chain ')
+        run: SCENARIOS=501_no_chain ./scripts/run_scenarios.sh
+
+      - name: '2-4) 502_chain_boundary'
+        if: contains(env.SCENARIO_LIST, ' 502_chain_boundary ')
+        run: SCENARIOS=502_chain_boundary ./scripts/run_scenarios.sh
+
+      - name: '2-4) 503_direct_chain'
+        if: contains(env.SCENARIO_LIST, ' 503_direct_chain ')
+        run: SCENARIOS=503_direct_chain ./scripts/run_scenarios.sh
+
+      - name: '2-4) 504_stepwise_chain'
+        if: contains(env.SCENARIO_LIST, ' 504_stepwise_chain ')
+        run: SCENARIOS=504_stepwise_chain ./scripts/run_scenarios.sh
+
+      # Before the diagnostics, so a cluster that refuses to detach is part of
+      # what the run reports rather than something the teardown hides.
+      - name: '4) Clean up: Remove adopted ClusterDeployment'
+        if: env.TEST_MODE == 'adopted'
+        run: ./scripts/steps/remove_adopted_cluster.sh
+
+      - name: Collect diagnostics
+        if: failure()
+        run: ./scripts/steps/collect_logs.sh
+
+      - name: Upload diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-logs-${{ github.run_id }}-serial
+          path: logs*/
+          retention-days: 7
+
+      - name: '4) Clean up: Remove k0s cluster'
+        if: always()
+        run: ./scripts/remove_k0rdent.sh

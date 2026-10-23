@@ -31,4 +31,35 @@ assert_eq "CI runs the same scripts, in the same order, as the entry points" \
 assert_not_eq "the workflow extraction found something" "" "$ci"
 assert_contains "and it really is the pipeline" "$ci" "wait_for_management.sh"
 
+# e2e-serial.yml builds the same environment and then runs the scenarios one
+# step at a time, so only the build half is comparable -- and against
+# deploy_k0rdent.sh alone.
+SERIAL="$REPO_ROOT/.github/workflows/e2e-serial.yml"
+serial_ci="$(grep -oE '^ +run: \./scripts/steps/[a-z_0-9]+\.sh$' "$SERIAL" | strip)"
+# shellcheck disable=SC2016 # $SCRIPTS_DIR is the literal text being matched
+build_local="$(grep -hoE '^ *"\$SCRIPTS_DIR/steps/[a-z_0-9]+\.sh"' \
+    "$SCRIPTS_DIR/deploy_k0rdent.sh" | tr -d '"' | strip)"
+
+assert_eq "the serial workflow builds the environment like deploy_k0rdent.sh" \
+    "$build_local" "$serial_ci"
+assert_contains "and it really is the build" "$serial_ci" "wait_for_management.sh"
+assert_contains "the serial workflow runs the scenarios through run_scenarios.sh" \
+    "$(cat "$SERIAL")" "run_scenarios.sh"
+
+# One step per scenario, written out because Actions has no per-step matrix. A
+# scenario added to test_scenarios/ and not here would be skipped in every
+# serial run, and a skipped step reads as coverage nobody is missing.
+serial_steps="$(grep -oE '^ +run: SCENARIOS=[a-z_0-9]+ ' "$SERIAL" \
+    | sed -E 's/.*SCENARIOS=//; s/ $//' | sort)"
+all_scenarios=""
+for f in "$REPO_ROOT"/test_scenarios/*.yaml; do all_scenarios+="$(basename "$f" .yaml)"$'\n'; done
+assert_eq "the serial workflow has a step for every scenario" \
+    "$(sort <<< "${all_scenarios%$'\n'}" | tr '\n' ' ')" "$(tr '\n' ' ' <<< "$serial_steps")"
+
+# Each of those steps has to be switchable, or the 'scenarios' input stops
+# selecting anything and every run is the full set.
+assert_eq "and each one is conditional on the input" \
+    "$(wc -l <<< "$serial_steps")" \
+    "$(grep -cE "^ +if: contains\(env\.SCENARIO_LIST, ' [a-z_0-9]+ '\)$" "$SERIAL")"
+
 finish

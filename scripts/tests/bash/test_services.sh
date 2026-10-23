@@ -33,6 +33,15 @@ out=$(SCENARIO=nope bash -c "unset SERVICES_FILE; source '$SCRIPTS_DIR/lib/commo
 assert_eq "an unknown scenario is rejected" 1 "$?"
 assert_contains "lists the available scenarios" "$out" "201_svcdep"
 
+# MCS_NAME and SERVICES_FILE are exported, and a child honours an inherited
+# pair over its own SCENARIO. Running several scenarios from one process is
+# exactly where that bites: eleven scenarios all deploying the first one's
+# services, all green. A run that tests the wrong thing has to fail, not pass.
+out=$(MCS_NAME=mcs-101-basic SCENARIO=504_stepwise_chain bash -c \
+    "unset SERVICES_FILE; source '$SCRIPTS_DIR/lib/common.sh'; check_scenario" 2>&1)
+assert_eq "an MCS_NAME from another scenario is rejected" 1 "$?"
+assert_contains "and says what it should have been" "$out" "mcs-504-stepwise-chain"
+
 # A scenario pinned to one mode has to refuse the other: CI reads testMode
 # when it picks the jobs, but a local environment is built before anyone looks
 # at the scenario file, so nothing else would notice the mismatch.
