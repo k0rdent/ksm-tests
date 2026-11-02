@@ -11,7 +11,11 @@ spec:
   credential: aws-credential
   config:
     controlPlane:
-      instanceType: AWS_EC2_FAMILY.small
+      # .small is two burstable vCPUs and 2 GiB, which catalog's one-app demo
+      # fits. A serial run is a dozen helm installs and uninstalls against the
+      # same control plane, and on .small it degrades as the run goes on until
+      # the apiserver stops completing TLS handshakes.
+      instanceType: AWS_EC2_FAMILY.medium
     controlPlaneNumber: 1
     publicIP: false
     region: AWS_REGION

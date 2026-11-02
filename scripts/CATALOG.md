@@ -19,7 +19,11 @@ merge — and the layout is part of that, because they call each other as
 | `list_cld_resources_gcp.sh` | `scripts/list_cld_resources_gcp.sh` |
 
 `scripts/config/{aws,azure,gcp}-cld.yaml` come from catalog's `scripts/config/`
-the same way.
+the same way, with one deliberate change: `aws-cld.yaml` asks for a `.medium`
+control plane where catalog asks for `.small`. Catalog provisions a cluster to
+demonstrate one application; a serial run puts a dozen helm installs and
+uninstalls through the same control plane, and `.small` degrades under that
+until the apiserver stops completing TLS handshakes.
 
 **Run them from the repository root**, with `KUBECONFIG` pointing at the
 management cluster and `TEST_MODE` and the provider variables in the

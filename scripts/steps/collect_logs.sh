@@ -77,6 +77,30 @@ for ns in "$NAMESPACE" projectsveltos; do
     done < <(kube get pods -n "$ns" -o name 2>/dev/null)
 done
 
-# The services land in this same cluster under self-management, so the
-# cluster-wide dumps above already cover them. There is nothing else to reach.
+# ── Child cluster ────────────────────────────────────────────────────────────
+# Under self-management the services land in this same cluster and the dumps
+# above already cover them. Adopted and provisioned clusters are a separate
+# machine, and when that machine is what broke -- a control plane too starved
+# to finish a TLS handshake, say -- this is the only place it shows.
+#
+# Bounded from the outside: the cluster being unreachable is the case we are
+# collecting for, and kubectl's own --request-timeout does not cover the dial,
+# so against a black hole it runs for 100s rather than the 20s it was asked
+# for. `timeout` bounds it whichever phase stalls.
+if [[ "$KUBECONFIG_CHILD" != "$KUBECONFIG_MGMT" && -f "$KUBECONFIG_CHILD" ]]; then
+    child() { timeout 30 kubectl --kubeconfig "$KUBECONFIG_CHILD" --request-timeout=25s "$@"; }
+
+    dump child-nodes.txt child get nodes -o wide
+    # Conditions and allocated resources: whether it ran out of memory, disk
+    # or room to schedule, which `get nodes` alone will not say.
+    dump child-nodes-describe.txt child describe nodes
+    dump child-pods.txt child get pods -A -o wide
+    dump child-events.txt child get events -A --sort-by=.lastTimestamp
+    # Best effort -- the child may have no metrics-server.
+    dump child-top-nodes.txt child top nodes
+    dump child-top-pods.txt child top pods -A
+else
+    log "No separate child cluster to dump"
+fi
+
 ok "Diagnostics written to $LOG_DIR"
