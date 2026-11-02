@@ -260,9 +260,16 @@ MCS_TIMEOUT="${MCS_TIMEOUT:-900}"                  # 15 min
 # Provisioning and deprovisioning at a cloud provider, which is slower than
 # anything else here -- and the removal needs the same budget as the creation.
 CLUSTER_TIMEOUT="${CLUSTER_TIMEOUT:-2400}"         # 40 min
-# Teardown separately, and much shorter: a removal that has not finished in a
-# minute is wedged, and waiting the deploy budget out only delays the report.
-REMOVE_TIMEOUT="${REMOVE_TIMEOUT:-60}"             # 1 min
+# Teardown separately, and much shorter: a removal that has not finished is
+# wedged, and waiting the deploy budget out only delays the report. A minute is
+# right for a child cluster in Docker; at a provider every uninstall is a round
+# trip over the network, and a scenario with several services needs more than
+# one service took.
+if is_cloud_mode; then
+    REMOVE_TIMEOUT="${REMOVE_TIMEOUT:-300}"        # 5 min
+else
+    REMOVE_TIMEOUT="${REMOVE_TIMEOUT:-60}"         # 1 min
+fi
 export MANAGEMENT_TIMEOUT TEMPLATES_TIMEOUT PODS_TIMEOUT MCS_TIMEOUT REMOVE_TIMEOUT
 export CLUSTER_TIMEOUT
 
