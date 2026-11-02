@@ -13,7 +13,7 @@ spec:
     project: "GCP_PROJECT" # your GCP project
     region: "GCP_REGION"
     controlPlane:
-      instanceType: "e2-small"
+      instanceType: "e2-medium"
       image: projects/ubuntu-os-cloud/global/images/ubuntu-2404-noble-amd64-v20261009
       publicIP: true
     controlPlaneNumber: 1
