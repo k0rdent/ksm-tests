@@ -11,6 +11,12 @@ set -euo pipefail
 #   WAIT_FOR_CREATING=true   stop once all pods are at least ContainerCreating
 #   WAIT_FOR_PODS="a b"      also require pods whose names contain these substrings
 #   PODS_TIMEOUT=900         seconds before giving up
+#   POD_TICK_INTERVAL=30     seconds between heartbeats while nothing changes
+#
+# While it waits it prints what is actually there -- every pod, its phase, how
+# many of its containers are ready and why the rest are not -- and reprints it
+# whenever that changes. A cluster coming up then tells its own story instead
+# of a line saying only that it has not finished.
 #
 # Adapted from k0rdent/catalog's scripts/wait_for_deployment.sh.
 
@@ -25,8 +31,28 @@ export KUBECONFIG="${KUBECONFIG:-$KUBECONFIG_MGMT}"
 
 debug="${DEBUG:-}"
 TIMEOUT="$PODS_TIMEOUT"
+POD_TICK_INTERVAL="${POD_TICK_INTERVAL:-30}"
 SECONDS=0
 pods_json=""
+last_summary=""
+last_tick=0
+
+# pod_summary -- one line per pod: name, phase, ready containers, and the
+# waiting or terminated reason behind the ones that are not. Sorted, so a
+# reordering by the API server does not read as a change.
+pod_summary() {
+    jq -r '
+      .items[] as $p
+      | (($p.status.containerStatuses // [])) as $cs
+      | ( [ $cs[] | (.state.waiting.reason // .state.terminated.reason // empty) ]
+          | unique | join(",") ) as $r
+      | [ $p.metadata.name,
+          ($p.status.phase // "-"),
+          (([ $cs[] | select(.ready == true) ] | length | tostring)
+             + "/" + ($cs | length | tostring)),
+          (if $r == "" then "-" else $r end)
+        ] | @tsv' <<< "$1" | sort
+}
 
 step "Waiting for pods in namespace '$NAMESPACE' ($KUBECONFIG)"
 
@@ -94,13 +120,35 @@ while (( SECONDS < TIMEOUT )); do
 
     if [[ "${WAIT_FOR_RUNNING:-}" == "true" ]]; then
         $all_running && { ok "All pods running in '$NAMESPACE'"; break; }
-        log "⏳ Some pods are not running yet... (${SECONDS}s)"
+        waiting_for="running"
     elif [[ "${WAIT_FOR_CREATING:-}" == "true" ]]; then
         $all_creating && { ok "All pods at least ContainerCreating in '$NAMESPACE'"; break; }
-        log "⏳ Some pods are not creating yet... (${SECONDS}s)"
+        waiting_for="creating"
     else
         $all_ready && { ok "All pods are ready in '$NAMESPACE'"; break; }
-        log "⏳ Some pods are not ready yet... (${SECONDS}s)"
+        waiting_for="ready"
+    fi
+
+    summary="$(pod_summary "$pods_json")"
+    # A pod with no container statuses yet is not ready, so it must not count
+    # as 0/0 "all ready".
+    ready_pods="$(jq '[ .items[]
+        | (.status.containerStatuses // []) as $cs
+        | select(($cs | length) > 0
+                 and ([ $cs[] | select(.ready == true) ] | length) == ($cs | length))
+      ] | length' <<< "$pods_json")"
+
+    # The table on every change, a heartbeat otherwise: a provisioning cluster
+    # changes often enough to follow, and a stuck one must not scroll the
+    # reason for being stuck off the top of the log.
+    if [[ "$summary" != "$last_summary" ]]; then
+        log "⏳ waiting for pods to be $waiting_for -- $ready_pods/$pod_count ready (${SECONDS}s)"
+        awk -F'\t' '{ printf "      %-46s %-10s %-6s %s\n", $1, $2, $3, $4 }' <<< "$summary"
+        last_summary="$summary"
+        last_tick=$SECONDS
+    elif (( SECONDS - last_tick >= POD_TICK_INTERVAL )); then
+        log "⏳ unchanged -- $ready_pods/$pod_count ready (${SECONDS}s)"
+        last_tick=$SECONDS
     fi
 
     sleep 5
