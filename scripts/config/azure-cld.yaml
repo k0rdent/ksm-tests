@@ -1,7 +1,7 @@
 apiVersion: k0rdent.mirantis.com/v1beta1
 kind: ClusterDeployment
 metadata:
-  name: azure-example-USER
+  name: CLD_NAME
   namespace: kcm-system
   labels:
     type: azure
