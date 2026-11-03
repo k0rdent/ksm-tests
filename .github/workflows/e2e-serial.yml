@@ -36,6 +36,10 @@ on:
         description: 'KCM release oci url (kcm_mode: release)'
         required: false
         default: 'oci://ghcr.io/k0rdent/kcm/staging'
+      providers:
+        description: 'Tested providers, options: adopted, aws, azure, gcp'
+        required: false
+        default: 'adopted'
       scenarios:
         # Spelled out so a subset can be picked without opening test_scenarios/.
         # test_ci_matches_entrypoints.sh asserts this list stays complete.
@@ -47,10 +51,6 @@ on:
           (empty = all)
         required: false
         default: ''
-      providers:
-        description: 'Tested providers, options: adopted, aws, azure, gcp'
-        required: false
-        default: 'adopted'
 
   pull_request:
     types: [opened, synchronize, reopened]
