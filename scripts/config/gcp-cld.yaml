@@ -21,5 +21,4 @@ spec:
       instanceType: e2-medium
       image: projects/ubuntu-os-cloud/global/images/ubuntu-2404-noble-amd64-v20261009
       publicIP: true
-      rootVolumeSize: 16
     workersNumber: 1
