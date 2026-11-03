@@ -68,4 +68,21 @@ assert_eq "and each one is conditional on the input" \
     "$(wc -l <<< "$serial_steps")" \
     "$(grep -cE "^ +if: contains\(env\.SCENARIO_LIST, ' [a-z_0-9]+ '\)$" "$SERIAL")"
 
+# The dispatch form spells the scenarios out so a subset can be picked without
+# opening test_scenarios/. A list that has gone stale is worse than no list:
+# the one scenario missing from it is the one nobody thinks to run.
+want_ids="$(sort <<< "${all_scenarios%$'\n'}" | tr '\n' ' ')"
+for wf in "$SERIAL" "$REPO_ROOT/.github/workflows/e2e.yml"; do
+    # Only the input block: the serial workflow also names every scenario in
+    # its per-scenario steps, and matching those would pass on a description
+    # that lists nothing at all. The folded block runs from `scenarios:` to the
+    # `required:` that ends it.
+    listed="$(awk '/^ +scenarios:/ { inblock = 1 }
+                   inblock && /^ +required:/ { inblock = 0 }
+                   inblock' "$wf" \
+        | grep -oE '[0-9]{3}_[a-z_0-9]+' | sort -u | tr '\n' ' ')"
+    assert_eq "$(basename "$wf") offers every scenario in its description" \
+        "$want_ids" "$listed"
+done
+
 finish

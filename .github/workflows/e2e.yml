@@ -39,12 +39,17 @@ on:
         required: false
         default: 'oci://ghcr.io/k0rdent/kcm/staging'
       TEST_MODE:
-        description: 'Where the services land, options: self, adopted'
+        description: 'Tested providers, options: self, adopted'
         type: string
         required: false
         default: 'self'
       scenarios:
-        description: '(empty = all), e.g. "101_basic, 201_svcdep"'
+        description: >-
+          Testing scenarios, options: 101_basic, 201_svcdep,
+          202_svcdep_invalid, 301_upgrade, 302_upgrade_invalid_atomic,
+          401_mcsdep_valid, 402_mcsdep_invalid, 501_no_chain,
+          502_chain_boundary, 503_direct_chain, 504_stepwise_chain
+          (empty = all)
         type: string
         required: false
         default: ''
@@ -69,7 +74,7 @@ on:
       KCM:
         description: 'KCM version (chart version, branch, tag, sha)'
         required: false
-        default: 1.12.0-rc.3
+        default: 1.12.0-rc1-64-gba78125e
       KCM_MODE:
         description: 'KCM deployoment mode, options: source, release'
         required: false
@@ -85,11 +90,19 @@ on:
         # kcm-templates from under this path.
         default: 'oci://ghcr.io/k0rdent/kcm/staging'
       TEST_MODE:
-        description: 'Where the services land, options: self, adopted'
+        # Not the serial workflow's `providers`: this one builds an environment
+        # per scenario, and the step that reads this rejects anything else.
+        description: 'Tested providers, options: self, adopted'
         required: false
         default: 'self'
       scenarios:
-        description: '(empty = all), e.g. "101_basic, 201_svcdep"'
+        # test_ci_matches_entrypoints.sh asserts this list stays complete.
+        description: >-
+          Testing scenarios, options: 101_basic, 201_svcdep,
+          202_svcdep_invalid, 301_upgrade, 302_upgrade_invalid_atomic,
+          401_mcsdep_valid, 402_mcsdep_invalid, 501_no_chain,
+          502_chain_boundary, 503_direct_chain, 504_stepwise_chain
+          (empty = all)
         required: false
         default: ''
   schedule:

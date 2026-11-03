@@ -17,12 +17,11 @@ on:
   workflow_dispatch:
     inputs:
       KCM:
-        description: >-
-          KCM version (chart version, branch, tag, sha).
-          Empty takes the prCheck build from scripts/config/kcm-variants.yaml,
-          which is the one this repository actually tests.
+        description: 'KCM version (chart version, branch, tag, sha)'
         required: false
-        default: ''
+        # Empty still means the prCheck build from kcm-variants.yaml, which is
+        # what a pull request run takes; this is only the form's starting point.
+        default: 1.12.0-rc1-64-gba78125e
       KCM_MODE:
         description: 'KCM deployoment mode, options: source, release'
         required: false
@@ -38,11 +37,18 @@ on:
         required: false
         default: 'oci://ghcr.io/k0rdent/kcm/staging'
       scenarios:
-        description: '(empty = all), e.g. "101_basic, 201_svcdep"'
+        # Spelled out so a subset can be picked without opening test_scenarios/.
+        # test_ci_matches_entrypoints.sh asserts this list stays complete.
+        description: >-
+          Testing scenarios, options: 101_basic, 201_svcdep,
+          202_svcdep_invalid, 301_upgrade, 302_upgrade_invalid_atomic,
+          401_mcsdep_valid, 402_mcsdep_invalid, 501_no_chain,
+          502_chain_boundary, 503_direct_chain, 504_stepwise_chain
+          (empty = all)
         required: false
         default: ''
       providers:
-        description: 'Where the services land, e.g. "adopted" or "adopted, aws, gcp"'
+        description: 'Tested providers, options: adopted, aws, azure, gcp'
         required: false
         default: 'adopted'
 
