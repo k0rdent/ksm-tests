@@ -54,6 +54,13 @@ pod_summary() {
         ] | @tsv' <<< "$1" | sort
 }
 
+# pod_table -- pod_summary's output, aligned. Printed on the way through and
+# again at the end: a namespace that came up on the first poll would otherwise
+# pass with nothing said about what is in it.
+pod_table() {
+    awk -F'\t' '{ printf "      %-46s %-10s %-6s %s\n", $1, $2, $3, $4 }' <<< "$1"
+}
+
 step "Waiting for pods in namespace '$NAMESPACE' ($KUBECONFIG)"
 
 while (( SECONDS < TIMEOUT )); do
@@ -118,17 +125,6 @@ while (( SECONDS < TIMEOUT )); do
         fi
     done
 
-    if [[ "${WAIT_FOR_RUNNING:-}" == "true" ]]; then
-        $all_running && { ok "All pods running in '$NAMESPACE'"; break; }
-        waiting_for="running"
-    elif [[ "${WAIT_FOR_CREATING:-}" == "true" ]]; then
-        $all_creating && { ok "All pods at least ContainerCreating in '$NAMESPACE'"; break; }
-        waiting_for="creating"
-    else
-        $all_ready && { ok "All pods are ready in '$NAMESPACE'"; break; }
-        waiting_for="ready"
-    fi
-
     summary="$(pod_summary "$pods_json")"
     # A pod with no container statuses yet is not ready, so it must not count
     # as 0/0 "all ready".
@@ -138,12 +134,23 @@ while (( SECONDS < TIMEOUT )); do
                  and ([ $cs[] | select(.ready == true) ] | length) == ($cs | length))
       ] | length' <<< "$pods_json")"
 
+    if [[ "${WAIT_FOR_RUNNING:-}" == "true" ]]; then
+        $all_running && { ok "All pods running in '$NAMESPACE'"; pod_table "$summary"; break; }
+        waiting_for="running"
+    elif [[ "${WAIT_FOR_CREATING:-}" == "true" ]]; then
+        $all_creating && { ok "All pods at least ContainerCreating in '$NAMESPACE'"; pod_table "$summary"; break; }
+        waiting_for="creating"
+    else
+        $all_ready && { ok "All pods are ready in '$NAMESPACE'"; pod_table "$summary"; break; }
+        waiting_for="ready"
+    fi
+
     # The table on every change, a heartbeat otherwise: a provisioning cluster
     # changes often enough to follow, and a stuck one must not scroll the
     # reason for being stuck off the top of the log.
     if [[ "$summary" != "$last_summary" ]]; then
         log "⏳ waiting for pods to be $waiting_for -- $ready_pods/$pod_count ready (${SECONDS}s)"
-        awk -F'\t' '{ printf "      %-46s %-10s %-6s %s\n", $1, $2, $3, $4 }' <<< "$summary"
+        pod_table "$summary"
         last_summary="$summary"
         last_tick=$SECONDS
     elif (( SECONDS - last_tick >= POD_TICK_INTERVAL )); then
