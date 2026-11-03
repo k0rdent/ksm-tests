@@ -21,7 +21,7 @@ fi
 
 require_cmd kubectl helm
 ensure_workdir
-time_phase "child cluster ($TEST_MODE) -- create"
+time_phase "$(provider_label) cluster create"
 
 export KUBECONFIG="$KUBECONFIG_MGMT"
 require_cluster

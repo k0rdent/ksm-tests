@@ -31,10 +31,15 @@ while IFS=$'\t' read -r label secs status; do
     printf '   %-40s %3dm%02ds  %s\n' \
         "$label" "$(( secs / 60 ))" "$(( secs % 60 ))" \
         "$( (( status == 0 )) && echo "ok" || echo "FAILED" )"
-    # Marked only when it failed, so a green run's table reads as plainly as
-    # catalog's does.
-    rows+=("| $label | $(printf '%dm %02ds' "$(( secs / 60 ))" "$(( secs % 60 ))")\
+    # The summary table is the environment only, like catalog's: a scenario
+    # row per scenario would make it as long as the run, and the scenarios
+    # already have a step each. Their ids are what tells them apart.
+    if [[ ! "$label" =~ ^[0-9]{3}_ ]]; then
+        # Marked only when it failed, so a green run's table reads as plainly
+        # as catalog's does.
+        rows+=("| $label | $(printf '%dm %02ds' "$(( secs / 60 ))" "$(( secs % 60 ))")\
 $( (( status == 0 )) || echo ' ❌') |")
+    fi
 done < "$TIMINGS_FILE"
 
 printf '   %-40s %3dm%02ds\n' "total" "$(( total / 60 ))" "$(( total % 60 ))"
@@ -67,9 +72,6 @@ if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
         echo "| Phase | Duration |"
         echo "| --- | --- |"
         printf '%s\n' "${rows[@]}"
-        printf '| **total** | **%dm %02ds** |\n' "$(( total / 60 ))" "$(( total % 60 ))"
-        echo ""
-        echo "Timed phases only; the environment build in between is not counted."
     } >> "$GITHUB_STEP_SUMMARY"
 fi
 exit 0

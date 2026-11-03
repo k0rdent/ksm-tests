@@ -97,6 +97,27 @@ record_phase() {
     printf '%s\t%s\t%s\n' "$1" "$2" "${3:-0}" >> "$TIMINGS_FILE" 2>/dev/null || true
 }
 
+# How the reports name this mode. Catalog's wording, so a run of either
+# repository reads the same on its summary page.
+provider_label() {
+    case "$TEST_MODE" in
+        aws)   echo "AWS" ;;
+        azure) echo "Azure" ;;
+        gcp)   echo "GCP" ;;
+        *)     echo "Adopted" ;;
+    esac
+}
+
+# The k0rdent row: which infrastructure provider it brought up, or none -- a
+# self or adopted run installs sveltos and nothing else.
+k0rdent_label() {
+    if is_cloud_mode; then
+        echo "k0rdent ($(provider_label) provider)"
+    else
+        echo "k0rdent (sveltos only)"
+    fi
+}
+
 # time_phase LABEL -- record this script's own duration when it exits, however
 # it exits, with its exit code. Call it after the early returns: a step that is
 # a no-op in this mode should not show up as a phase that took no time.

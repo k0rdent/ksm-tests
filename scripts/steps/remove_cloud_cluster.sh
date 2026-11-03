@@ -15,7 +15,7 @@ if ! is_cloud_mode; then
     exit 0
 fi
 
-time_phase "child cluster ($TEST_MODE) -- delete"
+time_phase "$(provider_label) cluster remove"
 
 if [[ ! -f "$KUBECONFIG_MGMT" ]]; then
     warn "No management kubeconfig at $KUBECONFIG_MGMT -- cannot remove '$CLD_NAME'"

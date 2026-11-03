@@ -16,7 +16,7 @@ require_cmd docker kubectl
 # A run starts here, so the ledger does too -- otherwise a second run in the
 # same checkout would report both.
 rm -f "$TIMINGS_FILE"
-time_phase "management cluster"
+time_phase "$(k0rdent_label)"
 
 step "Deploying management cluster '$MGMT_CLUSTER_NAME'"
 

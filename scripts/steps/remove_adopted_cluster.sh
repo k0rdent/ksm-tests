@@ -16,7 +16,7 @@ if [[ "$TEST_MODE" != "adopted" ]]; then
     exit 0
 fi
 
-time_phase "child cluster (adopted) -- delete"
+time_phase "Adopted cluster remove"
 
 step "Removing the adopted cluster '$ADOPTED_CLUSTER_NAME'"
 
