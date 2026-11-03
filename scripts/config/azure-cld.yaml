@@ -18,3 +18,4 @@ spec:
       vmSize: Standard_A4_v2
     worker:
       vmSize: Standard_A4_v2
+      rootVolumeSize: 16
