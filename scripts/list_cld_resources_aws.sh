@@ -19,8 +19,10 @@ want_state=false
 TEST_MODE=aws ./scripts/check_test_mode.sh -x
 command -v aws >/dev/null 2>&1 || { echo "❌ AWS CLI not found"; exit 1; }
 
-# Same naming convention as deploy_cld.sh / remove_cld.sh.
-cld_name="${CLD_NAME:-aws-example-$USER}"
+# Same default as CLD_NAME in scripts/lib/common.sh, repeated rather than
+# sourced: this has to keep working from a bare shell with only the provider
+# variables set, which is the situation it exists for.
+cld_name="${CLD_NAME:-ksm-tests-aws-cld}"
 tag_key="sigs.k8s.io/cluster-api-provider-aws/cluster/${cld_name}"
 
 echo "Cluster: $cld_name"

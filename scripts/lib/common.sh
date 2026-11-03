@@ -84,6 +84,29 @@ BIN_DIR="${BIN_DIR:-$PROJECT_ROOT/.bin}"
 LOG_DIR="${LOG_DIR:-$PROJECT_ROOT/logs}"
 export WORKDIR ENVDIR BIN_DIR LOG_DIR
 
+# ── Phase timings ────────────────────────────────────────────────────────────
+# Where the run spent its time. CI runs the environment build, every scenario
+# and the teardown as separate steps, so no single script ever sees the whole
+# run -- each appends a line here and report.sh adds them up at the end.
+TIMINGS_FILE="${TIMINGS_FILE:-$PROJECT_ROOT/.timings}"
+export TIMINGS_FILE
+
+# record_phase LABEL SECONDS [STATUS] -- never fatal. A ledger that cannot be
+# written is worth less than the run it would otherwise take down.
+record_phase() {
+    printf '%s\t%s\t%s\n' "$1" "$2" "${3:-0}" >> "$TIMINGS_FILE" 2>/dev/null || true
+}
+
+# time_phase LABEL -- record this script's own duration when it exits, however
+# it exits, with its exit code. Call it after the early returns: a step that is
+# a no-op in this mode should not show up as a phase that took no time.
+time_phase() {
+    PHASE_LABEL="$1"
+    # shellcheck disable=SC2034 # read by the trap below, which is single-quoted
+    PHASE_START=$SECONDS
+    trap 'record_phase "$PHASE_LABEL" "$(( SECONDS - PHASE_START ))" "$?"' EXIT
+}
+
 # Tools installed by deps.sh take precedence over anything on the system.
 case ":$PATH:" in
     *":$BIN_DIR:"*) ;;
@@ -192,10 +215,10 @@ export ADOPTED_CLD_NAME ADOPTED_CRED_NAME ADOPTED_SECRET_NAME
 
 # The provisioned cluster, named after the mode that built it so two providers
 # can be in flight on one host. CLD_NAME is catalog's variable for the same
-# thing; the default differs because ours carries $KCM.
-# Dots are legal in $KCM and forbidden in an object name, and an empty $KCM
-# would leave a trailing dash.
-CLD_NAME="${CLD_NAME:-ksm-$TEST_MODE${KCM:+-${KCM//./-}}}"
+# thing; the default differs because ours says which repo left it behind --
+# the name is what you have to go on when you find a stray cluster at a
+# provider. Two runs of the same provider on one account need CLD_NAME set.
+CLD_NAME="${CLD_NAME:-ksm-tests-$TEST_MODE-cld}"
 KUBECONFIG_CLOUD="${KUBECONFIG_CLOUD:-$PROJECT_ROOT/kcfg_$TEST_MODE}"
 export CLD_NAME KUBECONFIG_CLOUD
 

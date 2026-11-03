@@ -21,6 +21,7 @@ fi
 
 require_cmd kubectl helm
 ensure_workdir
+time_phase "child cluster ($TEST_MODE) -- create"
 
 export KUBECONFIG="$KUBECONFIG_MGMT"
 require_cluster
@@ -72,9 +73,9 @@ sed -e "s/CLD_NAME/${CLD_NAME}/g" \
     -e "s/CT_GCP_STANDALONE_CP/${CT_GCP_STANDALONE_CP:-}/g" \
     "$CLD_FILE" > "$MANIFEST"
 
-# The name and the label, set rather than substituted. Catalog's files do not
-# agree on how the name gets in -- aws-cld.yaml has a CLD_NAME placeholder,
-# azure and gcp spell it `<provider>-example-USER` -- and a sed that misses one
+# The name and the label, set rather than left to the sed above. Catalog's own
+# files do not agree on how the name gets in -- ours all use the CLD_NAME
+# placeholder, a copy from there may not -- and a substitution that misses
 # leaves a cluster named something nobody waits for or deletes: a 40-minute
 # timeout followed by a teardown that removes nothing, with the real cluster
 # still running. Setting the field works whatever the file says.

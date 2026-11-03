@@ -13,8 +13,8 @@ set -euo pipefail
 ./scripts/check_test_mode.sh -x
 [[ "$TEST_MODE" == azure ]] || { echo "Only TEST_MODE=azure is supported, got '$TEST_MODE'"; exit 1; }
 
-# Same naming convention as deploy_cld.sh / remove_cld.sh.
-cld_name="${CLD_NAME:-$TEST_MODE-example-$USER}"
+# Same default as CLD_NAME in scripts/lib/common.sh -- see list_cld_resources_aws.sh.
+cld_name="${CLD_NAME:-ksm-tests-$TEST_MODE-cld}"
 api="https://management.azure.com/subscriptions/${AZURE_SUB_ID}/resourceGroups/${cld_name}"
 
 token=$(curl -sS -X POST \
