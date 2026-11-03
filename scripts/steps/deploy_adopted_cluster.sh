@@ -26,6 +26,7 @@ fi
 
 require_cmd docker kubectl
 ensure_workdir
+time_phase "child cluster (adopted) -- create"
 
 step "Deploying the cluster to adopt: '$ADOPTED_CLUSTER_NAME'"
 ensure_network "$DOCKER_NETWORK"

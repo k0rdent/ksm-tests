@@ -20,4 +20,7 @@ gh_read_token.txt
 logs/
 logs-*/
 
+# Phase durations, written as the run goes and printed by report.sh
+.timings
+
 *.bak

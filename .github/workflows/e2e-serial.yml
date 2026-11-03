@@ -319,3 +319,10 @@ jobs:
       - name: '4) Clean up: Remove k0s cluster'
         if: always()
         run: ./scripts/remove_k0rdent.sh
+
+      # Last and always(): every step above writes its own duration as it
+      # finishes, and a failed run is the one where knowing which phase ate the
+      # time is worth most.
+      - name: Report
+        if: always()
+        run: ./scripts/report.sh

@@ -13,6 +13,11 @@ source "$SCRIPTS_DIR/lib/k8s.sh"
 
 require_cmd docker kubectl
 
+# A run starts here, so the ledger does too -- otherwise a second run in the
+# same checkout would report both.
+rm -f "$TIMINGS_FILE"
+time_phase "management cluster"
+
 step "Deploying management cluster '$MGMT_CLUSTER_NAME'"
 
 ensure_network "$DOCKER_NETWORK"

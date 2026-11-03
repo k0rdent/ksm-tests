@@ -16,6 +16,8 @@ if [[ "$TEST_MODE" != "adopted" ]]; then
     exit 0
 fi
 
+time_phase "child cluster (adopted) -- delete"
+
 step "Removing the adopted cluster '$ADOPTED_CLUSTER_NAME'"
 
 # The ClusterDeployment first and on its own: deleting the Credential out from

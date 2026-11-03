@@ -99,6 +99,10 @@ for id in "${ordered[@]}"; do
         FAILED="$id"
     fi
     ELAPSED["$id"]=$(( SECONDS - start ))
+    # Also into the ledger: CI gives each scenario its own step, so the
+    # summary below only ever sees one of them.
+    record_phase "$id" "${ELAPSED[$id]}" \
+        "$( [[ "${RESULT[$id]}" == "passed" ]] && echo 0 || echo 1 )"
     [[ -n "$FAILED" ]] && break
 done
 
