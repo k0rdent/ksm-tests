@@ -256,13 +256,17 @@ wait_for_absence() {
     local kind="$1" name="$2" ns="$3" timeout="$4" poll="${5:-5}"
     shift 5 2>/dev/null || shift $#
     local progress=("$@")
-    local elapsed=0
+    local elapsed=0 rc
     local diag_every="${DIAG_INTERVAL:-120}"
 
     log "Waiting for $kind/$name to disappear (timeout ${timeout}s)"
     while (( elapsed < timeout )); do
-        resource_exists "$kind" "$name" "$ns"
-        case $? in
+        # `|| rc=$?` rather than a bare call: callers run under `set -e`, where
+        # an untested command returning non-zero -- which here is the ordinary
+        # answer "it is gone" -- kills the script before $? is ever read.
+        rc=0
+        resource_exists "$kind" "$name" "$ns" || rc=$?
+        case $rc in
             1) ok "$kind/$name is gone"; return 0 ;;
             # The API did not answer. Not an absence, and saying it is would
             # declare a cluster gone on the strength of a failed request.

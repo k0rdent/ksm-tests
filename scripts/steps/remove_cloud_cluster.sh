@@ -27,8 +27,11 @@ export KUBECONFIG="$KUBECONFIG_MGMT"
 
 step "Removing the $TEST_MODE cluster '$CLD_NAME'"
 
-resource_exists ClusterDeployment "$CLD_NAME" "$NAMESPACE"
-case $? in
+# `|| rc=$?`, not a bare call: this script does not run under `set -e`, but the
+# shape has to be the one that survives if it ever does.
+rc=0
+resource_exists ClusterDeployment "$CLD_NAME" "$NAMESPACE" || rc=$?
+case $rc in
     1)
         log "No ClusterDeployment '$CLD_NAME' -- nothing was provisioned"
         rm -f "$KUBECONFIG_CLOUD"

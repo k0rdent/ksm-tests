@@ -71,6 +71,20 @@ out=$(wait_for_absence ClusterDeployment docker-e2e kcm-system 2 1 2>&1)
 assert_eq "wait_for_absence -> 1 when the API does not answer" 1 "$?"
 assert_not_contains "and does not call it gone" "$out" "is gone"
 
+# Under `set -e`, which is what the callers use and this file does not. An
+# untested command returning non-zero aborts the shell there, and "the object
+# is gone" is exactly such a return -- so the success path died before it could
+# be reported. This harness would never have noticed: it runs without -e.
+# A real shell, not a subshell of this one: `set -e` has to be in force from
+# the start, the way a step script has it.
+echo ABSENT > "$STATE"
+out=$(bash -c 'set -euo pipefail
+               source "$SCRIPTS_DIR/lib/common.sh"
+               source "$SCRIPTS_DIR/lib/k8s.sh"
+               wait_for_absence ClusterDeployment docker-e2e kcm-system 10 1' 2>&1)
+assert_eq "wait_for_absence -> 0 under set -e" 0 "$?"
+assert_contains "and still reports removal" "$out" "is gone"
+
 echo present > "$STATE"
 out=$(wait_for_absence ClusterDeployment docker-e2e kcm-system 2 1 2>&1)
 assert_eq "wait_for_absence -> 1 while present" 1 "$?"
