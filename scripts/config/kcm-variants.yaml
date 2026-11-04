@@ -17,8 +17,8 @@ variants:
   # than upstream having shifted. The full matrix runs on main and nightly.
   - id: rel-staging
     name: 'release: staging'
-    kcm: '1.12.0-rc1-64-gba78125e'
+    kcm: '1.13.0-rc.5'
     mode: release
     # Not in the published charts registry yet.
-    oci: 'oci://ghcr.io/k0rdent/kcm/staging'
+    oci: 'oci://ghcr.io/k0rdent/kcm/charts'
     prCheck: true

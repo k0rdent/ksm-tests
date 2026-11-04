@@ -37,7 +37,7 @@ on:
         description: 'KCM release oci url (kcm_mode: release)'
         type: string
         required: false
-        default: 'oci://ghcr.io/k0rdent/kcm/staging'
+        default: 'oci://ghcr.io/k0rdent/kcm/charts'
       TEST_MODE:
         description: 'Tested providers, options: self, adopted'
         type: string
@@ -74,7 +74,7 @@ on:
       KCM:
         description: 'KCM version (chart version, branch, tag, sha)'
         required: false
-        default: 1.12.0-rc1-64-gba78125e
+        default: 1.13.0-rc.5
       KCM_MODE:
         description: 'KCM deployoment mode, options: source, release'
         required: false
@@ -88,7 +88,7 @@ on:
         required: false
         # The registry, not one chart in it: the scripts pull kcm and
         # kcm-templates from under this path.
-        default: 'oci://ghcr.io/k0rdent/kcm/staging'
+        default: 'oci://ghcr.io/k0rdent/kcm/charts'
       TEST_MODE:
         # Not the serial workflow's `providers`: this one builds an environment
         # per scenario, and the step that reads this rejects anything else.

@@ -21,7 +21,7 @@ on:
         required: false
         # Empty still means the prCheck build from kcm-variants.yaml, which is
         # what a pull request run takes; this is only the form's starting point.
-        default: 1.12.0-rc1-64-gba78125e
+        default: 1.13.0-rc.5
       KCM_MODE:
         description: 'KCM deployoment mode, options: source, release'
         required: false
@@ -35,7 +35,7 @@ on:
       OCI_URL:
         description: 'KCM release oci url (kcm_mode: release)'
         required: false
-        default: 'oci://ghcr.io/k0rdent/kcm/staging'
+        default: 'oci://ghcr.io/k0rdent/kcm/charts'
       providers:
         description: 'Tested providers, options: adopted, aws, azure, gcp'
         required: false
