@@ -37,7 +37,6 @@ SECONDS=0
 pods_json=""
 last_summary=""
 last_tick=0
-declare -A last_line=()
 
 # pod_summary -- one line per pod: name, phase, ready containers, and the
 # waiting or terminated reason behind the ones that are not. Sorted, so a
@@ -63,32 +62,20 @@ pod_table() {
     awk -F'\t' '{ printf "      %-46s %-10s %-6s %s\n", $1, $2, $3, $4 }' <<< "$1"
 }
 
-# pod_changes SUMMARY -- the rows that differ from the last poll: pods that
+# pod_changes NOW BEFORE -- the rows that differ from the last poll: pods that
 # changed state, pods that appeared, and pods that are no longer there. A
 # cluster coming up is mostly pods that already settled, and reprinting thirty
 # Running 1/1 lines every five seconds buries the one that did move.
+#
+# comm rather than an associative array, so this still runs under the bash 3.2
+# that macOS ships. Both sides are sorted by pod_summary, and the name is the
+# first field, so cutting it keeps that order.
 pod_changes() {
-    local name rest line
-    local -A seen=()
-    while IFS=$'\t' read -r name rest; do
-        [[ -n "$name" ]] || continue
-        seen["$name"]=1
-        line="$name"$'\t'"$rest"
-        [[ "${last_line[$name]-}" == "$line" ]] || printf '%s\n' "$line"
-    done <<< "$1"
-    for name in "${!last_line[@]}"; do
-        [[ -n "${seen[$name]-}" ]] || printf '%s\tgone\t-\t-\n' "$name"
-    done
-}
-
-# remember SUMMARY -- what the next poll compares against.
-remember() {
-    local name rest
-    last_line=()
-    while IFS=$'\t' read -r name rest; do
-        [[ -n "$name" ]] || continue
-        last_line["$name"]="$name"$'\t'"$rest"
-    done <<< "$1"
+    {
+        comm -13 <(printf '%s\n' "$2") <(printf '%s\n' "$1")
+        comm -13 <(printf '%s\n' "$1" | cut -f1) <(printf '%s\n' "$2" | cut -f1) \
+            | sed 's/$/\tgone\t-\t-/'
+    } | sort
 }
 
 step "Waiting for pods in namespace '$NAMESPACE' ($KUBECONFIG)"
@@ -183,11 +170,8 @@ while (( SECONDS < TIMEOUT )); do
         if [[ -z "$last_summary" ]]; then
             pod_table "$summary"
         else
-            # Sorted here rather than in pod_changes: the gone rows come out of
-            # an associative array, whose key order is not the printed order.
-            pod_table "$(pod_changes "$summary" | sort)"
+            pod_table "$(pod_changes "$summary" "$last_summary")"
         fi
-        remember "$summary"
         last_summary="$summary"
         last_tick=$SECONDS
     elif (( SECONDS - last_tick >= POD_TICK_INTERVAL )); then
