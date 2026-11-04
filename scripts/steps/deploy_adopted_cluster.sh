@@ -58,10 +58,12 @@ step "Waiting for the adopted cluster's node"
 until KUBECONFIG="$KUBECONFIG_ADOPTED" kubectl get nodes --no-headers 2>/dev/null | grep -q .; do
     sleep 2
 done
-until KUBECONFIG="$KUBECONFIG_ADOPTED" kubectl wait -n kube-system \
-    --for=condition=Ready pod --all --timeout=2s >/dev/null 2>&1; do
-    sleep 5
-done
+# The shared wait, as in deploy_mgmt_cluster.sh: one definition of ready, a
+# bound on how long it may take, and the stuck container named when it does
+# not finish. The loop it replaces waited in silence.
+KUBECONFIG="$KUBECONFIG_ADOPTED" NAMESPACE=kube-system \
+    "$SCRIPTS_DIR/utils/wait_for_deployment.sh"
+
 # Single-node cluster: everything has to run on the control plane.
 KUBECONFIG="$KUBECONFIG_ADOPTED" kubectl taint nodes "$ADOPTED_CLUSTER_NAME" \
     node-role.kubernetes.io/control-plane:NoSchedule- 2>/dev/null || true
