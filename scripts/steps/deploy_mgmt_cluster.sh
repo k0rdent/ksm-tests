@@ -33,17 +33,11 @@ write_k0s_kubeconfig "$MGMT_CLUSTER_NAME" "https://127.0.0.1:$MGMT_API_PORT" "$K
 # so switching environments is one ln and `ls -l` says which one is current.
 ln -sfn "$(basename "$KUBECONFIG_NAMED")" "$KUBECONFIG_MGMT"
 
-step "Waiting for the node to come up"
-log "Waiting for kube-system pods to appear..."
-until kube get pods -n kube-system --no-headers 2>/dev/null | grep -q .; do
-    sleep 2
-done
-
-log "Waiting for kube-system pods to become Ready..."
-until kube wait -n kube-system --for=condition=Ready pod --all --timeout=2s >/dev/null 2>&1; do
-    kube get pods -n kube-system || true
-    sleep 5
-done
+# The shared wait, not a loop of our own: it holds the one definition of what
+# "ready" means, it bounds the wait, and on a cluster that never comes up it
+# says which container is stuck and why. It also handles the namespace being
+# empty at first, which is what the appear-then-ready pair here used to do.
+NAMESPACE=kube-system "$SCRIPTS_DIR/utils/wait_for_deployment.sh"
 
 # Single-node cluster: everything has to run on the control plane.
 kube taint nodes "$MGMT_CLUSTER_NAME" node-role.kubernetes.io/control-plane:NoSchedule- 2>/dev/null || true
