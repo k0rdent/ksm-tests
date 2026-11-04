@@ -36,6 +36,13 @@ step "Installing the $TEST_MODE Credential"
 # ./scripts/<name>.sh. See scripts/CATALOG.md.
 ( cd "$PROJECT_ROOT" && ./scripts/setup_provider_credential.sh )
 
+# The chart install and the secret patches return before the controller has set
+# status.ready, and the ClusterDeployment webhook rejects a Credential that is
+# not ready -- which ends the run before any provisioning starts. The adopted
+# path waits for the same thing; so does this one now.
+wait_for_ready Credential "$TEST_MODE-credential" "$NAMESPACE" "$MCS_TIMEOUT" \
+    || die "Credential '$TEST_MODE-credential' never became ready"
+
 # The ClusterTemplate names carry a version that moves with every k0rdent
 # release, so they are read back from the cluster rather than pinned.
 #
@@ -118,4 +125,13 @@ kube_child get nodes -o wide
 # Everything, like catalog: what a provisioned cluster brought up on its own is
 # the context for anything that goes wrong in the scenarios afterwards.
 kube_child get pods -A
+
+# What was provisioned, so remove_k0rdent.sh can take it down before it
+# destroys the controllers that know how. Written last: a run that got no
+# cluster has nothing for the teardown to chase.
+{
+    echo "TEST_MODE='$TEST_MODE'"
+    echo "CLD_NAME='$CLD_NAME'"
+} > "$ENVDIR/cloud.env"
+
 ok "The $TEST_MODE cluster '$CLD_NAME' is ready"
