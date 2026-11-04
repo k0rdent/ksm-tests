@@ -14,9 +14,10 @@ set -euo pipefail
 #   POD_TICK_INTERVAL=30     seconds between heartbeats while nothing changes
 #
 # While it waits it prints what is actually there -- every pod, its phase, how
-# many of its containers are ready and why the rest are not -- and reprints it
-# whenever that changes. A cluster coming up then tells its own story instead
-# of a line saying only that it has not finished.
+# many of its containers are ready and why the rest are not. In full on the
+# first poll and once more at the end; in between only the pods that moved. A
+# cluster coming up then tells its own story instead of a line saying only
+# that it has not finished.
 #
 # Adapted from k0rdent/catalog's scripts/wait_for_deployment.sh.
 
@@ -36,6 +37,7 @@ SECONDS=0
 pods_json=""
 last_summary=""
 last_tick=0
+declare -A last_line=()
 
 # pod_summary -- one line per pod: name, phase, ready containers, and the
 # waiting or terminated reason behind the ones that are not. Sorted, so a
@@ -54,11 +56,39 @@ pod_summary() {
         ] | @tsv' <<< "$1" | sort
 }
 
-# pod_table -- pod_summary's output, aligned. Printed on the way through and
-# again at the end: a namespace that came up on the first poll would otherwise
-# pass with nothing said about what is in it.
+# pod_table -- pod_summary's output, aligned. Printed in full on the first
+# poll and again at the end; in between only what moved, see pod_changes.
 pod_table() {
+    [[ -n "$1" ]] || return 0
     awk -F'\t' '{ printf "      %-46s %-10s %-6s %s\n", $1, $2, $3, $4 }' <<< "$1"
+}
+
+# pod_changes SUMMARY -- the rows that differ from the last poll: pods that
+# changed state, pods that appeared, and pods that are no longer there. A
+# cluster coming up is mostly pods that already settled, and reprinting thirty
+# Running 1/1 lines every five seconds buries the one that did move.
+pod_changes() {
+    local name rest line
+    local -A seen=()
+    while IFS=$'\t' read -r name rest; do
+        [[ -n "$name" ]] || continue
+        seen["$name"]=1
+        line="$name"$'\t'"$rest"
+        [[ "${last_line[$name]-}" == "$line" ]] || printf '%s\n' "$line"
+    done <<< "$1"
+    for name in "${!last_line[@]}"; do
+        [[ -n "${seen[$name]-}" ]] || printf '%s\tgone\t-\t-\n' "$name"
+    done
+}
+
+# remember SUMMARY -- what the next poll compares against.
+remember() {
+    local name rest
+    last_line=()
+    while IFS=$'\t' read -r name rest; do
+        [[ -n "$name" ]] || continue
+        last_line["$name"]="$name"$'\t'"$rest"
+    done <<< "$1"
 }
 
 step "Waiting for pods in namespace '$NAMESPACE' ($KUBECONFIG)"
@@ -145,12 +175,19 @@ while (( SECONDS < TIMEOUT )); do
         waiting_for="ready"
     fi
 
-    # The table on every change, a heartbeat otherwise: a provisioning cluster
-    # changes often enough to follow, and a stuck one must not scroll the
-    # reason for being stuck off the top of the log.
+    # Everything the first time, only what moved after that, a heartbeat when
+    # nothing did: a provisioning cluster changes often enough to follow, and a
+    # stuck one must not scroll the reason for being stuck off the top.
     if [[ "$summary" != "$last_summary" ]]; then
         log "⏳ waiting for pods to be $waiting_for -- $ready_pods/$pod_count ready (${SECONDS}s)"
-        pod_table "$summary"
+        if [[ -z "$last_summary" ]]; then
+            pod_table "$summary"
+        else
+            # Sorted here rather than in pod_changes: the gone rows come out of
+            # an associative array, whose key order is not the printed order.
+            pod_table "$(pod_changes "$summary" | sort)"
+        fi
+        remember "$summary"
         last_summary="$summary"
         last_tick=$SECONDS
     elif (( SECONDS - last_tick >= POD_TICK_INTERVAL )); then
