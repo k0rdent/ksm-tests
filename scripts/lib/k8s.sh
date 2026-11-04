@@ -69,12 +69,20 @@ own k0rdent cluster there."
 
 # resource_exists KIND NAME [NAMESPACE]
 resource_exists() {
-    local kind="$1" name="$2" ns="${3:-}"
+    local kind="$1" name="$2" ns="${3:-}" out rc
+    # --ignore-not-found, so "it is not there" is a successful empty answer and
+    # a non-zero exit means the API did not answer at all. Without it the two
+    # are the same exit status, and a teardown reading an expired token or an
+    # unreachable apiserver as absence reports success over a cluster that is
+    # still running and still billing.
     if [[ -n "$ns" ]]; then
-        kube get "$kind" "$name" -n "$ns" >/dev/null 2>&1
+        out="$(kube get "$kind" "$name" -n "$ns" --ignore-not-found -o name 2>/dev/null)"
     else
-        kube get "$kind" "$name" >/dev/null 2>&1
+        out="$(kube get "$kind" "$name" --ignore-not-found -o name 2>/dev/null)"
     fi
+    rc=$?
+    (( rc == 0 )) || return 2
+    [[ -n "$out" ]]
 }
 
 # condition_status KIND NAME NAMESPACE TYPE -- prints True/False/"" for a
@@ -253,10 +261,13 @@ wait_for_absence() {
 
     log "Waiting for $kind/$name to disappear (timeout ${timeout}s)"
     while (( elapsed < timeout )); do
-        if ! resource_exists "$kind" "$name" "$ns"; then
-            ok "$kind/$name is gone"
-            return 0
-        fi
+        resource_exists "$kind" "$name" "$ns"
+        case $? in
+            1) ok "$kind/$name is gone"; return 0 ;;
+            # The API did not answer. Not an absence, and saying it is would
+            # declare a cluster gone on the strength of a failed request.
+            2) warn "Cannot reach the API to check $kind/$name -- still waiting" ;;
+        esac
         if (( elapsed > 0 && elapsed % diag_every == 0 )); then
             warn "$kind/$name still present after ${elapsed}s -- diagnostics:"
             { describe_stuck "$kind" "$name" "$ns"; kcm_errors 5m; } >&2

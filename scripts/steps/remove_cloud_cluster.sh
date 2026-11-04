@@ -27,12 +27,24 @@ export KUBECONFIG="$KUBECONFIG_MGMT"
 
 step "Removing the $TEST_MODE cluster '$CLD_NAME'"
 
-if ! resource_exists ClusterDeployment "$CLD_NAME" "$NAMESPACE"; then
-    log "No ClusterDeployment '$CLD_NAME' -- nothing was provisioned"
-    rm -f "$KUBECONFIG_CLOUD"
-    ok "Nothing to remove"
-    exit 0
-fi
+resource_exists ClusterDeployment "$CLD_NAME" "$NAMESPACE"
+case $? in
+    1)
+        log "No ClusterDeployment '$CLD_NAME' -- nothing was provisioned"
+        rm -f "$KUBECONFIG_CLOUD"
+        ok "Nothing to remove"
+        exit 0
+        ;;
+    2)
+        # Not an absence: the question went unanswered. Treating it as "nothing
+        # was provisioned" is how a teardown reports success over a cluster that
+        # is still billing, so this is the one place that must not guess.
+        warn "Cannot reach the management API to check for '$CLD_NAME'."
+        warn "Not assuming it is gone. Check the provider for leftovers:"
+        warn "  TEST_MODE=$TEST_MODE ./scripts/list_cld_resources_$TEST_MODE.sh"
+        exit 1
+        ;;
+esac
 
 step "What is there before the delete"
 kube get clusterdeployment -n "$NAMESPACE"
@@ -58,4 +70,8 @@ fi
 step "What is left"
 kube get clusterdeployment -n "$NAMESPACE"
 rm -f "$KUBECONFIG_CLOUD"
+# The note that told remove_k0rdent.sh there was something at a provider. Only
+# now, with the cluster actually gone -- while it is there, that file is what
+# stops the management cluster being destroyed on top of it.
+rm -f "$ENVDIR/cloud.env"
 ok "The $TEST_MODE cluster is gone"
