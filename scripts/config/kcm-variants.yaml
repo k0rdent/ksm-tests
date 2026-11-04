@@ -15,10 +15,9 @@ variants:
   # prCheck marks the one variant pull requests run against: a published chart
   # cannot move under a PR, so a red leg means the change broke something rather
   # than upstream having shifted. The full matrix runs on main and nightly.
-  - id: rel-staging
-    name: 'release: staging'
+  - id: rel-charts
+    name: 'release: charts'
     kcm: '1.13.0-rc.5'
     mode: release
-    # Not in the published charts registry yet.
     oci: 'oci://ghcr.io/k0rdent/kcm/charts'
     prCheck: true
