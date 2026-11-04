@@ -1,12 +1,17 @@
 #!/usr/bin/env bash
-# Remove one k0rdent test cluster: the containers, its kubeconfig and its
-# build state. Best-effort, so it is safe to run twice or from a trap.
+# Remove one k0rdent test cluster: any cluster it provisioned at a provider,
+# then the containers, its kubeconfig and its build state. Best-effort for the
+# local half, so it is safe to run twice or from a trap -- but it stops rather
+# than destroy a management cluster that a provider still depends on.
 #
 #   export KCM=1.12.0-rc.3            # required: which cluster
 #   ./scripts/remove_k0rdent.sh
 #
 #   ./scripts/remove_k0rdent.sh 1     # or: the # column of
 #                                     # ./scripts/k0rdent_clusters.sh
+#
+#   KEEP_CLOUD=true ./...             # local half only; the provider side is
+#                                     # then yours to clean up
 set -uo pipefail
 
 LIB="$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
@@ -77,6 +82,39 @@ $available}"
 fi
 
 step "Removing k0rdent $KCM"
+
+# The cloud cluster first, and only then the containers. Deleting the
+# management cluster is what removes the controllers that deprovision at the
+# provider, so the order is not cosmetic: the wrong way round leaves instances,
+# volumes and load balancers running with nothing left that knows about them.
+#
+# The provider and the name come from the file deploy_cloud_cluster.sh wrote,
+# not from the environment -- the index form resolves a cluster the caller
+# never named, and guessing TEST_MODE there would aim the teardown at the
+# wrong account.
+CLOUD_ENV="$ENVDIR/cloud.env"
+if [[ -f "$CLOUD_ENV" && "${KEEP_CLOUD:-false}" == "true" ]]; then
+    warn "KEEP_CLOUD=true -- leaving the provisioned cluster alone. It keeps billing."
+elif [[ -f "$CLOUD_ENV" ]]; then
+    cloud_mode="$(built_field TEST_MODE "$CLOUD_ENV")"
+    cloud_name="$(built_field CLD_NAME "$CLOUD_ENV")"
+    if [[ -n "$cloud_mode" ]]; then
+        log "This environment provisioned a $cloud_mode cluster ('$cloud_name')"
+        if TEST_MODE="$cloud_mode" CLD_NAME="$cloud_name" \
+            "$SCRIPTS_DIR/steps/remove_cloud_cluster.sh"; then
+            rm -f "$CLOUD_ENV"
+        else
+            # Not best-effort, unlike the rest of this script: everything below
+            # destroys the only thing that can still finish the job.
+            die "Could not remove the $cloud_mode cluster '$cloud_name'.
+Stopping before the management cluster goes with it -- without it nothing can
+deprovision, and the resources keep billing. Check what is left with:
+  TEST_MODE=$cloud_mode ./scripts/list_cld_resources_$cloud_mode.sh
+Re-run this script once it is gone, or KEEP_CLOUD=true to remove only the local
+environment and take responsibility for the provider side yourself."
+        fi
+    fi
+fi
 
 if command -v docker >/dev/null 2>&1; then
     for container in "$MGMT_CLUSTER_NAME" "$ADOPTED_CLUSTER_NAME" "$REGISTRY_NAME"; do
