@@ -136,7 +136,7 @@ scripts/            the entry points below, plus the provider helpers copied
 ### Create testing k0rdent cluster
 ~~~bash
 # Create local k0s-in-docker cluster "k0rdent-<KCM>", deploy KCM
-eval "$(./scripts/kcm_default.sh)"  # the build this repo tests, from kcm-variants.yaml
+eval "$(./scripts/kcm_default.sh --export)"  # the build this repo tests, from kcm-variants.yaml
 # export KCM=1.12.0-rc1  # or name one yourself: any release tag of the OCI_URL chart
 # ... export k0rdent cluster kubeconfig to kcfg_k0rdent and kcfg_k0rdent_<KCM>
 # export TEST_MODE=self (default); "adopted" - second k0s cluster, adopted
