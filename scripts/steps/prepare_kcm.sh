@@ -73,7 +73,9 @@ else
     step "Building container images"
     log "  controller: $IMG"
     log "  telemetry:  $IMG_TELEMETRY"
-    make -C "$KCM_DIR" docker-build IMG="$IMG" IMG_TELEMETRY="$IMG_TELEMETRY"
+    # Retried: anonymous base image pulls and `go mod download` flake in CI.
+    MAX_RETRIES=3 SLEEP=20 "$SCRIPTS_DIR/utils/retry.sh" \
+        make -C "$KCM_DIR" docker-build IMG="$IMG" IMG_TELEMETRY="$IMG_TELEMETRY"
 
     # The chart version ends up in the Release object and every template name.
     CHART_VERSION="$(chart_version "$KCM_DIR/templates/provider/kcm")"
