@@ -51,6 +51,10 @@ on:
           (empty = all)
         required: false
         default: ''
+      environment:
+        description: Target environment
+        type: environment
+        required: false
 
   pull_request:
     types: [opened, synchronize, reopened]
@@ -101,6 +105,7 @@ jobs:
     name: "${{ inputs.KCM && format('serial {0} ({1}: {2})', matrix.provider, inputs.KCM_MODE, inputs.KCM) || format('serial {0}', matrix.provider) }}"
     needs: plan
     runs-on: ubuntu-24.04
+    environment: ${{ inputs.environment }}
     # Every scenario on one cluster, so the budget is the whole set, not one --
     # and a provisioned cluster spends the first of it on being built.
     timeout-minutes: 300
