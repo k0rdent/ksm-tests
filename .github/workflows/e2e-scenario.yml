@@ -30,6 +30,11 @@ on:
         type: boolean
         required: false
         default: true
+      has_redeploy:
+        description: 'The scenario declares redeploy'
+        type: boolean
+        required: false
+        default: false
       src_url:
         description: 'Override the KCM repository to build (source mode only)'
         type: string
@@ -174,6 +179,20 @@ jobs:
         run: ./scripts/steps/upgrade_chain.sh
 
       - name: '4) Clean up: Remove services'
+        run: ./scripts/steps/remove_services.sh
+
+      # Helm keeps a chart's CRDs when it uninstalls it, so this second install
+      # meets them. The ServiceTemplates go back first: the removal takes those.
+      - name: '4) Clean up: Install ServiceTemplates again'
+        if: inputs.has_redeploy
+        run: ./scripts/steps/install_servicetemplate.sh
+
+      - name: '4) Clean up: Deploy MultiClusterService again'
+        if: inputs.has_redeploy
+        run: ./scripts/steps/deploy_mcs.sh
+
+      - name: '4) Clean up: Remove services again'
+        if: inputs.has_redeploy
         run: ./scripts/steps/remove_services.sh
 
       # Before the diagnostics, so a cluster that refuses to detach is part of

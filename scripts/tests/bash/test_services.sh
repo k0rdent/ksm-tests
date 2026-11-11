@@ -25,7 +25,7 @@ set_file() {
 assert_contains "101_basic is the default" "$(set_file '')" "101_basic.yaml"
 assert_contains "SCENARIO picks the file" "$(set_file 201_svcdep)" "201_svcdep.yaml"
 assert_eq "scenarios are discovered from the directory" \
-    "101_basic 201_svcdep 202_svcdep_invalid 301_upgrade 302_upgrade_invalid_atomic 401_mcsdep_valid 402_mcsdep_invalid 403_mcsdep_diamond 501_no_chain 502_chain_boundary 503_direct_chain 504_stepwise_chain" \
+    "101_basic 102_reinstall 201_svcdep 202_svcdep_invalid 301_upgrade 302_upgrade_invalid_atomic 401_mcsdep_valid 402_mcsdep_invalid 403_mcsdep_diamond 501_no_chain 502_chain_boundary 503_direct_chain 504_stepwise_chain" \
     "$(list_scenarios | tr '\n' ' ' | sed 's/ $//')"
 
 # A typo must say what is available rather than just refuse.

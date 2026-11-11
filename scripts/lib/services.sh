@@ -110,6 +110,16 @@ template_name_for() {
     echo "$1-$(fqdn_version "$2")"
 }
 
+# ── Redeploy ─────────────────────────────────────────────────────────────────
+# A `redeploy: true` scenario installs a second time over what the removal left
+# behind. Helm never deletes a chart's CRDs on uninstall, so the second install
+# meets them; since sveltos 1.17 that fails unless installOptions.existingCRDs
+# says Skip or Overwrite. Every scenario deployed once, so nothing noticed.
+
+has_redeploy() {
+    [[ "$(yq -r '.redeploy // false' "$SERVICES_FILE")" == "true" ]]
+}
+
 # ── Upgrades ─────────────────────────────────────────────────────────────────
 # An `upgrade:` block deploys once, changes some services, then asserts what
 # moved and what did not.

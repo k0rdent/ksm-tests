@@ -45,7 +45,7 @@ on:
         default: 'self'
       scenarios:
         description: >-
-          Testing scenarios, options: 101_basic, 201_svcdep,
+          Testing scenarios, options: 101_basic, 102_reinstall, 201_svcdep,
           202_svcdep_invalid, 301_upgrade, 302_upgrade_invalid_atomic,
           401_mcsdep_valid, 402_mcsdep_invalid, 403_mcsdep_diamond,
           501_no_chain, 502_chain_boundary, 503_direct_chain,
@@ -98,7 +98,7 @@ on:
       scenarios:
         # test_ci_matches_entrypoints.sh asserts this list stays complete.
         description: >-
-          Testing scenarios, options: 101_basic, 201_svcdep,
+          Testing scenarios, options: 101_basic, 102_reinstall, 201_svcdep,
           202_svcdep_invalid, 301_upgrade, 302_upgrade_invalid_atomic,
           401_mcsdep_valid, 402_mcsdep_invalid, 403_mcsdep_diamond,
           501_no_chain, 502_chain_boundary, 503_direct_chain,
@@ -355,6 +355,9 @@ jobs:
             up="$(yq -r '((.upgrade // "" | tag) == "!!map")
                          and (([.upgrade.steps[]?] | length) == 0)' "$f")"
             ch="$(yq -r '([.upgrade.steps[]?] | length) > 0' "$f")"
+            # Same idea for the second install: only the scenarios that ask for
+            # it get the steps, the rest have them greyed out.
+            rd="$(yq -r '.redeploy // false' "$f")"
             # The run says where the services land; a scenario that only makes
             # sense in one mode says so itself and wins.
             tm="$(yq -r ".testMode // \"$WANT_TEST_MODE\"" "$f")"
@@ -364,8 +367,8 @@ jobs:
                  exit 1 ;;
             esac
             scenarios="$(jq -c --arg id "$id" --arg v "$vjson" --arg tm "$tm" \
-              --argjson up "$up" --argjson ch "$ch" \
-              '. + [{id: $id, variants: $v, upgrade: $up, chain: $ch, test_mode: $tm}]' <<< "$scenarios")"
+              --argjson up "$up" --argjson ch "$ch" --argjson rd "$rd" \
+              '. + [{id: $id, variants: $v, upgrade: $up, chain: $ch, redeploy: $rd, test_mode: $tm}]' <<< "$scenarios")"
           done
 
           # Nothing to run is normal for a docs-only pull request, but for a
@@ -400,6 +403,7 @@ jobs:
       kcm_variants: ${{ matrix.scenario.variants }}
       has_upgrade: ${{ matrix.scenario.upgrade }}
       has_chain: ${{ matrix.scenario.chain }}
+      has_redeploy: ${{ matrix.scenario.redeploy }}
       test_mode: ${{ matrix.scenario.test_mode }}
       src_url: ${{ inputs.SRC_URL || '' }}
       oci_url: ${{ inputs.OCI_URL || '' }}

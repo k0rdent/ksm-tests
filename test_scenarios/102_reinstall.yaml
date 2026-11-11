@@ -1,0 +1,25 @@
+name: 102_reinstall
+group: Basics
+description: >-
+  One service removed and installed again. Helm keeps a chart's CRDs when it
+  uninstalls it, so the second install meets them, and what happens then is the
+  installOptions.existingCRDs policy -- which sveltos changed in 1.17.0 from
+  overwriting the existing CRD to failing the install.
+
+# What makes this scenario work is the crds/ directory: postgres-operator ships
+# its CRDs there (charts/postgres-operator/crds/postgresqls.yaml and two more),
+# and only those are left behind by an uninstall. A chart that renders its CRDs
+# as ordinary templates -- kserve-crd, for one, despite the name -- has them
+# removed with the release and would never reach the second install.
+redeploy: true
+
+# Charts come from k0rdent/catalog's registry. Those are thin wrappers that
+# declare the upstream chart as a dependency of the same name, so values must
+# be nested one level under that name, exactly as catalog's own example does.
+services:
+  - name: postgres-operator
+    chart: postgres-operator
+    version: 1.14.0
+    repo: oci://ghcr.io/k0rdent/catalog/charts
+    namespace: postgres-operator
+    waitForPods: postgres-operator-

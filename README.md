@@ -94,6 +94,7 @@ cost.
 | Scenario | Asserts |
 |---|---|
 | [`101_basic`](test_scenarios/101_basic.md) | one service reaches the child cluster and can be removed |
+| [`102_reinstall`](test_scenarios/102_reinstall.md) | a service installs again over the CRDs its removal left behind |
 | [`201_svcdep`](test_scenarios/201_svcdep.md) | a `dependsOn` chain deploys in order |
 | [`202_svcdep_invalid`](test_scenarios/202_svcdep_invalid.md) | an invalid service stops the rollout: nothing behind it runs, nothing before it is rolled back |
 | [`301_upgrade`](test_scenarios/301_upgrade.md) | upgrading one service leaves the others untouched |

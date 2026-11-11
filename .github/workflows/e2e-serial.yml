@@ -44,7 +44,7 @@ on:
         # Spelled out so a subset can be picked without opening test_scenarios/.
         # test_ci_matches_entrypoints.sh asserts this list stays complete.
         description: >-
-          Testing scenarios, options: 101_basic, 201_svcdep,
+          Testing scenarios, options: 101_basic, 102_reinstall, 201_svcdep,
           202_svcdep_invalid, 301_upgrade, 302_upgrade_invalid_atomic,
           401_mcsdep_valid, 402_mcsdep_invalid, 403_mcsdep_diamond,
           501_no_chain, 502_chain_boundary, 503_direct_chain,
@@ -262,6 +262,10 @@ jobs:
       - name: '2-4) 101_basic'
         if: contains(env.SCENARIO_LIST, ' 101_basic ')
         run: SCENARIOS=101_basic ./scripts/run_scenarios.sh
+
+      - name: '2-4) 102_reinstall'
+        if: contains(env.SCENARIO_LIST, ' 102_reinstall ')
+        run: SCENARIOS=102_reinstall ./scripts/run_scenarios.sh
 
       - name: '2-4) 201_svcdep'
         if: contains(env.SCENARIO_LIST, ' 201_svcdep ')

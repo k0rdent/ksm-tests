@@ -17,8 +17,11 @@ set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
 # shellcheck source=scripts/lib/k8s.sh
 source "$SCRIPTS_DIR/lib/k8s.sh"
+# shellcheck source=scripts/lib/services.sh
+source "$SCRIPTS_DIR/lib/services.sh"
 
 check_scenario
+require_yq
 require_cluster
 ensure_workdir
 
@@ -42,5 +45,17 @@ if [[ "${SCENARIO_KEEP:-false}" == "true" ]]; then
 fi
 
 "$SCRIPTS_DIR/steps/remove_services.sh"
+
+# Install a second time over what the removal left behind. Helm never deletes a
+# chart's CRDs on uninstall, so the second install meets them, and the
+# ServiceTemplates have to be put back because the removal takes those too.
+if has_redeploy; then
+    step "Scenario $SCENARIO: installing again over what the removal left behind"
+    "$SCRIPTS_DIR/steps/install_servicetemplate.sh"
+    "$SCRIPTS_DIR/steps/deploy_mcs.sh"
+    # Scenarios run one after another on the same management cluster, so this
+    # one has to leave it as empty as it found it.
+    "$SCRIPTS_DIR/steps/remove_services.sh"
+fi
 
 ok "$SCENARIO passed in $(( (SECONDS - START) / 60 ))m$(( (SECONDS - START) % 60 ))s"
