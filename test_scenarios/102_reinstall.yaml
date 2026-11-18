@@ -13,6 +13,14 @@ description: >-
 # removed with the release and would never reach the second install.
 redeploy: true
 
+# postgres-operator rewrites its postgresqls CRD once it runs, so the CRD left
+# behind no longer matches the chart's. Sveltos' default since 1.17.0, Fail,
+# would refuse the second install; Skip keeps the existing CRD and lets the
+# install go on, as a user reinstalling the chart would have to set.
+helmOptions:
+  installOptions:
+    existingCRDs: Skip
+
 # Charts come from k0rdent/catalog's registry. Those are thin wrappers that
 # declare the upstream chart as a dependency of the same name, so values must
 # be nested one level under that name, exactly as catalog's own example does.

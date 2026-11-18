@@ -12,7 +12,10 @@
 6. Install the whole thing again. The chart ships its CRDs in `crds/`, so this
    second install meets the ones the first left behind, and the
    `installOptions.existingCRDs` policy decides whether it proceeds. Sveltos
-   overwrote the existing CRD until 1.17.0 and fails the install since.
+   overwrote the existing CRD until 1.17.0 and fails the install since, when
+   the CRD differs from the chart's. postgres-operator rewrites its CRD once it
+   runs, so the scenario sets `existingCRDs: Skip` to keep the existing CRD
+   and let the install proceed.
 7. Remove the services again, so the next scenario starts on an empty cluster.
 
 ## Scenario schema
