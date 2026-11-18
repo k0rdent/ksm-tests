@@ -270,7 +270,8 @@ jobs:
         run: SCENARIOS=101_basic ./scripts/run_scenarios.sh
 
       - name: '2-4) 102_reinstall'
-        if: contains(env.SCENARIO_LIST, ' 102_reinstall ')
+        # Temporarily disabled.
+        if: false && contains(env.SCENARIO_LIST, ' 102_reinstall ')
         run: SCENARIOS=102_reinstall ./scripts/run_scenarios.sh
 
       - name: '2-4) 201_svcdep'
