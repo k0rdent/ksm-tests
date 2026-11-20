@@ -241,6 +241,11 @@ jobs:
               ALL="$(jq -c --arg id "$vid" --arg n "$(src_name "$vref" "$DEFAULT_SRC_URL")" \
                 '[ .[] | if .id == $id then . + {name: $n} else . end ]' <<< "$ALL")"
             done < <(jq -r '.[] | select(.mode == "source") | "\(.id) \(.kcm)"' <<< "$ALL")
+            # Same for the release variants, which the file names after their
+            # registry: the job title should say which build failed, and the
+            # dispatch path above already spells it this way.
+            ALL="$(jq -c '[ .[] | if .mode == "release"
+                                  then . + {name: ("release: " + .kcm)} else . end ]' <<< "$ALL")"
           fi
 
           PR_VARIANT="$(jq -r '[.[] | select(.prCheck == true) | .id][0] // empty' <<< "$ALL")"
