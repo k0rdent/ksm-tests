@@ -17,7 +17,7 @@ variants:
   # than upstream having shifted. The full matrix runs on main and nightly.
   - id: rel-charts
     name: 'release: charts'
-    kcm: '1.13.0-rc.5'
+    kcm: '1.14.0-dev.1-5-gba9d29cb'
     mode: release
-    oci: 'oci://ghcr.io/k0rdent/kcm/charts'
+    oci: 'oci://ghcr.io/k0rdent/kcm/staging'
     prCheck: true

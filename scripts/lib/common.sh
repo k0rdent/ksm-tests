@@ -53,7 +53,7 @@ esac
 
 # The registry, not one chart in it: kcm, kcm-templates and every provider
 # chart sit side by side, so a staging build is just a different OCI_URL.
-OCI_URL="${OCI_URL:-oci://ghcr.io/k0rdent/kcm/charts}"
+OCI_URL="${OCI_URL:-oci://ghcr.io/k0rdent/kcm/staging}"
 SRC_URL="${SRC_URL:-https://github.com/K0rdent/kcm.git}"
 export OCI_URL SRC_URL
 

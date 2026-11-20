@@ -12,14 +12,14 @@ value_of() { # value_of KCM_MODE VAR
 # ── Modes ────────────────────────────────────────────────────────────────────
 # Release mode reads charts straight from ghcr over TLS.
 assert_eq "release: templatesRepoURL is ghcr" \
-    "oci://ghcr.io/k0rdent/kcm/charts" "$(value_of release TEMPLATES_REPO_URL)"
+    "oci://ghcr.io/k0rdent/kcm/staging" "$(value_of release TEMPLATES_REPO_URL)"
 assert_eq "release: registry is not insecure" \
     "false" "$(value_of release INSECURE_REGISTRY)"
 # Release mode needs no git at all: the manifests come from the registry, so
 # nothing has to correspond to a tag. That is what lets an -rc or a staging
 # build work, since their chart version is not one.
 assert_eq "release: the registry is the source of everything" \
-    "oci://ghcr.io/k0rdent/kcm/charts" "$(value_of release OCI_URL)"
+    "oci://ghcr.io/k0rdent/kcm/staging" "$(value_of release OCI_URL)"
 
 # Source mode reads them from the local registry over plain HTTP.
 assert_contains "source: templatesRepoURL is the local registry" \

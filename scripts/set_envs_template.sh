@@ -14,7 +14,7 @@
 # (k0rdent-$KCM) as well as the build, so several can exist side by side.
 # export KCM="1.12.0-rc.3"              # a published chart version
 # export KCM_MODE="release"             # or source, to build from git
-# export OCI_URL="oci://ghcr.io/k0rdent/kcm/charts"   # or .../staging
+# export OCI_URL="oci://ghcr.io/k0rdent/kcm/staging"   # or .../staging
 
 # Source mode: KCM is any branch, tag or commit, from any repository.
 # export KCM="main"
