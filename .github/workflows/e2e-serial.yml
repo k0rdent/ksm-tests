@@ -87,6 +87,24 @@ on:
         type: string
         required: false
         default: ''
+    # Named so a caller can map its own secrets onto them -- 'inherit' matches by
+    # name, and k0rdent/kcm keeps the AWS pair as CI_AWS_*. None required: a run
+    # picks its providers, and check_provider_creds.sh checks what it needs.
+    secrets:
+      AWS_ACCESS_KEY_ID:
+        required: false
+      AWS_SECRET_ACCESS_KEY:
+        required: false
+      AZURE_SP_APP_ID:
+        required: false
+      AZURE_SP_PASSWORD:
+        required: false
+      AZURE_SP_TENANT_ID:
+        required: false
+      AZURE_SUB_ID:
+        required: false
+      GCP_B64ENCODED_CREDENTIALS:
+        required: false
 
   workflow_dispatch:
     inputs:
