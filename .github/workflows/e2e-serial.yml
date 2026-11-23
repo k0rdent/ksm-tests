@@ -4,16 +4,90 @@ name: E2E serial
 # is e2e.yml, which builds an environment per scenario -- cheap for a
 # container, not for a cluster that has to be provisioned.
 #
-# Standalone on purpose: one KCM per run, no diff-based selection, and nothing
-# here is wired into e2e.yml. It runs on pull requests to THIS repository, so a
-# change to the scripts is checked against the serial pipeline too; a pull
-# request in k0rdent/kcm reaches e2e.yml through workflow_call and never gets
-# here, which is what keeps this out of their checks.
+# Standalone on purpose: one KCM per run, and no diff-based selection. It runs
+# on pull requests to THIS repository, so a change to the scripts is checked
+# against the serial pipeline too; a pull request in k0rdent/kcm reaches e2e.yml
+# and never gets here, which is what keeps a provisioned cluster out of their
+# per-push checks. Their nightly calls this through workflow_call below.
 #
 # The phase-1 steps repeat deploy_k0rdent.sh; test_ci_matches_entrypoints.sh
 # asserts the two lists stay in step.
 
+# Cross-repo calls check this out by name: in a called workflow the github
+# context describes the caller, so github.repository is not this repository and
+# a bare checkout clones the wrong one. A caller running a fork of this
+# repository overrides it with ksm_repo, alongside its uses: line.
+env:
+  SELF_REPO: ${{ inputs.ksm_repo || 'k0rdent/ksm-tests' }}
+
 on:
+  # Same knobs as workflow_dispatch, for another repository to run its own build
+  # through this pipeline. A call is treated exactly like a manual run: every
+  # choice this workflow would otherwise make from github.event_name belongs to
+  # the caller's event there, which says nothing about what to run here.
+  workflow_call:
+    inputs:
+      KCM:
+        description: 'KCM version (chart version, branch, tag, sha)'
+        type: string
+        required: false
+        # Empty means kcm_default.sh, the build this repository tests. A form
+        # needs a starting point and so the dispatch default below names one;
+        # a caller that names nothing means the default, not last year's tag.
+        default: ''
+      KCM_MODE:
+        description: 'KCM deployoment mode, options: source, release'
+        type: string
+        required: false
+        default: 'release'
+      SRC_URL:
+        description: 'KCM source git repository (kcm_mode: source)'
+        type: string
+        required: false
+        default: 'https://github.com/k0rdent/kcm.git'
+      OCI_URL:
+        description: 'KCM release oci url (kcm_mode: release)'
+        type: string
+        required: false
+        default: 'oci://ghcr.io/k0rdent/kcm/charts'
+      providers:
+        description: 'Tested providers, options: adopted, aws, azure, gcp'
+        type: string
+        required: false
+        default: 'adopted'
+      scenarios:
+        description: >-
+          Testing scenarios, options: 101_basic, 102_reinstall, 201_svcdep,
+          202_svcdep_invalid, 301_upgrade, 302_upgrade_invalid_atomic,
+          401_mcsdep_valid, 402_mcsdep_invalid, 403_mcsdep_diamond,
+          501_no_chain, 502_chain_boundary, 503_direct_chain,
+          504_stepwise_chain (empty = all)
+        type: string
+        required: false
+        default: ''
+      environment:
+        description: >-
+          Target environment. Resolved against the CALLER's repository, so it
+          names one of theirs -- the provider credentials come from there too.
+        type: string
+        required: false
+        default: ''
+      ksm_ref:
+        description: >-
+          The ref of THIS repository to run, matching the one in the caller's
+          uses:. Required, and not discoverable from here: in a called workflow
+          the github context describes the caller, and no context exposes the
+          called workflow's own ref.
+        type: string
+        required: true
+      ksm_repo:
+        description: >-
+          The repository of THIS workflow, matching the caller's uses:. Only
+          needed when that is a fork; empty means k0rdent/ksm-tests.
+        type: string
+        required: false
+        default: ''
+
   workflow_dispatch:
     inputs:
       KCM:
@@ -81,15 +155,18 @@ jobs:
   plan:
     name: plan
     runs-on: ubuntu-24.04
-    # Scheduled runs only where the repo opts in (ENABLE_CRON_E2E_SERIAL=1)
-    if: github.event_name != 'schedule' || vars.ENABLE_CRON_E2E_SERIAL == '1'
+    # Scheduled runs only where the repo opts in (ENABLE_CRON_E2E_SERIAL=1).
+    # A call is never that schedule, whatever the caller's event was -- and
+    # vars there are the caller's, so the opt-in would be read from the wrong
+    # repository.
+    if: inputs.ksm_ref || github.event_name != 'schedule' || vars.ENABLE_CRON_E2E_SERIAL == '1'
     outputs:
       providers: ${{ steps.pick.outputs.providers }}
     steps:
       - name: Pick the providers
         id: pick
         env:
-          WANT: ${{ inputs.providers || (github.event_name == 'schedule' && 'adopted,aws') || '' }}
+          WANT: ${{ inputs.providers || (!inputs.ksm_ref && github.event_name == 'schedule' && 'adopted,aws') || '' }}
         run: |
           set -euo pipefail
           list="${WANT:-adopted}"
@@ -109,7 +186,7 @@ jobs:
     name: "${{ inputs.KCM && format('serial {0} ({1}: {2})', matrix.provider, inputs.KCM_MODE, inputs.KCM) || format('serial {0}', matrix.provider) }}"
     needs: plan
     runs-on: ubuntu-24.04
-    environment: ${{ inputs.environment || (github.event_name == 'schedule' && 'prod') || '' }}
+    environment: ${{ inputs.environment || (!inputs.ksm_ref && github.event_name == 'schedule' && 'prod') || '' }}
     # Every scenario on one cluster, so the budget is the whole set, not one --
     # and a provisioned cluster spends the first of it on being built.
     timeout-minutes: 300
@@ -145,13 +222,16 @@ jobs:
       GCP_REGION: ${{ vars.GCP_REGION || 'us-east4' }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          repository: ${{ inputs.ksm_ref && env.SELF_REPO || github.repository }}
+          ref:        ${{ inputs.ksm_ref || github.ref }}
 
       - name: Pick the KCM build
         env:
           # The Scheduled tests the code, not a published chart: kcm main, built
           # from a checkout. kcm_default.sh answers for everything else.
-          WANT_KCM: ${{ inputs.KCM || (github.event_name == 'schedule' && 'main') || '' }}
-          WANT_KCM_MODE: ${{ inputs.KCM_MODE || (github.event_name == 'schedule' && 'source') || '' }}
+          WANT_KCM: ${{ inputs.KCM || (!inputs.ksm_ref && github.event_name == 'schedule' && 'main') || '' }}
+          WANT_KCM_MODE: ${{ inputs.KCM_MODE || (!inputs.ksm_ref && github.event_name == 'schedule' && 'source') || '' }}
           WANT_OCI_URL: ${{ inputs.OCI_URL }}
         run: |
           set -euo pipefail
@@ -244,7 +324,10 @@ jobs:
       # the job, so the fail-fast behaviour is the same either way.
       - name: Select the scenarios
         env:
-          EVENT: ${{ github.event_name }}
+          # A call is a manual run whose inputs come from another repository:
+          # github.event_name describes the caller's event, and their pull
+          # request is not the one PR_SCENARIOS below is about.
+          EVENT: ${{ inputs.ksm_ref && 'workflow_dispatch' || github.event_name }}
           # What a pull request runs when it is not told otherwise. Not the
           # whole set: a pull request is here to check that the serial pipeline
           # works, and the parallel one already covers every scenario. These
