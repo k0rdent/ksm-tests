@@ -174,6 +174,11 @@ eval "$(./scripts/kcm_default.sh --export)"  # the build this repo tests, from k
 ./scripts/deploy_k0rdent.sh
 ~~~
 
+Which sveltos gets installed is `scripts/config/sveltos-values.yaml`, Helm values
+for the projectsveltos provider chart that `apply_management.sh` carries into the
+`Management` object. `SVELTOS_VALUES` names another file, or nothing
+(`SVELTOS_VALUES=`) for the chart's own defaults.
+
 ### Run scenario
 ~~~bash
 # TEST_MODE has to match the one deploy_k0rdent.sh built, and does by default

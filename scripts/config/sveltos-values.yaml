@@ -1,0 +1,11 @@
+# Disable all optional components. Nested under the chart's own name: the
+# provider chart KCM installs is a wrapper around the upstream chart.
+projectsveltos:
+  accessManager:
+    enabled: false
+  shardController:
+    enabled: false
+  mcpServer:
+    enabled: false
+  techsupportController:
+    enabled: false

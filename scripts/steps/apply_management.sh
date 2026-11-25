@@ -22,10 +22,23 @@ require_env RELEASE_NAME
 
 export KUBECONFIG="$KUBECONFIG_MGMT"
 
+# The rationale belongs in the file, not in a Kubernetes object, so the comments
+# are stripped -- and a file with nothing but comments must render no config.
+SVELTOS_CONFIG=""
+if [[ -n "$SVELTOS_VALUES" && -f "$SVELTOS_VALUES" ]]; then
+    SVELTOS_CONFIG="$(yq -P '... comments="" | select(. != null)' "$SVELTOS_VALUES")"
+    SVELTOS_CONFIG="$(sed '/^[[:space:]]*$/d' <<< "$SVELTOS_CONFIG")"
+fi
+
 read -ra providers <<< "$KCM_PROVIDERS"
 MANAGEMENT_PROVIDERS=""
 for provider in "${providers[@]}"; do
     MANAGEMENT_PROVIDERS+="  - name: $provider"$'\n'
+    if [[ "$provider" == "projectsveltos" && -n "$SVELTOS_CONFIG" ]]; then
+        MANAGEMENT_PROVIDERS+="    config:"$'\n'
+        # shellcheck disable=SC2001 # per-line prefix, not a substring replace
+        MANAGEMENT_PROVIDERS+="$(sed 's/^/      /' <<< "$SVELTOS_CONFIG")"$'\n'
+    fi
 done
 # envsubst keeps the trailing newline; drop it so the YAML stays tidy.
 MANAGEMENT_PROVIDERS="${MANAGEMENT_PROVIDERS%$'\n'}"
